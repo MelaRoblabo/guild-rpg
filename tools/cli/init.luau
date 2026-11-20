@@ -106,7 +106,15 @@ local HELP = [[
   open [all|ch_uid...]       宝箱を開ける（省略時 all）
   sell <eq_uid...>           装備を売る
   sell item <itm_id> [個数]   アイテムを売る
-  lock <uid> / unlock <uid>  保護の切り替え]]
+  lock <uid> / unlock <uid>  保護の切り替え
+  hire                       雇用を始める（雇用費を支払い候補を表示）
+  candidates                 候補と面接の状況を表示
+  pick <番号>                面接する候補を選ぶ（ステータスを抽選）
+  reroll                     ステータスを引き直す（無料回数→チケット）
+  choose <prev|cur>          採用する結果を選んで雇用する
+  cancel                     雇用をやめる（雇用費は戻らない）
+  rename <adv_uid> <名前>    名前を変える
+  dismiss <adv_uid>          解雇する]]
 
 local function handle(tokens: { string }): (boolean, any)
 	local c = tokens[1]
@@ -181,6 +189,32 @@ local function handle(tokens: { string }): (boolean, any)
 		else
 			result = run({ type = "Sell", equipmentUids = table.move(tokens, 2, #tokens, 1, {}) })
 		end
+	elseif c == "hire" then
+		result = run({ type = "HireStart" })
+		if result.ok then
+			say(Text.hiring(save, master))
+		end
+	elseif c == "candidates" then
+		say(Text.hiring(save, master))
+	elseif c == "pick" then
+		result = run({ type = "HirePick", candidateIndex = tonumber(tokens[2]) })
+		if result.ok then
+			say(Text.hiring(save, master))
+		end
+	elseif c == "reroll" then
+		result = run({ type = "HireReroll" })
+		if result.ok then
+			say(Text.hiring(save, master))
+		end
+	elseif c == "choose" then
+		local which = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else tokens[2]
+		result = run({ type = "HireChoose", which = which })
+	elseif c == "cancel" then
+		result = run({ type = "HireCancel" })
+	elseif c == "rename" then
+		result = run({ type = "Rename", adventurerUid = tokens[2], name = tokens[3] })
+	elseif c == "dismiss" then
+		result = run({ type = "Dismiss", adventurerUid = tokens[2] })
 	elseif c == "lock" or c == "unlock" then
 		result = run({ type = "SetLock", uid = tokens[2], locked = c == "lock" })
 	else

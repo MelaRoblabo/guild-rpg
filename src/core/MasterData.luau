@@ -540,6 +540,88 @@ local function validateLootAndStarter(c: Checker, d: any)
 	end
 end
 
+local function validateHiringData(c: Checker, d: any)
+	-- 職業の雇用重み
+	if type(d.Jobs) == "table" then
+		local total = 0
+		for i, j in d.Jobs do
+			if c:number(`Jobs[{i}].hireWeight`, j.hireWeight, 0) then
+				total += j.hireWeight
+			end
+		end
+		if total <= 0 then
+			c:error("Jobs", "hireWeight の合計が 0（雇用候補が作れない）")
+		end
+	end
+
+	-- 見た目（D-042：16カテゴリ × 15種）
+	local appearanceIds = c:uniqueIds("Appearances", d.Appearances, "chr_")
+	local counts: { [string]: number } = {}
+	if type(d.Appearances) == "table" then
+		for i, a in d.Appearances do
+			local p = `Appearances[{i}]`
+			oneOf(c, p .. ".gender", a.gender, { m = true, f = true })
+			oneOf(c, p .. ".looks", a.looks, { bea = true, nor = true, ugl = true, dem = true })
+			oneOf(c, p .. ".outfitClass", a.outfitClass, { phy = true, mag = true })
+			if a.looks == "dem" then
+				oneOf(
+					c,
+					p .. ".race",
+					a.race,
+					{ elf = true, beastkin = true, dwarf = true, halforc = true, halfgoblin = true }
+				)
+			end
+			local key = `{a.gender}_{a.looks}_{a.outfitClass}`
+			counts[key] = (counts[key] or 0) + 1
+		end
+		for _, g in { "m", "f" } do
+			for _, l in { "bea", "nor", "ugl", "dem" } do
+				for _, o in { "phy", "mag" } do
+					local n = counts[`{g}_{l}_{o}`] or 0
+					if n < 2 then
+						c:error(
+							"Appearances",
+							`カテゴリ {g}_{l}_{o} が {n} 種（直前と同じ見た目を除外するため2種以上必要）`
+						)
+					elseif n ~= 15 then
+						c:warn("Appearances", `カテゴリ {g}_{l}_{o} が {n} 種（仕様は15種：D-042）`)
+					end
+				end
+			end
+		end
+	end
+	local _ = appearanceIds
+
+	-- 名前（D-054）
+	for _, key in { "m", "f", "dem" } do
+		local list = if type(d.Names) == "table" then d.Names[key] else nil
+		if c:array(`Names.{key}`, list) and #list == 0 then
+			c:error(`Names.{key}`, "空のリスト")
+		end
+	end
+
+	-- ユニーク（D-055）
+	local jobIds, giftIds = idSet(d.Jobs), idSet(d.Gifts)
+	c:uniqueIds("Uniques", d.Uniques, "uni_")
+	if type(d.Uniques) == "table" then
+		for i, u in d.Uniques do
+			local p = `Uniques[{i}]`
+			c:ref(p .. ".jobId", u.jobId, jobIds)
+			oneOf(c, p .. ".gender", u.gender, { m = true, f = true })
+			for _, s in Types.STAT_KEYS do
+				c:integer(`{p}.baseStats.{s}`, if type(u.baseStats) == "table" then u.baseStats[s] else nil, 0)
+			end
+			for k, g in u.giftIds or {} do
+				c:ref(`{p}.giftIds[{k}]`, g, giftIds)
+			end
+			oneOf(c, p .. ".jobChange", u.jobChange, { line = true, none = true })
+			if type(u.acquire) ~= "string" then
+				c:error(p .. ".acquire", "文字列が必要")
+			end
+		end
+	end
+end
+
 -- id → 行 の索引を作る
 local function byId(rows: any): { [string]: any }
 	local m = {}
@@ -563,6 +645,7 @@ function MasterData.validate(data: any): { Issue }
 	validateConstants(c, data.Constants)
 	validateContent(c, data)
 	validateLootAndStarter(c, data)
+	validateHiringData(c, data)
 	return c.issues
 end
 
@@ -600,6 +683,8 @@ function MasterData.load(data: any): any
 		monsters = byId(data.Monsters),
 		dungeons = byId(data.Dungeons),
 		dungeonList = data.Dungeons,
+		appearances = byId(data.Appearances),
+		uniques = byId(data.Uniques),
 	})
 end
 

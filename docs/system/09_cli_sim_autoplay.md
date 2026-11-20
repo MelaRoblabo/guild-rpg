@@ -28,7 +28,8 @@ lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   
 | `wait <秒>` | 仮想時計を進めて advance |
 | `open [all\|<uid>...]` | OpenChests |
 | `sell <eq_uid>...` / `lock <uid>` | Sell / SetLock |
-| `hire` / `pick <n>` / `reroll` / `choose prev\|cur` | Hire 系（M3） |
+| `hire` / `candidates` / `pick <n>` / `reroll` / `choose prev\|cur` / `cancel` | Hire 系（M3） |
+| `rename <uid> <名前>` / `dismiss <uid>` | Rename / Dismiss（M3） |
 | `rebirth <uid> [keep]` / `jobchange <uid> <job>` / `looks <uid>` | M4 |
 | `expand <id>` / `autosell ...` | M5 |
 | `log` | 直近のイベントを表示 |

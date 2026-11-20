@@ -12,6 +12,7 @@ return {
 		line = "warrior",
 		attackType = "physical",
 		isRare = false,
+		hireWeight = 1, -- 雇用候補に出る重み
 		heals = false,
 		outfitClass = "phy",
 		growth = { str = 4, mag = 0, agi = 1, dex = 0, hp = 5 },
@@ -23,6 +24,7 @@ return {
 		line = "scout",
 		attackType = "physical",
 		isRare = false,
+		hireWeight = 1, -- 雇用候補に出る重み
 		heals = false,
 		outfitClass = "phy",
 		growth = { str = 2, mag = 0, agi = 3, dex = 4, hp = 3 },
@@ -34,6 +36,7 @@ return {
 		line = "mage",
 		attackType = "magic",
 		isRare = false,
+		hireWeight = 1, -- 雇用候補に出る重み
 		heals = false,
 		outfitClass = "mag",
 		growth = { str = 0, mag = 5, agi = 2, dex = 1, hp = 2 },
@@ -45,6 +48,7 @@ return {
 		line = "support",
 		attackType = "magic",
 		isRare = false,
+		hireWeight = 1, -- 雇用候補に出る重み
 		heals = true,
 		outfitClass = "mag",
 		growth = { str = 1, mag = 4, agi = 1, dex = 1, hp = 3 },
@@ -56,6 +60,7 @@ return {
 		line = "warrior",
 		attackType = "physical",
 		isRare = true,
+		hireWeight = 0, -- レア職は雇用では出ない（転職ポーションでなる）
 		heals = false,
 		outfitClass = "phy",
 		growth = { str = 5, mag = 0, agi = 1, dex = 0, hp = 6 },
@@ -67,6 +72,7 @@ return {
 		line = "scout",
 		attackType = "physical",
 		isRare = true,
+		hireWeight = 0, -- レア職は雇用では出ない（転職ポーションでなる）
 		heals = false,
 		outfitClass = "phy",
 		growth = { str = 2, mag = 0, agi = 4, dex = 5, hp = 3 },
@@ -78,6 +84,7 @@ return {
 		line = "mage",
 		attackType = "magic",
 		isRare = true,
+		hireWeight = 0, -- レア職は雇用では出ない（転職ポーションでなる）
 		heals = false,
 		outfitClass = "mag",
 		growth = { str = 0, mag = 6, agi = 2, dex = 2, hp = 2 },
@@ -89,6 +96,7 @@ return {
 		line = "support",
 		attackType = "magic",
 		isRare = true,
+		hireWeight = 0, -- レア職は雇用では出ない（転職ポーションでなる）
 		heals = true,
 		outfitClass = "mag",
 		growth = { str = 1, mag = 5, agi = 1, dex = 1, hp = 4 },

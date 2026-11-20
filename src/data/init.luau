@@ -14,4 +14,7 @@ return {
 	Dungeons = require("./Dungeons"),
 	LootTables = require("./LootTables"),
 	StarterSet = require("./StarterSet"),
+	Appearances = require("./Appearances"),
+	Names = require("./Names"),
+	Uniques = require("./Uniques"),
 }

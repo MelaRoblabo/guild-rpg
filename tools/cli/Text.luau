@@ -31,6 +31,19 @@ local ERRORS = {
 	NOT_ENOUGH_ITEMS = "数が足りません",
 	NOT_FOUND = "見つかりません",
 	UNKNOWN_COMMAND = "不明なコマンドです",
+	SESSION_EXISTS = "雇用の途中です（candidates で確認、cancel でやめる）",
+	ROSTER_FULL = "所属枠がいっぱいです",
+	NOT_ENOUGH_GOLD = "お金が足りません",
+	NO_SESSION = "雇用を始めていません（hire）",
+	ALREADY_PICKED = "面接する候補はもう選んでいます",
+	CANDIDATE_NOT_FOUND = "その番号の候補はいません",
+	NOT_PICKED = "まず面接する候補を選んでください（pick）",
+	UNIQUE_FIXED_STATS = "特別な訪問者のステータスは固定です",
+	NO_TICKET = "ステータススロットチケットがありません",
+	INVALID_CHOICE = "prev か cur を指定してください",
+	UNIQUE_CANNOT_RENAME = "ユニークキャラの名前は変えられません",
+	INVALID_NAME = "名前は1〜12文字です",
+	ADVENTURER_LOCKED = "保護中の冒険者です",
 }
 
 function Text.errorText(code: string?): string
@@ -356,9 +369,85 @@ function Text.events(events: { any }, save: any, master: any): string
 				table.insert(got, `{r.gold}G`)
 			end
 			table.insert(lines, t .. `{RANK_NAME[r.rank]}の宝箱を開けた：{table.concat(got, "、")}`)
+		elseif e.type == "HireStarted" then
+			table.insert(lines, t .. `雇用を始めた（雇用費 {e.cost}G）`)
+		elseif e.type == "Hired" then
+			table.insert(lines, t .. `{advName(save, e.uid)}（{e.uid}）を雇用した`)
+		elseif e.type == "HireCanceled" then
+			table.insert(lines, t .. "雇用をやめた")
+		elseif e.type == "Dismissed" then
+			table.insert(lines, t .. `{e.name} を解雇した`)
 		elseif e.type == "Sold" then
 			table.insert(lines, t .. `売却して {e.gold}G を得た`)
 		end
+	end
+	return table.concat(lines, "\n")
+end
+
+local LOOKS_NAME = { bea = "美形", nor = "普通", ugl = "ブサイク", dem = "亜人" }
+local RACE_NAME = {
+	elf = "エルフ",
+	beastkin = "獣人",
+	dwarf = "ドワーフ",
+	halforc = "ハーフオーク",
+	halfgoblin = "ハーフゴブリン",
+}
+local STAT_ORDER = { "str", "mag", "agi", "dex", "hp" }
+
+-- D-046：成長の型（基準値の大きい2項目）
+local function growthType(jobId: string, master: any): string
+	local g = master.jobs[jobId].growth
+	local keys = { "str", "mag", "agi", "dex", "hp" }
+	table.sort(keys, function(a, b)
+		return g[a] > g[b]
+	end)
+	return `{STAT_NAME[keys[1]]}・{STAT_NAME[keys[2]]}が伸びる`
+end
+
+local function statLine(stats: any): string
+	local parts = {}
+	for _, k in STAT_ORDER do
+		if k ~= "hp" then
+			table.insert(parts, `{STAT_NAME[k]}{stats[k]}`)
+		end
+	end
+	local total = stats.str + stats.mag + stats.agi + stats.dex
+	return `{table.concat(parts, " ")} ／ 合計 {total} ／ HP {stats.hp}`
+end
+
+function Text.hiring(save: any, master: any): string
+	local h = save.state.hireSession
+	if not h then
+		return "雇用していません（hire で開始）"
+	end
+	local lines = { "候補：" }
+	for i, c in h.candidates do
+		local gifts = {}
+		for _, g in c.giftIds do
+			table.insert(gifts, master.gifts[g].name)
+		end
+		local a = master.appearances[c.appearanceId]
+		local look = if a then LOOKS_NAME[a.looks] .. (if a.race then "・" .. RACE_NAME[a.race] else "") else "固有"
+		local mark = if c.kind == "unique" then "★特別な訪問者 " else ""
+		local picked = if h.pickedIndex == i then " ← 面接中" else ""
+		table.insert(
+			lines,
+			`  {i}. {mark}{c.name}（{master.jobs[c.jobId].name}・{look}）ギフト：{table.concat(gifts, "・")} ／ 成長：{growthType(
+				c.jobId,
+				master
+			)}{picked}`
+		)
+	end
+	if h.currentRoll then
+		table.insert(lines, "面接の結果：")
+		if h.previousRoll then
+			table.insert(lines, `  前回（prev）：{statLine(h.previousRoll)}`)
+		end
+		table.insert(lines, `  今回（cur） ：{statLine(h.currentRoll)}`)
+		table.insert(
+			lines,
+			`  無料の引き直し 残り{h.freeRerollsLeft}回 ／ チケット {save.state.items.itm_slot_ticket or 0}枚`
+		)
 	end
 	return table.concat(lines, "\n")
 end

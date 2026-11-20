@@ -10,6 +10,7 @@ local Chest = require("./Chest")
 local Expedition = require("./Expedition")
 local Formulas = require("./Formulas")
 local Growth = require("./Growth")
+local Hiring = require("./Hiring")
 local Inventory = require("./Inventory")
 local Migration = require("./Migration")
 local Party = require("./Party")
@@ -497,6 +498,174 @@ handlers.SetLock = function(state, cmd, _ctx)
 	end
 	target.locked = cmd.locked == true
 	return { ok = true, events = {} }
+end
+
+-- 雇用・面接（02章 §3、Q-006） -------------------------------------------
+
+local function rosterCount(state: any): number
+	local n = 0
+	for _ in state.adventurers do
+		n += 1
+	end
+	return n
+end
+
+handlers.HireStart = function(state, _cmd, ctx)
+	local K = ctx.master.K
+	if state.hireSession then
+		return fail("SESSION_EXISTS")
+	end
+	if rosterCount(state) >= state.expansions.rosterSize then
+		return fail("ROSTER_FULL")
+	end
+	if state.gold < K.hireCost then
+		return fail("NOT_ENOUGH_GOLD")
+	end
+	state.gold -= K.hireCost
+	local rng = takeRng(state)
+	state.hireSession = {
+		candidates = Hiring.rollCandidates(state, rng, ctx.master),
+		pickedIndex = nil,
+		previousRoll = nil,
+		currentRoll = nil,
+		freeRerollsLeft = K.hireFreeRerolls,
+	}
+	bump(state, "hireStarted")
+	return { ok = true, events = { { type = "HireStarted", at = ctx.now, cost = K.hireCost } } }
+end
+
+handlers.HirePick = function(state, cmd, ctx)
+	local h = state.hireSession
+	if not h then
+		return fail("NO_SESSION")
+	end
+	if h.pickedIndex then
+		return fail("ALREADY_PICKED")
+	end
+	local c = h.candidates[cmd.candidateIndex]
+	if not c then
+		return fail("CANDIDATE_NOT_FOUND")
+	end
+	h.pickedIndex = cmd.candidateIndex
+	if c.kind == "unique" then
+		h.currentRoll = Hiring.uniqueStats(c.uniqueId, ctx.master)
+	else
+		h.currentRoll = Hiring.rollStats(state.guild.level, takeRng(state), ctx.master)
+	end
+	return { ok = true, events = { { type = "StatsRolled", at = ctx.now, stats = h.currentRoll } } }
+end
+
+handlers.HireReroll = function(state, _cmd, ctx)
+	local h = state.hireSession
+	if not h then
+		return fail("NO_SESSION")
+	end
+	if not h.pickedIndex then
+		return fail("NOT_PICKED")
+	end
+	local c = h.candidates[h.pickedIndex]
+	if c.kind == "unique" then
+		return fail("UNIQUE_FIXED_STATS")
+	end
+	local usedTicket = false
+	if h.freeRerollsLeft > 0 then
+		h.freeRerollsLeft -= 1
+	else
+		if (state.items.itm_slot_ticket or 0) < 1 then
+			return fail("NO_TICKET")
+		end
+		state.items.itm_slot_ticket -= 1
+		usedTicket = true
+	end
+	-- 直前の結果と新しい結果を並べる（02章 §3）
+	h.previousRoll = h.currentRoll
+	h.currentRoll = Hiring.rollStats(state.guild.level, takeRng(state), ctx.master)
+	bump(state, "hireRerolls")
+	return {
+		ok = true,
+		events = { { type = "StatsRolled", at = ctx.now, stats = h.currentRoll, usedTicket = usedTicket } },
+	}
+end
+
+handlers.HireChoose = function(state, cmd, ctx)
+	local h = state.hireSession
+	if not h then
+		return fail("NO_SESSION")
+	end
+	if not h.pickedIndex then
+		return fail("NOT_PICKED")
+	end
+	local stats = if cmd.which == "previous"
+		then h.previousRoll
+		elseif cmd.which == "current" then h.currentRoll
+		else nil
+	if not stats then
+		return fail("INVALID_CHOICE")
+	end
+	if rosterCount(state) >= state.expansions.rosterSize then
+		return fail("ROSTER_FULL")
+	end
+	local uid = newUid(state, "adv")
+	local adv = Hiring.newAdventurer(uid, h.candidates[h.pickedIndex], stats, ctx.now, ctx.master)
+	state.adventurers[uid] = adv
+	state.hireSession = nil
+	bump(state, "hired")
+	return { ok = true, events = { { type = "Hired", at = ctx.now, uid = uid } } }
+end
+
+handlers.HireCancel = function(state, _cmd, ctx)
+	if not state.hireSession then
+		return fail("NO_SESSION")
+	end
+	state.hireSession = nil -- 雇用費は戻らない（05章）
+	return { ok = true, events = { { type = "HireCanceled", at = ctx.now } } }
+end
+
+handlers.Rename = function(state, cmd, _ctx)
+	local adv = state.adventurers[cmd.adventurerUid]
+	if not adv then
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	if adv.uniqueId then
+		return fail("UNIQUE_CANNOT_RENAME")
+	end
+	local len = if type(cmd.name) == "string" then utf8.len(cmd.name) else nil
+	if not len or len < 1 or len > 12 then
+		return fail("INVALID_NAME")
+	end
+	adv.name = cmd.name
+	return { ok = true, events = {} }
+end
+
+-- 解雇（Q-020）：保護中・探索中は不可。装備は倉庫へ戻す
+handlers.Dismiss = function(state, cmd, ctx)
+	local adv = state.adventurers[cmd.adventurerUid]
+	if not adv then
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	if adv.locked then
+		return fail("ADVENTURER_LOCKED")
+	end
+	if Party.isAdventurerBusy(state, adv.uid) then
+		return fail("ADVENTURER_ON_EXPEDITION")
+	end
+	local equipped = 0
+	for _ in adv.equipment do
+		equipped += 1
+	end
+	if Inventory.warehouseFree(state) < equipped then
+		return fail("WAREHOUSE_FULL")
+	end
+	for slot, uid in adv.equipment do
+		state.equipment[uid].equippedBy = nil
+		adv.equipment[slot] = nil
+	end
+	local partyIndex, slot = Party.find(state, adv.uid)
+	if partyIndex and slot then
+		state.parties[partyIndex].slots[slot] = Party.EMPTY
+	end
+	state.adventurers[adv.uid] = nil
+	return { ok = true, events = { { type = "Dismissed", at = ctx.now, uid = adv.uid, name = adv.name } } }
 end
 
 Game.COMMANDS = {}
