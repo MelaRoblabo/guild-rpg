@@ -10,10 +10,13 @@ local Chest = require("./Chest")
 local Expedition = require("./Expedition")
 local Formulas = require("./Formulas")
 local Growth = require("./Growth")
+local Appearance = require("./Appearance")
 local Hiring = require("./Hiring")
+local JobChange = require("./JobChange")
 local Inventory = require("./Inventory")
 local Migration = require("./Migration")
 local Party = require("./Party")
+local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
 
 local Game = {}
@@ -369,6 +372,9 @@ handlers.Dispatch = function(state, cmd, ctx)
 	if Party.isBusy(state, cmd.partyIndex) then
 		return fail("PARTY_BUSY")
 	end
+	if state.rebirthSession and table.find(p.slots, state.rebirthSession.adventurerUid) then
+		return fail("ADVENTURER_IN_REBIRTH")
+	end
 	if not ctx.master.dungeons[cmd.dungeonId] then
 		return fail("DUNGEON_NOT_FOUND")
 	end
@@ -555,7 +561,7 @@ handlers.HirePick = function(state, cmd, ctx)
 	return { ok = true, events = { { type = "StatsRolled", at = ctx.now, stats = h.currentRoll } } }
 end
 
-handlers.HireReroll = function(state, _cmd, ctx)
+handlers.HireReroll = function(state, cmd, ctx)
 	local h = state.hireSession
 	if not h then
 		return fail("NO_SESSION")
@@ -577,8 +583,8 @@ handlers.HireReroll = function(state, _cmd, ctx)
 		state.items.itm_slot_ticket -= 1
 		usedTicket = true
 	end
-	-- 直前の結果と新しい結果を並べる（02章 §3）
-	h.previousRoll = h.currentRoll
+	-- Q-021：残す方（keep）と新しい結果を並べる。指定がなければ合計値の高い方を残す
+	h.previousRoll = Rebirth.pickKept(h.previousRoll, h.currentRoll, cmd.keep)
 	h.currentRoll = Hiring.rollStats(state.guild.level, takeRng(state), ctx.master)
 	bump(state, "hireRerolls")
 	return {
@@ -649,6 +655,12 @@ handlers.Dismiss = function(state, cmd, ctx)
 	if Party.isAdventurerBusy(state, adv.uid) then
 		return fail("ADVENTURER_ON_EXPEDITION")
 	end
+	if
+		(state.rebirthSession and state.rebirthSession.adventurerUid == adv.uid)
+		or (state.appearanceSession and state.appearanceSession.adventurerUid == adv.uid)
+	then
+		return fail("ADVENTURER_IN_SESSION")
+	end
 	local equipped = 0
 	for _ in adv.equipment do
 		equipped += 1
@@ -666,6 +678,193 @@ handlers.Dismiss = function(state, cmd, ctx)
 	end
 	state.adventurers[adv.uid] = nil
 	return { ok = true, events = { { type = "Dismissed", at = ctx.now, uid = adv.uid, name = adv.name } } }
+end
+
+-- 転生（07章 §2、D-071, D-072, Q-021） ------------------------------------
+
+handlers.RebirthStart = function(state, cmd, ctx)
+	local master = ctx.master
+	local adv = state.adventurers[cmd.adventurerUid]
+	if not adv then
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	if state.rebirthSession then
+		return fail("SESSION_EXISTS")
+	end
+	if Party.isAdventurerBusy(state, adv.uid) then
+		return fail("ADVENTURER_ON_EXPEDITION")
+	end
+	local err = Rebirth.canRebirth(adv, master)
+	if err then
+		return fail(err)
+	end
+	local rng = takeRng(state)
+	local newAppearanceId = adv.appearanceId
+	if adv.uniqueId then
+		if cmd.useKeepPotion then
+			return fail("UNIQUE_APPEARANCE_FIXED") -- ユニークは見た目固定。ポーションを無駄にさせない
+		end
+	elseif cmd.useKeepPotion then
+		if (state.items.itm_potion_appearance_keep or 0) < 1 then
+			return fail("NO_POTION")
+		end
+		state.items.itm_potion_appearance_keep -= 1
+	else
+		-- 通常転生：性別固定で見た目を引き直す（D-051）
+		local outfit = Appearance.outfitClassOf(adv.jobId, master)
+		newAppearanceId = Appearance.roll(adv.gender, outfit, rng, master, adv.appearanceId).appearanceId
+	end
+	state.rebirthSession = {
+		adventurerUid = adv.uid,
+		inherited = Rebirth.inherited(adv.baseStats),
+		bonusMax = Rebirth.bonusMax(adv.baseStats, master),
+		previousBonus = nil,
+		currentBonus = Rebirth.rollBonus(adv.baseStats, adv.rebirthCount + 1, rng, master),
+		freeRerollsLeft = master.K.rebirthFreeRerolls,
+		newAppearanceId = newAppearanceId,
+	}
+	return { ok = true, events = { { type = "RebirthStarted", at = ctx.now, uid = adv.uid } } }
+end
+
+handlers.RebirthReroll = function(state, cmd, ctx)
+	local r = state.rebirthSession
+	if not r then
+		return fail("NO_SESSION")
+	end
+	local usedTicket = false
+	if r.freeRerollsLeft > 0 then
+		r.freeRerollsLeft -= 1
+	else
+		if (state.items.itm_slot_ticket or 0) < 1 then
+			return fail("NO_TICKET")
+		end
+		state.items.itm_slot_ticket -= 1
+		usedTicket = true
+	end
+	local adv = state.adventurers[r.adventurerUid]
+	r.previousBonus = Rebirth.pickKept(r.previousBonus, r.currentBonus, cmd.keep) -- Q-021
+	r.currentBonus = Rebirth.rollBonus(adv.baseStats, adv.rebirthCount + 1, takeRng(state), ctx.master)
+	bump(state, "rebirthRerolls")
+	return { ok = true, events = { { type = "RebirthRerolled", at = ctx.now, usedTicket = usedTicket } } }
+end
+
+handlers.RebirthChoose = function(state, cmd, ctx)
+	local r = state.rebirthSession
+	if not r then
+		return fail("NO_SESSION")
+	end
+	local bonus = if cmd.which == "previous"
+		then r.previousBonus
+		elseif cmd.which == "current" then r.currentBonus
+		else nil
+	if not bonus then
+		return fail("INVALID_CHOICE")
+	end
+	local adv = state.adventurers[r.adventurerUid]
+	local giftId = Rebirth.apply(adv, r, bonus, takeRng(state), ctx.master)
+	state.rebirthSession = nil
+	bump(state, "rebirths")
+	return {
+		ok = true,
+		events = {
+			{
+				type = "Reborn",
+				at = ctx.now,
+				uid = adv.uid,
+				rebirthCount = adv.rebirthCount,
+				levelCap = adv.levelCap,
+				giftAdded = giftId,
+			},
+		},
+	}
+end
+
+-- 転職（03章 §4） --------------------------------------------------------
+
+handlers.ChangeJob = function(state, cmd, ctx)
+	local master = ctx.master
+	local adv = state.adventurers[cmd.adventurerUid]
+	if not adv then
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	if Party.isAdventurerBusy(state, adv.uid) then
+		return fail("ADVENTURER_ON_EXPEDITION")
+	end
+	local err = JobChange.check(adv, cmd.jobId, master)
+	if err then
+		return fail(err)
+	end
+	local potion = JobChange.potionId(cmd.jobId)
+	if (state.items[potion] or 0) < 1 then
+		return fail("NO_POTION")
+	end
+	-- 装備できなくなる品は倉庫へ戻す
+	local slots = JobChange.unequippableSlots(state, adv, cmd.jobId, master)
+	if Inventory.warehouseFree(state) < #slots then
+		return fail("WAREHOUSE_FULL")
+	end
+	for _, slot in slots do
+		state.equipment[adv.equipment[slot]].equippedBy = nil
+		adv.equipment[slot] = nil
+	end
+	state.items[potion] -= 1
+	local from = adv.jobId
+	adv.jobId = cmd.jobId -- 見た目は維持（D-052）。以降の成長は新しい職業（D-045）
+	bump(state, "jobChanges")
+	return {
+		ok = true,
+		events = {
+			{ type = "JobChanged", at = ctx.now, uid = adv.uid, from = from, to = cmd.jobId, unequipped = slots },
+		},
+	}
+end
+
+-- 見た目変更ポーション（07章 §3、D-051） ------------------------------------
+
+handlers.ChangeAppearance = function(state, cmd, ctx)
+	local master = ctx.master
+	local adv = state.adventurers[cmd.adventurerUid]
+	if not adv then
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	if adv.uniqueId then
+		return fail("UNIQUE_CANNOT_CHANGE")
+	end
+	if state.appearanceSession then
+		return fail("SESSION_EXISTS")
+	end
+	if (state.items.itm_potion_appearance_change or 0) < 1 then
+		return fail("NO_POTION")
+	end
+	state.items.itm_potion_appearance_change -= 1 -- どちらを選んでも1個消費
+	local outfit = Appearance.outfitClassOf(adv.jobId, master)
+	local rolled = Appearance.roll(adv.gender, outfit, takeRng(state), master, adv.appearanceId)
+	state.appearanceSession =
+		{ adventurerUid = adv.uid, previousId = adv.appearanceId, currentId = rolled.appearanceId }
+	return {
+		ok = true,
+		events = { { type = "AppearanceRolled", at = ctx.now, uid = adv.uid, appearanceId = rolled.appearanceId } },
+	}
+end
+
+handlers.ChangeAppearanceChoose = function(state, cmd, ctx)
+	local a = state.appearanceSession
+	if not a then
+		return fail("NO_SESSION")
+	end
+	local id = if cmd.which == "previous" then a.previousId elseif cmd.which == "current" then a.currentId else nil
+	if not id then
+		return fail("INVALID_CHOICE")
+	end
+	local adv = state.adventurers[a.adventurerUid]
+	if adv then
+		adv.appearanceId = id
+	end
+	state.appearanceSession = nil
+	return {
+		ok = true,
+		events = { { type = "AppearanceChanged", at = ctx.now, uid = a.adventurerUid, appearanceId = id } },
+	}
 end
 
 Game.COMMANDS = {}

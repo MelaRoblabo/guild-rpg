@@ -47,6 +47,7 @@ local result = Game.execute(state, command, ctx)
 
 - **すべてのコマンドの前に `Game.advance` を呼ぶ**（入口側の責任）。
 - `execute` は検証 → 変更の順で行い、検証に失敗したら状態に触れない（部分更新を残さない）。
+- 実装上は state を複製して変更し、成功したら中身を差し替える。**execute の後は、state 内のテーブル（冒険者など）への参照を取り直すこと**（古い参照は更新されない）。
 - `events` は「何が起きたか」の列（例：`ExpeditionReturned`, `ChestOpened`）。CLIは文章に、UIは演出に変換する。
 
 ## 4. 探索の流れ（D-026）

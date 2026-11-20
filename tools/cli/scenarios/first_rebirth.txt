@@ -1,0 +1,19 @@
+# M4 確認：上限レベルまで育てて転生する
+new 3
+repeat 1 dng_graveyard
+go 1 dng_graveyard
+wait 900
+repeat 1 dng_ruins
+wait 1800
+repeat 1 dng_tower
+wait 2400
+repeat 1 off
+wait 300
+roster
+show adv_1
+rebirth adv_1
+rb-reroll
+rb-reroll
+rb-reroll
+rb-choose prev
+show adv_1

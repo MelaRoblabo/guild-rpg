@@ -88,6 +88,7 @@ export type PlayerState = {
 	clearedDungeons: { [string]: boolean },   -- 初回踏破の判定
 	hireSession: HireSession?,
 	rebirthSession: RebirthSession?,
+	appearanceSession: { adventurerUid: string, previousId: string, currentId: string }?, -- 見た目変更ポーションの選択中
 	settings: { autoSell: { enabled: boolean, maxRarity: number } },
 	stats: { [string]: number },      -- 集計用カウンタ（指標・実績）
 	lastAdvancedAt: number,

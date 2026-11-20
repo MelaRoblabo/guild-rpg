@@ -27,13 +27,13 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M2 | `SetLock` | uid, locked | 保護の切り替え | — | 02章 |
 | M3 | `HireStart` | — | 雇用費を払い候補を抽選 | NOT_ENOUGH_GOLD, ROSTER_FULL, SESSION_EXISTS | 02章 |
 | M3 | `HirePick` | candidateIndex | 面接する候補を選び初回抽選 | — | 02章 |
-| M3 | `HireReroll` | — | 引き直し（無料回数→チケット） | NO_TICKET | 02章 |
+| M3 | `HireReroll` | keep?（"previous"/"current"、省略時は合計値の高い方） | 引き直し（無料回数→チケット）。keep を比較の基準に残す | NO_TICKET | 02章, D-073 |
 | M3 | `HireChoose` | "previous" / "current" | 採用する結果を選んで雇用確定 | — | 02章 |
 | M3 | `HireCancel` | — | 雇用を中止（雇用費は戻らない） | — | 02章 |
 | M3 | `Rename` | adventurerUid, name | 名前変更（ユニーク不可） | UNIQUE_CANNOT_RENAME | 02章 |
 | M3 | `Dismiss` | adventurerUid | 冒険者を解雇（保護中・探索中は不可） | ADVENTURER_LOCKED | Q-020 |
 | M4 | `RebirthStart` | adventurerUid, useKeepPotion | 見た目を決めて転生を開始 | LEVEL_NOT_AT_CAP | 07章 |
-| M4 | `RebirthReroll` | — | 加算分の引き直し | NO_TICKET | 07章 |
+| M4 | `RebirthReroll` | keep? | 加算分の引き直し（keep は HireReroll と同じ） | NO_TICKET | 07章, D-073 |
 | M4 | `RebirthChoose` | "previous" / "current" | 結果を確定 | — | 07章 |
 | M4 | `ChangeJob` | adventurerUid, jobId | 転職ポーションを使う | NO_POTION, UNIQUE_JOB_RESTRICTED | 03章 |
 | M4 | `ChangeAppearance` | adventurerUid | 見た目変更ポーションで抽選 | NO_POTION, UNIQUE_CANNOT_CHANGE | 07章 |

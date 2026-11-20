@@ -44,6 +44,16 @@ local ERRORS = {
 	UNIQUE_CANNOT_RENAME = "ユニークキャラの名前は変えられません",
 	INVALID_NAME = "名前は1〜12文字です",
 	ADVENTURER_LOCKED = "保護中の冒険者です",
+	LEVEL_NOT_AT_CAP = "レベル上限に達していません",
+	MAX_REBIRTH = "これ以上転生できません",
+	UNIQUE_APPEARANCE_FIXED = "ユニークキャラの見た目は固定です",
+	NO_POTION = "ポーションがありません",
+	ADVENTURER_IN_REBIRTH = "転生の途中の冒険者がいます",
+	ADVENTURER_IN_SESSION = "転生・見た目変更の途中です",
+	JOB_NOT_FOUND = "その職業はありません",
+	SAME_JOB = "すでにその職業です",
+	UNIQUE_JOB_RESTRICTED = "このユニークキャラはその職業に転職できません",
+	UNIQUE_CANNOT_CHANGE = "ユニークキャラの見た目は変えられません",
 }
 
 function Text.errorText(code: string?): string
@@ -377,6 +387,22 @@ function Text.events(events: { any }, save: any, master: any): string
 			table.insert(lines, t .. "雇用をやめた")
 		elseif e.type == "Dismissed" then
 			table.insert(lines, t .. `{e.name} を解雇した`)
+		elseif e.type == "Reborn" then
+			local gift = if e.giftAdded then `、ギフト「{master.gifts[e.giftAdded].name}」を獲得` else ""
+			table.insert(
+				lines,
+				t
+					.. `{advName(save, e.uid)} が転生した（{e.rebirthCount}回目・レベル上限 {e.levelCap}）{gift}`
+			)
+		elseif e.type == "JobChanged" then
+			table.insert(
+				lines,
+				t .. `{advName(save, e.uid)} が{master.jobs[e.from].name}から{master.jobs[e.to].name}に転職した`
+			)
+		elseif e.type == "AppearanceRolled" then
+			table.insert(lines, t .. `新しい見た目：{e.appearanceId}（looks-choose prev|cur で選ぶ）`)
+		elseif e.type == "AppearanceChanged" then
+			table.insert(lines, t .. `{advName(save, e.uid)} の見た目：{e.appearanceId}`)
 		elseif e.type == "Sold" then
 			table.insert(lines, t .. `売却して {e.gold}G を得た`)
 		end
@@ -441,7 +467,7 @@ function Text.hiring(save: any, master: any): string
 	if h.currentRoll then
 		table.insert(lines, "面接の結果：")
 		if h.previousRoll then
-			table.insert(lines, `  前回（prev）：{statLine(h.previousRoll)}`)
+			table.insert(lines, `  残した結果（prev）：{statLine(h.previousRoll)}`)
 		end
 		table.insert(lines, `  今回（cur） ：{statLine(h.currentRoll)}`)
 		table.insert(
@@ -449,6 +475,34 @@ function Text.hiring(save: any, master: any): string
 			`  無料の引き直し 残り{h.freeRerollsLeft}回 ／ チケット {save.state.items.itm_slot_ticket or 0}枚`
 		)
 	end
+	return table.concat(lines, "\n")
+end
+
+function Text.rebirth(save: any, _master: any): string
+	local r = save.state.rebirthSession
+	if not r then
+		return "転生していません"
+	end
+	local function line(bonus: any): string
+		local parts = {}
+		for _, k in STAT_ORDER do
+			table.insert(parts, `{STAT_NAME[k]}{r.inherited[k] + bonus[k]}(+{bonus[k]}/{r.bonusMax[k]})`)
+		end
+		local total = bonus.str + bonus.mag + bonus.agi + bonus.dex
+		return table.concat(parts, " ") .. ` ／ 加算合計 {total}`
+	end
+	local lines = {
+		`{advName(save, r.adventurerUid)} の転生 ／ 新しい見た目：{r.newAppearanceId}`,
+		"表示：転生後の値(＋加算分/加算の上限)",
+	}
+	if r.previousBonus then
+		table.insert(lines, `  残した結果（prev）：{line(r.previousBonus)}`)
+	end
+	table.insert(lines, `  今回（cur）       ：{line(r.currentBonus)}`)
+	table.insert(
+		lines,
+		`  無料の引き直し 残り{r.freeRerollsLeft}回 ／ チケット {save.state.items.itm_slot_ticket or 0}枚`
+	)
 	return table.concat(lines, "\n")
 end
 

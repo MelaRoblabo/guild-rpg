@@ -110,11 +110,17 @@ local HELP = [[
   hire                       雇用を始める（雇用費を支払い候補を表示）
   candidates                 候補と面接の状況を表示
   pick <番号>                面接する候補を選ぶ（ステータスを抽選）
-  reroll                     ステータスを引き直す（無料回数→チケット）
+  reroll [prev|cur]          ステータスを引き直す（無料回数→チケット）。残す方を指定（省略時は合計の高い方）
   choose <prev|cur>          採用する結果を選んで雇用する
   cancel                     雇用をやめる（雇用費は戻らない）
   rename <adv_uid> <名前>    名前を変える
-  dismiss <adv_uid>          解雇する]]
+  dismiss <adv_uid>          解雇する
+  rebirth <adv_uid> [keep]   転生を始める（keep：見た目維持ポーションを使う）
+  rb-reroll [prev|cur]       転生スロットを引き直す（残す方を指定、省略時は合計の高い方）
+  rb-choose <prev|cur>       転生スロットの結果を確定する
+  jobchange <adv_uid> <job_id>   転職ポーションで転職する
+  looks <adv_uid>            見た目変更ポーションを使う
+  looks-choose <prev|cur>    見た目を選ぶ（prev＝今の姿、cur＝新しい姿）]]
 
 local function handle(tokens: { string }): (boolean, any)
 	local c = tokens[1]
@@ -202,7 +208,8 @@ local function handle(tokens: { string }): (boolean, any)
 			say(Text.hiring(save, master))
 		end
 	elseif c == "reroll" then
-		result = run({ type = "HireReroll" })
+		local keep = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else nil
+		result = run({ type = "HireReroll", keep = keep })
 		if result.ok then
 			say(Text.hiring(save, master))
 		end
@@ -213,6 +220,27 @@ local function handle(tokens: { string }): (boolean, any)
 		result = run({ type = "HireCancel" })
 	elseif c == "rename" then
 		result = run({ type = "Rename", adventurerUid = tokens[2], name = tokens[3] })
+	elseif c == "rebirth" then
+		result = run({ type = "RebirthStart", adventurerUid = tokens[2], useKeepPotion = tokens[3] == "keep" })
+		if result.ok then
+			say(Text.rebirth(save, master))
+		end
+	elseif c == "rb-reroll" then
+		local keep = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else nil
+		result = run({ type = "RebirthReroll", keep = keep })
+		if result.ok then
+			say(Text.rebirth(save, master))
+		end
+	elseif c == "rb-choose" then
+		local which = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else tokens[2]
+		result = run({ type = "RebirthChoose", which = which })
+	elseif c == "jobchange" then
+		result = run({ type = "ChangeJob", adventurerUid = tokens[2], jobId = tokens[3] })
+	elseif c == "looks" then
+		result = run({ type = "ChangeAppearance", adventurerUid = tokens[2] })
+	elseif c == "looks-choose" then
+		local which = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else tokens[2]
+		result = run({ type = "ChangeAppearanceChoose", which = which })
 	elseif c == "dismiss" then
 		result = run({ type = "Dismiss", adventurerUid = tokens[2] })
 	elseif c == "lock" or c == "unlock" then
