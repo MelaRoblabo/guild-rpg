@@ -6,7 +6,11 @@ local Game = require("../../src/core/Game")
 local Text = {}
 
 local START_CLOCK = 1767225600
-local RANK_NAME = { "コモン", "アンコモン", "レア", "エピック", "レジェンド" }
+-- レアリティ名はマスターデータから作る（D-085：レアリティは増える）
+local RANK_NAME: { string } = {}
+for _, r in require("../../src/data/Rarities") do
+	RANK_NAME[r.rank] = r.name
+end
 local SLOT_NAME = { weapon = "武器", armor = "防具", sub = "補助" }
 local STAT_NAME = { str = "腕力", mag = "魔力", agi = "俊敏", dex = "技巧", hp = "HP" }
 
@@ -125,13 +129,13 @@ function Text.status(save: any, master: any): string
 		local rep = if p.autoRepeat then ` ／ 自動再派遣：{master.dungeons[p.autoRepeat.dungeonId].name}` else ""
 		table.insert(lines, `パーティ{i} [{table.concat(names, " ")}] {partyStatus(save, i, master)}{rep}`)
 	end
-	local byRank = Game.query.chestsByRank(s)
+	local byRank = Game.query.chestsByRank(s, master)
 	local totalChests = 0
 	for _, n in byRank do
 		totalChests += n
 	end
 	local chestText = {}
-	for r = 1, 5 do
+	for r = 1, #byRank do
 		if byRank[r] > 0 then
 			table.insert(chestText, `{RANK_NAME[r]}×{byRank[r]}`)
 		end
@@ -271,6 +275,21 @@ function Text.dungeons(save: any, master: any): string
 	return table.concat(lines, "\n")
 end
 
+-- 宝箱のレアリティの出現率（D-085）
+local function rarityOdds(d: any): string
+	local total = 0
+	for _, w in d.chestRarityWeights do
+		total += w
+	end
+	local parts = {}
+	for r, w in d.chestRarityWeights do
+		if w > 0 then
+			table.insert(parts, `{RANK_NAME[r]}{math.floor(w / total * 100 + 0.5)}%`)
+		end
+	end
+	return table.concat(parts, "・")
+end
+
 function Text.hint(id: string, master: any): string
 	local d = master.dungeons[id]
 	if not d then
@@ -297,7 +316,7 @@ function Text.hint(id: string, master: any): string
 			magic / total * 100 + 0.5
 		)}%`,
 		`種族：{table.concat(raceText, "、")}`,
-		`罠レベル {d.trapLevel} ／ 最低宝箱ランク {RANK_NAME[d.minChestRank]}`,
+		`罠レベル {d.trapLevel} ／ 宝箱 {rarityOdds(d)}`,
 		`敵の目安：HP{d.base.hp} 攻撃{d.base.atk} 物防{d.base.pdef} 魔防{d.base.mdef}（戦闘ごとに+20%）`,
 	}, "\n")
 end
@@ -606,7 +625,7 @@ function Text.view(save: any, master: any): any
 		gold = s.gold,
 		guildExp = s.guild.exp,
 		parties = parties,
-		unopenedChests = Game.query.chestsByRank(s),
+		unopenedChests = Game.query.chestsByRank(s, master),
 		warehouse = wh,
 		unlockedDungeons = unlocked,
 	}

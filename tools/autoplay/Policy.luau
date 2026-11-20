@@ -393,7 +393,7 @@ local function savingForUnlock(state: any, master: any): boolean
 		return false
 	end
 	local locked = 0
-	for r, n in Game.query.chestsByRank(state) do
+	for r, n in Game.query.chestsByRank(state, master) do
 		if r > state.expansions.unlockRank then
 			locked += n
 		end

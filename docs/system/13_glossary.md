@@ -23,7 +23,7 @@
 | 踏破／撤退 | clear / retreat | |
 | 戦闘不能 | down | |
 | 宝箱／宝箱ランク | chest / rank | 保管は数だけ（chests[dungeonId][rank]、D-084） |
-| レアリティ | rarity | 1〜5 |
+| レアリティ | rarity | 1〜（リリース時6＝ミシック。D-085） |
 | 基本アイテム | equipmentBase | |
 | 装備個体 | equipmentItem | uid を持つ |
 | 修飾語 | modifier | |

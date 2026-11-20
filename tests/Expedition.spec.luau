@@ -154,16 +154,57 @@ return function(t)
 			expect(counts.fountain / n).toBeCloseTo(0.10, 0.01)
 			expect(counts.none / n).toBeCloseTo(0.15, 0.01)
 		end)
-		it("D-015 統計: 宝箱ランク 最低60/+1 25/+2 10/+3 5%", function()
-			local ctx = ctxWith({ Fixtures.memberState({}) }, "dng_graveyard")
-			local counts = { 0, 0, 0, 0, 0 }
-			local n = 50000
-			for _ = 1, n do
-				counts[Events.rollChestRank(ctx)] += 1
+		it(
+			"D-085 統計: 宝箱のレアリティはダンジョンの出現率の表どおり（罠の遺跡）",
+			function()
+				local ctx = ctxWith({ Fixtures.memberState({}) }, "dng_ruins")
+				local w = master.dungeons.dng_ruins.chestRarityWeights
+				local total = 0
+				for _, x in w do
+					total += x
+				end
+				local counts = table.create(master.rarityCount, 0)
+				local n = 50000
+				for _ = 1, n do
+					counts[Events.rollChestRank(ctx)] += 1
+				end
+				for r = 1, master.rarityCount do
+					expect(counts[r] / n).toBeCloseTo((w[r] or 0) / total, 0.01)
+				end
 			end
-			expect(counts[1] / n).toBeCloseTo(0.60, 0.01)
-			expect(counts[4] / n).toBeCloseTo(0.05, 0.01)
+		)
+		it("D-085 古い墓地はコモン・アンコモンだけ、罠の遺跡はレアまで", function()
+			expect(#master.dungeons.dng_graveyard.chestRarityWeights).toBe(2)
+			expect(#master.dungeons.dng_ruins.chestRarityWeights).toBe(3)
 		end)
+		it("D-085 深いダンジョンほどコモンが減り、上位が増える（緩やかに）", function()
+			local prevCommon, prevTop = math.huge, -1
+			for _, d in master.dungeonList do
+				local total, top = 0, 0
+				for r, x in d.chestRarityWeights do
+					total += x
+					if r >= 4 then
+						top += x
+					end
+				end
+				local common = (d.chestRarityWeights[1] or 0) / total
+				expect(common <= prevCommon).toBeTruthy()
+				expect(top / total >= prevTop).toBeTruthy()
+				prevCommon, prevTop = common, top / total
+			end
+		end)
+		it(
+			"D-085 最も深いダンジョンでも最上位のレアリティは1割未満（ハズレがある）",
+			function()
+				local d = master.dungeonList[#master.dungeonList]
+				local total = 0
+				for _, x in d.chestRarityWeights do
+					total += x
+				end
+				expect((d.chestRarityWeights[master.rarityCount] or 0) / total < 0.1).toBeTruthy()
+				expect((d.chestRarityWeights[master.rarityCount] or 0) / total > 0).toBeTruthy()
+			end
+		)
 		it("D-017 罠に技巧0で挑むと全員がダメージ、全滅もありうる", function()
 			-- 罠が出るまで回す
 			for seed = 1, 500 do

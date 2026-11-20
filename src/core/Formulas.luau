@@ -240,11 +240,6 @@ function Formulas.fountainHeal(maxHp: number, K: any): number
 	return math.floor(maxHp * K.fountainHealRate)
 end
 
--- 06章 §5：宝箱ランク（D-015）
-function Formulas.chestRank(minRank: number, offset: number): number
-	return math.min(minRank + offset, 5)
-end
-
 -- 06章 §6：幸運（D-019, Q-004）
 function Formulas.luckyChance(holders: number, K: any): number
 	return math.min(holders * K.luckyChancePerHolder, K.luckyChanceCap)

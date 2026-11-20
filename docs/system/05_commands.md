@@ -22,7 +22,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M2 | `Unequip` | adventurerUid, slot | 外す | WAREHOUSE_FULL | 06章 |
 | M2 | `Dispatch` | partyIndex, dungeonId | 派遣。派遣費があれば払い、探索ログを確定 | PARTY_BUSY, PARTY_EMPTY, DUNGEON_LOCKED, NOT_ENOUGH_GOLD | D-026, D-079, D-071 |
 | M2 | `SetAutoRepeat` | partyIndex, dungeonId? | 自動再派遣の設定・解除 | — | 01章 |
-| M2 | `OpenChests` | rank?（1〜5）, dungeonId?, count?（省略時はすべて） | 宝箱を開ける。中身をここで抽選。解錠技術の上限以下のランクだけ。開ける順はダンジョンの並び順→ランクの低い順 | WAREHOUSE_FULL, CHEST_RANK_TOO_HIGH, NO_CHEST | D-015, D-078, D-084 |
+| M2 | `OpenChests` | rank?（1〜レアリティの数）, dungeonId?, count?（省略時はすべて） | 宝箱を開ける。中身をここで抽選。解錠技術の上限以下のランクだけ。開ける順はダンジョンの並び順→ランクの低い順 | WAREHOUSE_FULL, CHEST_RANK_TOO_HIGH, NO_CHEST | D-015, D-078, D-084 |
 | M2 | `Sell` | equipmentUids / itemId+count | 売却 | ITEM_LOCKED, ITEM_EQUIPPED | 06章 |
 | M2 | `SetLock` | uid, locked | 保護の切り替え | — | 02章 |
 | M3 | `HireStart` | — | 雇用費を払い候補を抽選 | NOT_ENOUGH_GOLD, ROSTER_FULL, SESSION_EXISTS | 02章 |

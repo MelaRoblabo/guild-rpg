@@ -76,6 +76,7 @@ return {
 			{ value = 3, guildLevel = 1, gold = 5000 },
 			{ value = 4, guildLevel = 20, gold = 200000 },
 			{ value = 5, guildLevel = 40, gold = 1000000 },
+			{ value = 6, guildLevel = 60, gold = 5000000 }, -- ミシック（D-085）
 		},
 	},
 }

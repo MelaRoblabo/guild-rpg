@@ -94,13 +94,28 @@ local function runOnce(master: any, seed: number)
 		return best
 	end
 
+	-- そのダンジョンで「上位10%に入る」レアリティ（何度も回して手元に残る良い装備の目安。D-085）
+	local function goodRarity(d: any): number
+		local total, acc = 0, 0
+		for _, w in d.chestRarityWeights do
+			total += w
+		end
+		for r = #d.chestRarityWeights, 1, -1 do
+			acc += d.chestRarityWeights[r]
+			if acc >= total * 0.1 then
+				return r
+			end
+		end
+		return 1
+	end
+
 	local function upgradeGear()
 		local tier = bestClearedTier()
 		local d = master.dungeonList[tier]
 		for _, e in state.equipment do
 			if e.equippedBy then
 				e.itemLevel = tier
-				e.rarity = math.min(5, d.minChestRank + 1)
+				e.rarity = goodRarity(d)
 				e.grade = 1
 			end
 		end

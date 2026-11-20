@@ -83,27 +83,31 @@ function Chest.rollContents(rank: number, dungeon: any, rng: Rng.Rng, master: an
 end
 
 -- 宝箱の保管（D-084）：倉庫とは別に「ダンジョン×ランクごとの数」だけを持つ。上限なし
--- state.chests[dungeonId] = { ランク1の数, …, ランク5の数 }
+-- state.chests[dungeonId] = { ランク1の数, …, 最上位ランクの数 }（長さはレアリティの数。D-085）
+-- レアリティが増えたら、足りない分を0で伸ばす
 function Chest.add(state: any, dungeonId: string, rank: number, n: number)
 	local row = state.chests[dungeonId]
 	if row == nil then
-		row = { 0, 0, 0, 0, 0 }
+		row = {}
 		state.chests[dungeonId] = row
+	end
+	for r = #row + 1, rank do
+		row[r] = 0
 	end
 	row[rank] += n
 end
 
 function Chest.count(state: any, dungeonId: string, rank: number): number
 	local row = state.chests[dungeonId]
-	return if row then row[rank] else 0
+	return if row then row[rank] or 0 else 0
 end
 
 -- ランクごとの合計（画面はこの単位で表示する）
-function Chest.countByRank(state: any): { number }
-	local out = { 0, 0, 0, 0, 0 }
+function Chest.countByRank(state: any, master: any): { number }
+	local out = table.create(master.rarityCount, 0)
 	for _, row in state.chests do
-		for r = 1, 5 do
-			out[r] += row[r]
+		for r, n in row do
+			out[r] += n
 		end
 	end
 	return out
@@ -111,8 +115,10 @@ end
 
 function Chest.total(state: any): number
 	local n = 0
-	for _, v in Chest.countByRank(state) do
-		n += v
+	for _, row in state.chests do
+		for _, v in row do
+			n += v
+		end
 	end
 	return n
 end

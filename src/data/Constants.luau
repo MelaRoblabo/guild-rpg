@@ -20,12 +20,7 @@ return {
 		{ id = "fountain", weight = 0.10 },
 		{ id = "none", weight = 0.15 },
 	},
-	chestRankOffsets = {
-		{ id = "+0", offset = 0, weight = 0.60 },
-		{ id = "+1", offset = 1, weight = 0.25 },
-		{ id = "+2", offset = 2, weight = 0.10 },
-		{ id = "+3", offset = 3, weight = 0.05 },
-	},
+	-- 宝箱のレアリティはダンジョンごとの出現率の表で決める（Dungeons.chestRarityWeights、D-085）
 	fountainHealRate = 0.25,
 	trapK = 40, -- D-067
 	trapDamageRate = 0.20, -- D-067。ダンジョンごとに上書き可（Dungeons.trapDamageRate）
@@ -134,9 +129,9 @@ return {
 		{ id = "ticket", weight = 0.06 }, -- D-074：遊んで出る量を約1/10に。主な入手はギルドレベル報酬
 		{ id = "sellable", weight = 0.94 },
 	},
-	sellRarityMult = { 1, 1.5, 2.5, 4, 7 }, -- 仮
+	sellRarityMult = { 1, 1.5, 2.5, 4, 7, 12 }, -- 仮。レアリティの数だけ並べる（D-085）
 	sellGradeCoef = 0.5, -- 仮
-	equipRarityMult = { 1.0, 1.3, 1.7, 2.2, 3.0 }, -- 仮（Q-020）
+	equipRarityMult = { 1.0, 1.3, 1.7, 2.2, 3.0, 4.0 }, -- 仮（Q-020）。レアリティの数だけ並べる（D-085）
 	equipGradeCoef = 0.10, -- 仮（Q-020）
 	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
 	-- 宝箱の保管は上限なし（D-084。旧 chestStorageMax は廃止）

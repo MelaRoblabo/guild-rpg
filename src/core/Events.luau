@@ -30,10 +30,9 @@ local function weightOf(e: any): number
 	return e.weight
 end
 
--- 宝箱ランクを抽選する（D-015）
+-- 宝箱ランク（＝レアリティ）を抽選する（D-015、D-085：ダンジョンごとの出現率の表）
 function Events.rollChestRank(ctx: EventContext): number
-	local e = ctx.rng:pickWeighted(ctx.K.chestRankOffsets, weightOf)
-	return Formulas.chestRank(ctx.dungeon.minChestRank, e.offset)
+	return ctx.rng:pickWeighted(ctx.dungeon.chestRarityTable, weightOf).rank
 end
 
 -- 宝箱を1個確保し、幸運の判定を行う（D-019）。確保したランクの一覧を返す

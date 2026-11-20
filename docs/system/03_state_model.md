@@ -26,7 +26,7 @@ export type Adventurer = {
 export type EquipmentItem = {
 	uid: string,              -- "eq_<連番>"
 	baseId: string,           -- 基本アイテムID
-	rarity: number,           -- 1=コモン … 5=レジェンド
+	rarity: number,           -- 1=コモン … 6=ミシック（増やせる：D-085）
 	grade: number,            -- 0〜3
 	modifierId: string?,
 	modifierValue: number?,
@@ -36,7 +36,7 @@ export type EquipmentItem = {
 
 -- 宝箱（D-084）：倉庫とは別の「宝箱置き場」。1個ずつの記録は持たず、ダンジョン×ランクの数だけ。上限なし
 -- 例：chests = { dng_ruins = { 12, 4, 1, 0, 0 } }  … 罠の遺跡の宝箱がコモン12・アンコモン4・レア1
-export type ChestCounts = { [string]: { number } }  -- dungeonId → ランク1〜5の数（長さ5の配列）
+export type ChestCounts = { [string]: { number } }  -- dungeonId → ランク1からの数（配列。出た最上位ランクまでの長さ。D-085）
 
 export type Party = {
 	index: number,                    -- 1〜（解放済みパーティ枠）

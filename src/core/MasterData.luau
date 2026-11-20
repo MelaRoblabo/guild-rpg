@@ -158,7 +158,7 @@ end
 
 -- 各データの検証 ----------------------------------------------------------
 
-local function validateConstants(c: Checker, k: any)
+local function validateConstants(c: Checker, k: any, nRarity: number)
 	local p = "Constants"
 	if type(k) ~= "table" then
 		c:error(p, "テーブルが必要")
@@ -177,11 +177,6 @@ local function validateConstants(c: Checker, k: any)
 
 	-- イベント
 	c:weights(p .. ".eventWeights", k.eventWeights, "weight", true)
-	if c:weights(p .. ".chestRankOffsets", k.chestRankOffsets, "weight", true) then
-		for i, e in k.chestRankOffsets do
-			c:integer(`{p}.chestRankOffsets[{i}].offset`, e.offset, 0, 4)
-		end
-	end
 	c:probability(p .. ".fountainHealRate", k.fountainHealRate)
 	c:number(p .. ".trapK", k.trapK, 0)
 	c:probability(p .. ".trapDamageRate", k.trapDamageRate)
@@ -305,7 +300,7 @@ local function validateConstants(c: Checker, k: any)
 	c:weights(p .. ".potionKindWeights", k.potionKindWeights, "weight", true)
 	c:weights(p .. ".itemEventWeights", k.itemEventWeights, "weight", true)
 	for _, key in { "sellRarityMult", "equipRarityMult" } do
-		if c:array(`{p}.{key}`, k[key], 5) then
+		if c:array(`{p}.{key}`, k[key], nRarity) then -- レアリティの数だけ（D-085）
 			for i, v in k[key] do
 				c:number(`{p}.{key}[{i}]`, v, 0)
 			end
@@ -352,13 +347,17 @@ local function weightedRefs(c: Checker, path: string, list: any, known: { [strin
 	end
 end
 
+local function rarityCount(d: any): number
+	return if type(d.Rarities) == "table" then #d.Rarities else 0
+end
+
 local function validateContent(c: Checker, d: any)
 	-- レアリティ
 	c:uniqueIds("Rarities", d.Rarities, "rar_")
-	if c:array("Rarities", d.Rarities, 5) then
+	if c:array("Rarities", d.Rarities) then
 		for i, r in d.Rarities do
 			if r.rank ~= i then
-				c:error(`Rarities[{i}].rank`, "rank は 1〜5 の連番")
+				c:error(`Rarities[{i}].rank`, "rank は 1 からの連番")
 			end
 		end
 	end
@@ -425,7 +424,7 @@ local function validateContent(c: Checker, d: any)
 		for i, e in d.EquipmentBases do
 			local p = `EquipmentBases[{i}]`
 			oneOf(c, p .. ".slot", e.slot, SLOTS)
-			c:integer(p .. ".minRarity", e.minRarity, 1, 5)
+			c:integer(p .. ".minRarity", e.minRarity, 1, rarityCount(d))
 			c:integer(p .. ".sellPrice", e.sellPrice, 0)
 			for _, key in { "atk", "pdef", "mdef" } do
 				if e[key] ~= nil then
@@ -501,7 +500,21 @@ local function validateContent(c: Checker, d: any)
 			end
 			c:number(p .. ".refAgi", g.refAgi, 1)
 			c:integer(p .. ".tier", g.tier, 1)
-			c:integer(p .. ".minChestRank", g.minChestRank, 1, 5)
+			-- 宝箱のレアリティの出現率（D-085）。長さはレアリティの数以下（足りない上位は0）、合計は正
+			if c:array(p .. ".chestRarityWeights", g.chestRarityWeights) then
+				if #g.chestRarityWeights > rarityCount(d) then
+					c:error(p .. ".chestRarityWeights", `レアリティの数（{rarityCount(d)}）以下が必要`)
+				end
+				local sum = 0
+				for r, w in g.chestRarityWeights do
+					if c:number(`{p}.chestRarityWeights[{r}]`, w, 0) then
+						sum += w
+					end
+				end
+				if sum <= 0 then
+					c:error(p .. ".chestRarityWeights", "合計が0より大きいことが必要")
+				end
+			end
 			if g.dispatchFee ~= nil then
 				c:integer(p .. ".dispatchFee", g.dispatchFee, 0) -- D-079
 			end
@@ -541,7 +554,7 @@ local function validateLootAndStarter(c: Checker, d: any)
 		end
 		c:weights("LootTables.chest.extraWeights", L.extraWeights, "weight", true)
 		c:number("LootTables.chest.goldMult", L.goldMult, 0)
-		c:integer("LootTables.chest.potionMinRank", L.potionMinRank, 1, 5)
+		c:integer("LootTables.chest.potionMinRank", L.potionMinRank, 1, rarityCount(d))
 	end
 
 	local S = d.StarterSet
@@ -692,7 +705,7 @@ local function validateExpansions(c: Checker, d: any)
 			unlockRank = true,
 		})
 		local maxValue = if e.kind == "unlockRank"
-			then 5
+			then (if type(d.Rarities) == "table" then rarityCount(d) else 0)
 			elseif
 				e.kind == "trainingLevel"
 				and type(d.Constants) == "table"
@@ -740,7 +753,7 @@ function MasterData.validate(data: any): { Issue }
 		c:error("(root)", "テーブルが必要")
 		return c.issues
 	end
-	validateConstants(c, data.Constants)
+	validateConstants(c, data.Constants, if type(data.Rarities) == "table" then #data.Rarities else 0)
 	validateContent(c, data)
 	validateLootAndStarter(c, data)
 	validateHiringData(c, data)
@@ -769,8 +782,19 @@ function MasterData.load(data: any): any
 	if #errors > 0 then
 		error("マスターデータの検証に失敗しました:\n" .. MasterData.formatIssues(errors), 2)
 	end
+	-- 宝箱のレアリティの抽選表（D-085）：0の行を除いた { rank, weight } の配列
+	for _, dg in data.Dungeons do
+		local t = {}
+		for rank, w in dg.chestRarityWeights do
+			if w > 0 then
+				table.insert(t, { rank = rank, weight = w })
+			end
+		end
+		dg.chestRarityTable = t
+	end
 	-- core が使う形にまとめる（読み取り専用）
 	return table.freeze({
+		rarityCount = #data.Rarities,
 		raw = data,
 		K = data.Constants,
 		rarities = data.Rarities,

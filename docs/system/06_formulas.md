@@ -51,7 +51,8 @@
   技巧合計 = 生存者の 実効dex の合計。罠師の勘の所持者は本人分を2倍で数える
 罠ダメージ(各生存者) = floor( 最大HP × (ダンジョンの trapDamageRate または Constants.trapDamageRate) )   -- D-067
 泉の回復(各生存者) = floor( 最大HP × fountainHealRate )                               -- D-018
-宝箱ランク = min( ダンジョンの最低ランク + chestRankOffsets から抽選, 5 )              -- D-015
+宝箱ランク（＝中の装備のレアリティ）= ダンジョンの chestRarityWeights から重み付き抽選   -- D-015, D-085
+  （表の長さがレアリティの数より短ければ、上位は出ない。最上位はリリース時ミシック＝6）
 ```
 
 ## 6. 幸運（D-019, Q-004 仮）

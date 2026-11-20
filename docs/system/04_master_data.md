@@ -47,7 +47,7 @@
 | `maxTurns` | 30 | D-009 |
 | `monsterScalePerBattle` | 0.20 | D-003 |
 | `eventWeights` | 宝箱0.40 / アイテム0.15 / 罠0.20 / 泉0.10 / なし0.15 | D-014 |
-| `chestRankOffsets` | +0:0.60 / +1:0.25 / +2:0.10 / +3:0.05 | D-015 |
+| （宝箱のレアリティ） | ダンジョンごとの `chestRarityWeights`（§4） | D-085 |
 | `fountainHealRate` | 0.25 | D-018 |
 | `trapK` / `trapDamageRate` | 40 / 0.20（ダンジョンごとに上書き可） | D-017, D-067 |
 | `healThreshold` / `healCoef` | 0.70 / 0.30（仮） | D-034, Q-004 |
@@ -77,9 +77,9 @@
 | `modifierChance` | 0.40（仮） | 06章 |
 | `potionChanceRarePlus` | 0.05、内訳 転職0.40 / 見た目変更0.30 / 見た目維持0.30（仮） | Q-011 |
 | `itemEventWeights` | チケット0.60 / 売却用0.40（仮） | Q-011 |
-| `sellRarityMult` | 1 / 1.5 / 2.5 / 4 / 7（仮） | 06章 |
+| `sellRarityMult` | 1 / 1.5 / 2.5 / 4 / 7 / 12（仮。レアリティの数だけ） | 06章, D-085 |
 | `sellGradeCoef` | 0.5（仮） | 06章 |
-| `equipRarityMult` | 1.0 / 1.3 / 1.7 / 2.2 / 3.0（仮） | Q-020 |
+| `equipRarityMult` | 1.0 / 1.3 / 1.7 / 2.2 / 3.0 / 4.0（仮。レアリティの数だけ） | Q-020, D-085 |
 | `equipGradeCoef` / `equipTierMult` | 0.10 / 1.30（仮） | Q-020, D-069 |
 | `guildExpPerFloor` / `guildExpClearBonus` / `guildExpFirstClear` | 1 / 5 / 50（仮） | Q-017 |
 | `guildLevelMax` | 20（仮） | Q-017 |
@@ -91,6 +91,24 @@
 - 調整の考え方：各ダンジョンに「想定段階」（`tools/sim/Stages.luau`。転生回数・レベル・装備）を割り当て、その段階のバランス編成で
   踏破率約60%（古い墓地は約97%）、所要秒が目標（50秒 → 150秒）になるよう、強さ・距離・罠レベル・経験値を自動で決める。
 - 数値を変えたいときは、テンプレートの目標値か段階の想定を変えて `lune run tools/sim/calibrate` を再実行する。
+- 宝箱のレアリティの出現率 `chestRarityWeights`（D-085）もテンプレートに書き、calibrate がそのまま写す（%、[1]=コモン…）。
+
+| ダンジョン | コモン | アンコモン | レア | エピック | レジェンド | ミシック |
+| --- | --- | --- | --- | --- | --- | --- |
+| 古い墓地 | 80 | 20 | | | | |
+| 罠の遺跡 | 70 | 25 | 5 | | | |
+| 封印の塔 | 55 | 32 | 11 | 2 | | |
+| 騎士の古城 | 42 | 36 | 17 | 5 | | |
+| 水没神殿 | 31 | 37 | 23 | 8 | 1 | |
+| 霧の大森林 | 21 | 36 | 29 | 12 | 2 | |
+| 地下大迷宮 | 13 | 32 | 33 | 17 | 5 | |
+| 呪われた修道院 | 7 | 26 | 35 | 23 | 8 | 1 |
+| 鋼鉄の要塞 | 3 | 20 | 34 | 29 | 12 | 2 |
+| 竜の巣 | 1 | 14 | 31 | 33 | 17 | 4 |
+| 魔界の門 | 0 | 9 | 27 | 36 | 22 | 6 |
+| 天空の玉座 | 0 | 5 | 22 | 37 | 27 | 9 |
+
+- **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、`exp_unlock` に段階を足す。検証が長さの食い違いをエラーにする。
 - 派遣費 `dispatchFee`（D-079）はテンプレートに書き、calibrate がそのまま写す。難度7以降のみ（仮：1千〜3万G）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 

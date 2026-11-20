@@ -94,7 +94,7 @@ local function snapshotHour(h: number)
 		spentFees = state.stats.goldSpentOnFees or 0,
 		chests = (function()
 			local n = 0
-			for _, v in Game.query.chestsByRank(state) do
+			for _, v in Game.query.chestsByRank(state, master) do
 				n += v
 			end
 			return n

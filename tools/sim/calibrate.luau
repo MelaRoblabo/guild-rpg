@@ -61,7 +61,7 @@ for i, t in Templates do
 		trapLevel = 1,
 		trapDamageRate = t.trapDamageRate,
 		dispatchFee = t.dispatchFee,
-		minChestRank = t.minChestRank,
+		chestRarityWeights = t.chestRarityWeights,
 		battleReward = { exp = 100, gold = math.floor(GOLD_BASE * GOLD_GROWTH ^ (i - 1) + 0.5) },
 		sellableItems = t.sellableItems,
 		jobPotionTargets = t.jobPotionTargets,
@@ -191,6 +191,14 @@ for i, t in Templates do
 end
 
 -- 生成 ------------------------------------------------------------------
+local function numList(xs: { number }): string
+	local q = {}
+	for _, x in xs do
+		table.insert(q, tostring(x))
+	end
+	return "{ " .. table.concat(q, ", ") .. " }"
+end
+
 local function list(xs: { string }): string
 	local q = {}
 	for _, x in xs do
@@ -235,7 +243,7 @@ for _, r in lines do
 	if r.trapDamageRate then
 		table.insert(out, `\t\ttrapDamageRate = {r.trapDamageRate},`)
 	end
-	table.insert(out, `\t\tminChestRank = {r.minChestRank},`)
+	table.insert(out, `\t\tchestRarityWeights = {numList(r.chestRarityWeights)},`)
 	if r.dispatchFee then
 		table.insert(out, `\t\tdispatchFee = {r.dispatchFee},`)
 	end

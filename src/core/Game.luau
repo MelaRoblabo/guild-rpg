@@ -455,7 +455,7 @@ handlers.OpenChests = function(state, cmd, ctx)
 	-- 開ける順：ダンジョンの並び順 → ランクの低い順
 	local master = ctx.master
 	local unlockRank = state.expansions.unlockRank
-	if cmd.rank ~= nil and (type(cmd.rank) ~= "number" or cmd.rank < 1 or cmd.rank > 5) then
+	if cmd.rank ~= nil and (type(cmd.rank) ~= "number" or cmd.rank < 1 or cmd.rank > master.rarityCount) then
 		return fail("INVALID_RARITY")
 	end
 	if cmd.count ~= nil and (type(cmd.count) ~= "number" or cmd.count < 1 or cmd.count ~= math.floor(cmd.count)) then
@@ -469,7 +469,7 @@ handlers.OpenChests = function(state, cmd, ctx)
 	local lockedExists = false
 	for _, d in master.dungeonList do
 		if cmd.dungeonId == nil or cmd.dungeonId == d.id then
-			for r = 1, 5 do
+			for r = 1, master.rarityCount do
 				if cmd.rank == nil or cmd.rank == r then
 					local n = Chest.count(state, d.id, r)
 					if n > 0 and r > unlockRank then
@@ -1036,9 +1036,9 @@ handlers.BuyExpansion = function(state, cmd, ctx)
 	}
 end
 
-handlers.SetAutoSell = function(state, cmd, _ctx)
+handlers.SetAutoSell = function(state, cmd, ctx)
 	local r = tonumber(cmd.maxRarity) or state.settings.autoSell.maxRarity
-	if r < 1 or r > 5 then
+	if r < 1 or r > ctx.master.rarityCount then
 		return fail("INVALID_RARITY")
 	end
 	state.settings.autoSell = {
@@ -1113,8 +1113,8 @@ function Game.query.sellPrice(item: any, master: any): number
 end
 
 -- 未開封の宝箱のランクごとの数（D-084）
-function Game.query.chestsByRank(state: any): { number }
-	return Chest.countByRank(state)
+function Game.query.chestsByRank(state: any, master: any): { number }
+	return Chest.countByRank(state, master)
 end
 
 function Game.query.trainingQuote(state: any, uid: string, targetLevel: number, master: any)
