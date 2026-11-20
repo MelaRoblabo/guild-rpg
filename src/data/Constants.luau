@@ -55,7 +55,7 @@ return {
 	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
 	expBase = 100,
 	expExponent = 1.5,
-	expCycleMult = { 1.185, 0.9454, 1.351, 2.373, 3.725, 5.962, 7.145, 12.32, 16.38 },
+	expCycleMult = { 1.323, 1.067, 1.585, 2.872, 4.499, 7.182, 8.839, 14.76, 19.99 },
 	levelCapInitial = 20, -- D-071
 	levelCapPerRebirth = 10,
 	levelCapMax = 100,
@@ -69,8 +69,9 @@ return {
 	--   加算分 = floor(上限 × u ^ p)、u は [0,1) の一様乱数、p = SkewBase + SkewPerRebirth × (転生回数 − 1)
 	--   p が大きいほど大きな値が出にくい（後半の転生ほど何度も回す）
 	rebirthBonusMaxRate = 0.30,
-	rebirthBonusSkewBase = 1.0,
-	rebirthBonusSkewPerRebirth = 0.5,
+	-- D-074：上限比70%以上（4項目平均）に届く期待回数が 1回目 約100回 → 8回目 約300回
+	rebirthBonusSkewBase = 2.073,
+	rebirthBonusSkewPerRebirth = 0.116,
 	rebirthFreeRerolls = 3,
 
 	-- 雇用（Q-006）
@@ -112,8 +113,8 @@ return {
 		{ id = "appearance_keep", weight = 0.30 },
 	},
 	itemEventWeights = {
-		{ id = "ticket", weight = 0.60 },
-		{ id = "sellable", weight = 0.40 },
+		{ id = "ticket", weight = 0.06 }, -- D-074：遊んで出る量を約1/10に。主な入手はギルドレベル報酬
+		{ id = "sellable", weight = 0.94 },
 	},
 	sellRarityMult = { 1, 1.5, 2.5, 4, 7 }, -- 仮
 	sellGradeCoef = 0.5, -- 仮
@@ -126,5 +127,5 @@ return {
 	guildExpPerFloor = 1,
 	guildExpClearBonus = 5,
 	guildExpFirstClear = 50,
-	guildLevelMax = 20,
+	-- ギルドレベルの必要経験値と報酬は src/data/GuildLevels.luau（tools/sim/progression が生成：D-074）
 }

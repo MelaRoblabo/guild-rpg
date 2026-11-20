@@ -10,6 +10,7 @@ local Chest = require("./Chest")
 local Expedition = require("./Expedition")
 local Formulas = require("./Formulas")
 local Growth = require("./Growth")
+local Guild = require("./Guild")
 local Appearance = require("./Appearance")
 local Hiring = require("./Hiring")
 local JobChange = require("./JobChange")
@@ -201,7 +202,7 @@ local function collect(state: any, e: any, master: any, events: { any })
 		state.clearedDungeons[e.dungeonId] = true
 		guildExp += K.guildExpFirstClear
 	end
-	state.guild.exp += guildExp
+	Guild.addExp(state, guildExp, master, events, e.returnAt)
 
 	state.expeditions[e.uid] = nil
 	bump(state, if log.result == "clear" then "clears" else "retreats")

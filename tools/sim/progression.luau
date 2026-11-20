@@ -26,7 +26,7 @@ local Types = require("../../src/core/Types")
 -- 目標：周回ごとの所要時間（時間）。0周目＝最初の転生まで（D-071）
 local TARGET_HOURS = { 1, 1, 2, 4, 8, 16, 24, 48, 72 }
 
-local opts = { tune = 0, write = false, seeds = 2 }
+local opts = { tune = 0, write = false, writeGuild = false, seeds = 2 }
 do
 	local a = process.args
 	local i = 1
@@ -37,6 +37,8 @@ do
 		elseif a[i] == "--seeds" then
 			opts.seeds = tonumber(a[i + 1]) or 2
 			i += 1
+		elseif a[i] == "--write-guild" then
+			opts.writeGuild = true
 		elseif a[i] == "--write" then
 			opts.write = true
 		end
@@ -66,6 +68,12 @@ local function runOnce(master: any, seed: number)
 	local cycle = 0
 	local cycleStart = now
 	local cycleSeconds = {}
+	local cycleTickets = {}
+	local cycleGuildExp = {}
+	local cycleGuildInfo = {}
+	local guildExpAtStart = 0
+	local guildTicketsAtStart = 0
+	local ticketsAtStart = 0
 	local firstClears = {}
 	local evalRng = Rng.new(seed * 7919)
 	local rebirthRng = Rng.new(seed * 104729)
@@ -175,6 +183,16 @@ local function runOnce(master: any, seed: number)
 		assert(guard < 400000, "ループが終わらない")
 		if allAtCap() then
 			table.insert(cycleSeconds, now - cycleStart)
+			-- アイテムイベント由来のチケット（ギルド報酬分を除く）
+			local guildTickets = state.stats.ticketsFromGuild or 0
+			local tickets = (state.items.itm_slot_ticket or 0) - guildTickets
+			table.insert(cycleTickets, tickets - ticketsAtStart)
+			ticketsAtStart = tickets
+			table.insert(cycleGuildInfo, { level = state.guild.level, tickets = guildTickets - guildTicketsAtStart })
+			guildTicketsAtStart = guildTickets
+			local gexp = state.stats.guildExpTotal or 0
+			table.insert(cycleGuildExp, gexp - guildExpAtStart)
+			guildExpAtStart = gexp
 			if cycle == #TARGET_HOURS - 1 then
 				break
 			end
@@ -204,16 +222,31 @@ local function runOnce(master: any, seed: number)
 		-- 宝箱は経験値に関係しないので捨てる（倉庫・保管上限の影響を避ける）
 		state.chests = {}
 	end
-	return cycleSeconds, firstClears
+	local _ = guildTicketsAtStart
+	return cycleSeconds, firstClears, cycleTickets, cycleGuildExp, cycleGuildInfo
 end
 
+local lastTickets = {}
+local lastGuildExp = {}
+local lastGuildInfo = {}
 local function measure(master: any)
 	local sums = {}
 	local clearsBySeed = {}
+	lastTickets = {}
+	lastGuildExp = {}
 	for seed = 1, opts.seeds do
-		local secs, clears = runOnce(master, seed)
+		local secs, clears, tickets, gexp, ginfo = runOnce(master, seed)
+		if seed == 1 then
+			lastGuildInfo = ginfo
+		end
+		for k, v in gexp do
+			lastGuildExp[k] = (lastGuildExp[k] or 0) + v / opts.seeds
+		end
 		for k, v in secs do
 			sums[k] = (sums[k] or 0) + v / opts.seeds
+		end
+		for k, v in tickets do
+			lastTickets[k] = (lastTickets[k] or 0) + v / opts.seeds
 		end
 		clearsBySeed[seed] = clears
 	end
@@ -225,17 +258,22 @@ local master = MasterData.load(data)
 
 local function report(secs: { number }, clears: any)
 	local total = 0
-	print("周回  上限Lv  所要（時間）  目標（時間）  倍率")
+	print(
+		"周回  上限Lv  所要（時間）  目標（時間）  倍率   チケット(探索)  ギルドLv  チケット(ギルド)"
+	)
 	for k, s in secs do
 		total += s
 		print(
 			string.format(
-				"%3d   %4d   %10.2f   %10.2f   %8.3f",
+				"%3d   %4d   %10.2f   %10.2f   %8.3f   %8.0f   %8d   %8d",
 				k - 1,
 				math.min(master.K.levelCapInitial + master.K.levelCapPerRebirth * (k - 1), master.K.levelCapMax),
 				s / 3600,
 				TARGET_HOURS[k],
-				master.K.expCycleMult[k]
+				master.K.expCycleMult[k],
+				lastTickets[k] or 0,
+				lastGuildInfo[k] and lastGuildInfo[k].level or 0,
+				lastGuildInfo[k] and lastGuildInfo[k].tickets or 0
 			)
 		)
 	end
@@ -274,6 +312,82 @@ for iter = 1, opts.tune do
 end
 
 report(secs, clears)
+
+-- ギルドレベル表の生成（D-074） --------------------------------------------
+-- 周回 k の終わりにギルドレベル 10(k+1) になるよう必要経験値を決め、
+-- 「1回の転生で4人が必要とするチケット × PLAY_SHARE」から、アイテムイベント由来の分を引いた残りを
+-- その周回のレベルアップ報酬に均等に割り振る。10の倍数のレベルではポーションも配る。
+local PLAY_SHARE = 0.5 -- 遊んで手に入る割合
+local ROLLS_FIRST, ROLLS_LAST = 100, 300 -- 1キャラが「良い結果」に届く期待回数（転生1回目・8回目）
+local LEVELS_PER_CYCLE = 10
+
+local function ticketsNeededForRebirth(n: number): number
+	local rolls = ROLLS_FIRST + (ROLLS_LAST - ROLLS_FIRST) * (n - 1) / 7
+	local paid = rolls - 1 - master.K.rebirthFreeRerolls
+	return 4 * paid * PLAY_SHARE
+end
+
+if opts.writeGuild then
+	local levels = {}
+	local maxLevel = 100
+	local cycles = #TARGET_HOURS
+	for lv = 1, maxLevel do
+		levels[lv] = { level = lv, expToNext = 0, rewards = {} }
+	end
+	for k = 1, cycles do
+		local startLv = if k == 1 then 1 else LEVELS_PER_CYCLE * (k - 1)
+		local endLv = LEVELS_PER_CYCLE * k
+		local ups = endLv - startLv
+		local gexp = lastGuildExp[k] or lastGuildExp[#lastGuildExp]
+		local perLevel = math.max(1, math.floor(gexp / ups + 0.5))
+		local n = math.min(k, 8)
+		local need = ticketsNeededForRebirth(n) - (lastTickets[k] or 0)
+		local perLevelTickets = math.max(1, math.ceil(need / ups))
+		for lv = startLv, endLv - 1 do
+			levels[lv].expToNext = perLevel
+			levels[lv + 1].rewards = { itm_slot_ticket = perLevelTickets }
+		end
+	end
+	-- 最終周回の後（90〜99）は最終周回と同じ
+	local last = levels[LEVELS_PER_CYCLE * cycles - 1]
+	for lv = LEVELS_PER_CYCLE * cycles, maxLevel - 1 do
+		levels[lv].expToNext = last.expToNext
+		levels[lv + 1].rewards = table.clone(levels[LEVELS_PER_CYCLE * cycles].rewards)
+	end
+	for lv = 10, maxLevel, 10 do
+		levels[lv].rewards.itm_potion_appearance_change = 1
+		levels[lv].rewards.itm_potion_appearance_keep = 1
+	end
+	local out = {
+		"--!strict",
+		"-- ギルドレベル（D-074）",
+		"-- ※このファイルは tools/sim/progression.luau（--write-guild）が生成する。手で編集しない。",
+		"-- expToNext：そのレベルから次のレベルまでの必要ギルド経験値 / rewards：そのレベルに上がったときの報酬",
+		"",
+		"return {",
+		`	maxLevel = {maxLevel},`,
+		"	levels = {",
+	}
+	for _, row in levels do
+		local r = {}
+		local keys = {}
+		for id in row.rewards do
+			table.insert(keys, id)
+		end
+		table.sort(keys)
+		for _, id in keys do
+			table.insert(r, `{id} = {row.rewards[id]}`)
+		end
+		table.insert(
+			out,
+			`		\{ level = {row.level}, expToNext = {row.expToNext}, rewards = \{ {table.concat(r, ", ")} \} \},`
+		)
+	end
+	table.insert(out, "	},")
+	table.insert(out, "}")
+	fs.writeFile("src/data/GuildLevels.luau", table.concat(out, "\n") .. "\n")
+	print("書き込み: src/data/GuildLevels.luau")
+end
 
 if opts.write then
 	local parts = {}

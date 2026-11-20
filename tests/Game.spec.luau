@@ -100,7 +100,7 @@ return function(t)
 				expect(e.log.result).toBe("clear")
 				Game.advance(s, ctx(e.returnAt))
 				expect(s.unlockedDungeons.dng_ruins).toBe(true)
-				expect(s.guild.exp).toBe(e.log.rewards.guildExp + master.K.guildExpFirstClear)
+				expect(s.stats.guildExpTotal).toBe(e.log.rewards.guildExp + master.K.guildExpFirstClear)
 			end
 		)
 	end)

@@ -293,7 +293,6 @@ local function validateConstants(c: Checker, k: any)
 	c:integer(p .. ".guildExpPerFloor", k.guildExpPerFloor, 0)
 	c:integer(p .. ".guildExpClearBonus", k.guildExpClearBonus, 0)
 	c:integer(p .. ".guildExpFirstClear", k.guildExpFirstClear, 0)
-	c:integer(p .. ".guildLevelMax", k.guildLevelMax, 1)
 end
 
 local STAT_SET = { str = true, mag = true, agi = true, dex = true, hp = true }
@@ -622,6 +621,29 @@ local function validateHiringData(c: Checker, d: any)
 	end
 end
 
+local function validateGuildLevels(c: Checker, d: any)
+	local G = d.GuildLevels
+	if type(G) ~= "table" then
+		c:error("GuildLevels", "テーブルが必要")
+		return
+	end
+	c:integer("GuildLevels.maxLevel", G.maxLevel, 1)
+	local itemIds = idSet(d.Items)
+	if c:array("GuildLevels.levels", G.levels, G.maxLevel) then
+		for i, row in G.levels do
+			local p = `GuildLevels.levels[{i}]`
+			if row.level ~= i then
+				c:error(p .. ".level", "level は 1 からの連番")
+			end
+			c:integer(p .. ".expToNext", row.expToNext, if i < G.maxLevel then 1 else 0)
+			for itemId, n in row.rewards or {} do
+				c:ref(p .. ".rewards", itemId, itemIds)
+				c:integer(`{p}.rewards.{itemId}`, n, 1)
+			end
+		end
+	end
+end
+
 -- id → 行 の索引を作る
 local function byId(rows: any): { [string]: any }
 	local m = {}
@@ -646,6 +668,7 @@ function MasterData.validate(data: any): { Issue }
 	validateContent(c, data)
 	validateLootAndStarter(c, data)
 	validateHiringData(c, data)
+	validateGuildLevels(c, data)
 	return c.issues
 end
 

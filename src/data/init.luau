@@ -17,4 +17,5 @@ return {
 	Appearances = require("./Appearances"),
 	Names = require("./Names"),
 	Uniques = require("./Uniques"),
+	GuildLevels = require("./GuildLevels"),
 }

@@ -106,7 +106,7 @@ end
 function Text.status(save: any, master: any): string
 	local s = save.state
 	local lines = {
-		`【{Text.clock(save)}】 所持金 {s.gold}G ／ ギルド経験値 {s.guild.exp}`,
+		`【{Text.clock(save)}】 所持金 {s.gold}G ／ ギルドLv{s.guild.level}（次まで {s.guild.exp}/{master.raw.GuildLevels.levels[s.guild.level].expToNext}） ／ チケット {s.items.itm_slot_ticket or 0}枚`,
 	}
 	for i, p in s.parties do
 		local names = {}
@@ -403,6 +403,19 @@ function Text.events(events: { any }, save: any, master: any): string
 			table.insert(lines, t .. `新しい見た目：{e.appearanceId}（looks-choose prev|cur で選ぶ）`)
 		elseif e.type == "AppearanceChanged" then
 			table.insert(lines, t .. `{advName(save, e.uid)} の見た目：{e.appearanceId}`)
+		elseif e.type == "GuildLevelUp" then
+			local got = {}
+			for id, n in e.rewards do
+				table.insert(got, `{master.items[id].name}×{n}`)
+			end
+			table.sort(got)
+			table.insert(
+				lines,
+				t
+					.. `ギルドが Lv{e.level} に上がった！ 報酬：{if #got > 0
+						then table.concat(got, "、")
+						else "なし"}`
+			)
 		elseif e.type == "Sold" then
 			table.insert(lines, t .. `売却して {e.gold}G を得た`)
 		end
