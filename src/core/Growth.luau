@@ -45,7 +45,7 @@ function Growth.addExp(adv: any, rawAmount: number, rng: Rng.Rng, master: any): 
 	end
 	adv.exp += math.floor(rawAmount * Growth.expMultiplier(adv, master))
 	while adv.level < adv.levelCap do
-		local need = Formulas.expToNext(adv.level, K)
+		local need = Formulas.expToNext(adv.level, K, adv.rebirthCount)
 		if adv.exp < need then
 			break
 		end

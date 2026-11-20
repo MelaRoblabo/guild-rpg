@@ -2,24 +2,24 @@
 -- 成長段階のモデル（バランス調整用。docs/reports/M1b_balance.md）
 -- 段階 i ＝ ダンジョン i に初めて挑むころの、平均的なパーティの状態（仮の想定）
 --   k: 転生回数 / level: レベル / gearTier: 装備のアイテムレベル / rarity・grade: 装備のレアリティ・グレード
--- 基礎ステータス：雇用範囲の中央値から始め、転生ごとに「上限レベル時の値の1/2＋加算分の中央値」を引き継ぐ。
+-- 基礎ステータス：雇用範囲の中央値から始め、転生ごとに「上限レベル時の値の1/2＋加算分の期待値」を引き継ぐ。
 -- 成長は職業の基準値どおり（振れ幅なし）。
 
 local Stages = {}
 
 Stages.list = {
 	{ k = 0, level = 1, gearTier = 1, rarity = 1, grade = 0 },
-	{ k = 0, level = 8, gearTier = 1, rarity = 1, grade = 1 },
-	{ k = 0, level = 15, gearTier = 2, rarity = 2, grade = 1 },
-	{ k = 0, level = 24, gearTier = 3, rarity = 2, grade = 1 },
-	{ k = 1, level = 25, gearTier = 4, rarity = 3, grade = 1 },
-	{ k = 1, level = 38, gearTier = 5, rarity = 3, grade = 1 },
-	{ k = 2, level = 45, gearTier = 6, rarity = 3, grade = 1 },
-	{ k = 3, level = 55, gearTier = 7, rarity = 4, grade = 1 },
-	{ k = 4, level = 65, gearTier = 8, rarity = 4, grade = 1 },
-	{ k = 5, level = 75, gearTier = 9, rarity = 4, grade = 1 },
-	{ k = 6, level = 85, gearTier = 10, rarity = 4, grade = 2 },
-	{ k = 7, level = 98, gearTier = 11, rarity = 5, grade = 1 },
+	{ k = 0, level = 6, gearTier = 1, rarity = 1, grade = 1 },
+	{ k = 0, level = 12, gearTier = 2, rarity = 2, grade = 1 },
+	{ k = 0, level = 18, gearTier = 3, rarity = 2, grade = 1 },
+	{ k = 1, level = 20, gearTier = 4, rarity = 3, grade = 1 },
+	{ k = 2, level = 25, gearTier = 5, rarity = 3, grade = 1 },
+	{ k = 3, level = 35, gearTier = 6, rarity = 3, grade = 1 },
+	{ k = 4, level = 45, gearTier = 7, rarity = 4, grade = 1 },
+	{ k = 5, level = 55, gearTier = 8, rarity = 4, grade = 1 },
+	{ k = 6, level = 65, gearTier = 9, rarity = 4, grade = 1 },
+	{ k = 7, level = 75, gearTier = 10, rarity = 4, grade = 2 },
+	{ k = 8, level = 90, gearTier = 11, rarity = 5, grade = 1 },
 }
 
 local STATS = { "str", "mag", "agi", "dex", "hp" }
@@ -36,9 +36,11 @@ local JOB_GEAR = {
 }
 
 -- 転生モデルに沿った基礎ステータス
+-- 転生時の加算分は「無料の引き直し＋1回」の最良値の期待値：上限 × n/(n+p)（D-072）
 function Stages.baseStats(master: any, jobId: string, k: number, level: number)
 	local K = master.K
 	local job = master.jobs[jobId]
+	local n = K.rebirthFreeRerolls + 1
 	local out = {}
 	for _, s in STATS do
 		local r = K.hireStatRange[s]
@@ -46,8 +48,8 @@ function Stages.baseStats(master: any, jobId: string, k: number, level: number)
 		for j = 0, k - 1 do
 			local cap = math.min(K.levelCapInitial + K.levelCapPerRebirth * j, K.levelCapMax)
 			local atCap = stat + job.growth[s] * (cap - 1)
-			local b = K.rebirthBonusRange[s]
-			stat = math.floor(atCap / 2) + math.floor((b.min + b.max) / 2)
+			local p = K.rebirthBonusSkewBase + K.rebirthBonusSkewPerRebirth * j
+			stat = math.floor(atCap / 2) + math.floor(atCap * K.rebirthBonusMaxRate * n / (n + p))
 		end
 		out[s] = stat + job.growth[s] * (level - 1)
 	end

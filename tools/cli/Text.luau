@@ -153,7 +153,8 @@ function Text.adventurer(save: any, uid: string, master: any): string
 	local lines = {
 		`{a.name}（{job.name}・{if job.attackType == "physical" then "物理攻撃職" else "魔法攻撃職"}） Lv{a.level}/{a.levelCap} 経験値 {a.exp}/{Game.query.expToNext(
 			a.level,
-			master
+			master,
+			a.rebirthCount
 		)} 転生{a.rebirthCount}回`,
 		`基礎：腕力{a.baseStats.str} 魔力{a.baseStats.mag} 俊敏{a.baseStats.agi} 技巧{a.baseStats.dex} HP{a.baseStats.hp}`,
 		`実効：HP{snap.maxHp} 攻撃力{snap.atk} 物理防御{snap.pdef} 魔法防御{snap.mdef} 俊敏{snap.agi} 技巧{snap.dex}`,

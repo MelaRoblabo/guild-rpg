@@ -5,7 +5,7 @@
 
 return {
 	gold = 500,
-	expansions = { partySlots = 1, candidateSlots = 3, rosterSize = 8, warehouseSize = 100 },
+	expansions = { partySlots = 1, candidateSlots = 3, rosterSize = 8, warehouseSize = 300 },
 	adventurers = {
 		{
 			name = "アルド",

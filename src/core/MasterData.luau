@@ -205,6 +205,22 @@ local function validateConstants(c: Checker, k: any)
 	c:integer(p .. ".growthVariance", k.growthVariance, 0)
 	c:number(p .. ".expBase", k.expBase, 1)
 	c:number(p .. ".expExponent", k.expExponent, 0)
+	if c:array(p .. ".expCycleMult", k.expCycleMult) then
+		for i, v in k.expCycleMult do
+			c:number(`{p}.expCycleMult[{i}]`, v, 0.0001)
+		end
+		if
+			type(k.levelCapInitial) == "number"
+			and type(k.levelCapPerRebirth) == "number"
+			and type(k.levelCapMax) == "number"
+			and k.levelCapPerRebirth > 0
+		then
+			local cycles = math.ceil((k.levelCapMax - k.levelCapInitial) / k.levelCapPerRebirth) + 1
+			if #k.expCycleMult < cycles then
+				c:error(p .. ".expCycleMult", `転生の周回数（{cycles}）分の倍率が必要`)
+			end
+		end
+	end
 	c:integer(p .. ".levelCapInitial", k.levelCapInitial, 1)
 	c:integer(p .. ".levelCapPerRebirth", k.levelCapPerRebirth, 0)
 	c:integer(p .. ".levelCapMax", k.levelCapMax, 1)
@@ -231,12 +247,9 @@ local function validateConstants(c: Checker, k: any)
 			c:error(p .. ".rebirthGiftAddAt", "初期1つ＋追加回数が giftMax を超える")
 		end
 	end
-	for _, s in Types.STAT_KEYS do
-		c:range(
-			`{p}.rebirthBonusRange.{s}`,
-			if type(k.rebirthBonusRange) == "table" then k.rebirthBonusRange[s] else nil
-		)
-	end
+	c:probability(p .. ".rebirthBonusMaxRate", k.rebirthBonusMaxRate)
+	c:number(p .. ".rebirthBonusSkewBase", k.rebirthBonusSkewBase, 0)
+	c:number(p .. ".rebirthBonusSkewPerRebirth", k.rebirthBonusSkewPerRebirth, 0)
 	c:integer(p .. ".rebirthFreeRerolls", k.rebirthFreeRerolls, 0)
 
 	-- 雇用

@@ -57,11 +57,11 @@
 | `personalBonusCap` | 0.50 | D-070 |
 | （道案内・大食らいの効果量はギフトのデータに持つ） | — | 04章 §5 |
 | `growthVariance` | 1（±1、最低0） | D-043 |
-| `expCurve` | 必要経験値＝floor(100 × Lv^1.5)（仮） | 07章 |
-| `levelCapInitial` / `levelCapPerRebirth` / `levelCapMax` | 30 / 10 / 100（仮） | 07章 |
+| `expBase` / `expExponent` / `expCycleMult` | 100 / 1.5 / 周回ごとの倍率（`tools/sim/progression` が自動調整） | D-071 |
+| `levelCapInitial` / `levelCapPerRebirth` / `levelCapMax` | 20 / 10 / 100 | D-071 |
 | `rebirthExpBonusPerCount` | 0.5（仮） | 07章 |
 | `rebirthGiftAddAt` / `giftMax` | {2, 4, 6} / 4 | D-024 |
-| `rebirthBonusRange` | 腕力・魔力・俊敏・技巧 0〜20、HP 0〜50（仮） | Q-009 |
+| `rebirthBonusMaxRate` / `rebirthBonusSkewBase` / `rebirthBonusSkewPerRebirth` | 0.30 / 1.0 / 0.5 | D-072 |
 | `rebirthFreeRerolls` | 3（初回を含まない、仮） | Q-009 |
 | `hireCost` | 300G（仮） | Q-006 |
 | `hireStatRange` | 4項目 5〜20、HP 30〜60。ギルドLvごとに上限+1（HP+3）（仮） | Q-006 |
@@ -79,7 +79,7 @@
 | `equipGradeCoef` / `equipTierMult` | 0.10 / 1.30（仮） | Q-020, D-069 |
 | `guildExpPerFloor` / `guildExpClearBonus` / `guildExpFirstClear` | 1 / 5 / 50（仮） | Q-017 |
 | `guildLevelMax` | 20（仮） | Q-017 |
-| `chestStorageMax` | 200（仮） | Q-020 |
+| `chestStorageMax` | 500 | D-071 |
 
 ## 4. ダンジョン（D-068, D-069）
 
@@ -95,6 +95,6 @@
 
 ## 6. 初期状態（StarterSet.luau、Q-020 仮）
 
-- 所持金 500G、パーティ枠1、候補枠3、所属枠8、倉庫100。
+- 所持金 500G、パーティ枠1、候補枠3、所属枠8、倉庫300（D-071）。
 - 冒険者4人（戦士・盗賊・魔法使い・僧侶 各1、Lv1、基礎ステータスは固定値）を初期パーティの隊列1〜4に配置。各自コモンの武器・防具を装備。
 - 「最初の宝箱を1分以内」（01章）を満たすよう、古い墓地の初回は確実に宝箱1個以上（踏破確定宝箱）を得られる強さにする。

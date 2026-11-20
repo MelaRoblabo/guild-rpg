@@ -51,23 +51,26 @@ return {
 
 	-- 成長（D-043, 07章）
 	growthVariance = 1,
-	expBase = 100, -- 必要経験値 = floor(expBase * Lv^expExponent)（仮）
+	-- 必要経験値 = floor(expBase × Lv^expExponent × expCycleMult[転生回数+1])（D-071）
+	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
+	expBase = 100,
 	expExponent = 1.5,
-	levelCapInitial = 30, -- 仮
-	levelCapPerRebirth = 10, -- 仮
-	levelCapMax = 100, -- 仮
+	expCycleMult = { 1.185, 0.9454, 1.351, 2.373, 3.725, 5.962, 7.145, 12.32, 16.38 },
+	levelCapInitial = 20, -- D-071
+	levelCapPerRebirth = 10,
+	levelCapMax = 100,
 	rebirthExpBonusPerCount = 0.5, -- 仮
 
 	-- 転生（D-024, Q-009）
 	rebirthGiftAddAt = { 2, 4, 6 },
 	giftMax = 4,
-	rebirthBonusRange = {
-		str = { min = 0, max = 20 },
-		mag = { min = 0, max = 20 },
-		agi = { min = 0, max = 20 },
-		dex = { min = 0, max = 20 },
-		hp = { min = 0, max = 50 },
-	},
+	-- 転生スロットの加算分（D-072）
+	--   上限 = floor(転生前の値 × rebirthBonusMaxRate)
+	--   加算分 = floor(上限 × u ^ p)、u は [0,1) の一様乱数、p = SkewBase + SkewPerRebirth × (転生回数 − 1)
+	--   p が大きいほど大きな値が出にくい（後半の転生ほど何度も回す）
+	rebirthBonusMaxRate = 0.30,
+	rebirthBonusSkewBase = 1.0,
+	rebirthBonusSkewPerRebirth = 0.5,
 	rebirthFreeRerolls = 3,
 
 	-- 雇用（Q-006）
@@ -117,7 +120,7 @@ return {
 	equipRarityMult = { 1.0, 1.3, 1.7, 2.2, 3.0 }, -- 仮（Q-020）
 	equipGradeCoef = 0.10, -- 仮（Q-020）
 	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
-	chestStorageMax = 200, -- 仮（Q-020）
+	chestStorageMax = 500, -- D-071
 
 	-- ギルド（Q-017）
 	guildExpPerFloor = 1,

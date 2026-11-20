@@ -562,8 +562,8 @@ function Game.query.sellPrice(item: any, master: any): number
 	return Inventory.equipmentSellPrice(item, master)
 end
 
-function Game.query.expToNext(level: number, master: any): number
-	return Formulas.expToNext(level, master.K)
+function Game.query.expToNext(level: number, master: any, rebirthCount: number?): number
+	return Formulas.expToNext(level, master.K, rebirthCount)
 end
 
 return Game

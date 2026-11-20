@@ -75,7 +75,7 @@
 ```
 勝利時の経験値 = 戦闘報酬の経験値を勝利時点の生存者で等分（端数切り捨て）            -- D-041
   個人倍率 = (1 + rebirthExpBonusPerCount × 転生回数) × (1 + 大食らい 0.10)
-必要経験値(Lv→Lv+1) = floor(100 × Lv^1.5)
+必要経験値(Lv→Lv+1) = floor(100 × Lv^1.5 × expCycleMult[転生回数+1])   -- D-071
 レベルアップ時の成長(各項目) = max(0, 職業の基準値 + rng:int(−growthVariance, +growthVariance))   -- D-043
   成長は baseStats に加算。転職後は新しい職業の基準値を使う                            -- D-045
 レベル上限に達したら経験値は貯めない
@@ -85,7 +85,8 @@
 
 ```
 引き継ぎ = floor(転生前 baseStats.s / 2)        -- 装備・ギフト補正を含まない素の値
-加算分   = rng:int(rebirthBonusRange.s.min, rebirthBonusRange.s.max)
+加算分   = floor( floor(転生前の値 × rebirthBonusMaxRate) × u^p )   u は [0,1) の一様乱数     -- D-072
+           p = rebirthBonusSkewBase + rebirthBonusSkewPerRebirth × (転生後の回数 − 1)
 転生後   = 引き継ぎ + 加算分。Lv1、levelCap = min(levelCap + levelCapPerRebirth, levelCapMax)
 ギフト追加：転生後の rebirthCount が rebirthGiftAddAt に含まれれば、未所持のギフトから1つ抽選
 ```

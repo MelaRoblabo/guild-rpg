@@ -265,8 +265,24 @@ function Formulas.travelSeconds(snaps: { MemberSnapshot }, dungeon: any, K: any)
 end
 
 -- 06章 §8：必要経験値（Lv → Lv+1）
-function Formulas.expToNext(level: number, K: any): number
-	return math.floor(K.expBase * level ^ K.expExponent)
+-- D-071：転生回数ごとの倍率を掛ける
+function Formulas.expToNext(level: number, K: any, rebirthCount: number?): number
+	local mult = K.expCycleMult[math.min((rebirthCount or 0) + 1, #K.expCycleMult)]
+	return math.floor(K.expBase * level ^ K.expExponent * mult)
+end
+
+-- D-072：転生スロットの加算分の上限と抽選（newRebirthCount は転生後の回数 1〜）
+function Formulas.rebirthBonusMax(prevStat: number, K: any): number
+	return math.floor(prevStat * K.rebirthBonusMaxRate)
+end
+
+function Formulas.rebirthBonusSkew(newRebirthCount: number, K: any): number
+	return K.rebirthBonusSkewBase + K.rebirthBonusSkewPerRebirth * (newRebirthCount - 1)
+end
+
+function Formulas.rollRebirthBonus(prevStat: number, newRebirthCount: number, rng: any, K: any): number
+	local max = Formulas.rebirthBonusMax(prevStat, K)
+	return math.floor(max * rng:float() ^ Formulas.rebirthBonusSkew(newRebirthCount, K))
 end
 
 return Formulas
