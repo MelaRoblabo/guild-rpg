@@ -1,3 +1,6 @@
-std = "roblox"
+# core と tools は Roblox API を使わないため、標準の Luau のみを許可する（CLAUDE.md §2）。
+# M7 で src/server・src/client 用に roblox 標準を追加する。
+std = "luau"
+
 [rules]
 global_usage = "deny"
