@@ -1,0 +1,18 @@
+{
+  "name": "guild-rpg",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Core": { "$path": "build/core" },
+      "Data": { "$path": "build/data" }
+    },
+    "ServerScriptService": {
+      "Server": { "$path": "build/server" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": { "$path": "build/client" }
+      }
+    }
+  }
+}
