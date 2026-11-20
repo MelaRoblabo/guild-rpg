@@ -18,4 +18,5 @@ return {
 	Names = require("./Names"),
 	Uniques = require("./Uniques"),
 	GuildLevels = require("./GuildLevels"),
+	Expansions = require("./Expansions"),
 }

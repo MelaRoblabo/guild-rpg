@@ -41,7 +41,7 @@ return {
 	-- 移動・再生（D-021, D-026, Q-004）
 	travelSecondsPerDistance = 10, -- 仮
 	-- 片道秒 = 距離 × travelSecondsPerDistance × clamp(ダンジョンの基準俊敏 ÷ 平均俊敏, Min, Max)（D-069）
-	travelSpeedMin = 0.6,
+	travelSpeedMin = 0.8, -- D-075：強くなって速くなる幅を抑える（帰還間隔30秒の目標）
 	travelSpeedMax = 1.4,
 	replaySecondsPerTurn = 1,
 	replaySecondsPerEvent = 2,
@@ -55,7 +55,7 @@ return {
 	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
 	expBase = 100,
 	expExponent = 1.5,
-	expCycleMult = { 1.323, 1.067, 1.585, 2.872, 4.499, 7.182, 8.839, 14.76, 19.99 },
+	expCycleMult = { 1.179, 0.8121, 1.333, 2.228, 3.312, 5.418, 6.867, 11.84, 15.6 },
 	levelCapInitial = 20, -- D-071
 	levelCapPerRebirth = 10,
 	levelCapMax = 100,

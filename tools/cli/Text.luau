@@ -54,6 +54,11 @@ local ERRORS = {
 	SAME_JOB = "すでにその職業です",
 	UNIQUE_JOB_RESTRICTED = "このユニークキャラはその職業に転職できません",
 	UNIQUE_CANNOT_CHANGE = "ユニークキャラの見た目は変えられません",
+	EXPANSION_NOT_FOUND = "その拡張はありません",
+	EXPANSION_MAXED = "これ以上拡張できません",
+	GUILD_LEVEL_TOO_LOW = "ギルドレベルが足りません",
+	DUNGEON_NOT_CLEARED = "必要なダンジョンをまだ踏破していません",
+	INVALID_RARITY = "レアリティは1〜5です",
 }
 
 function Text.errorText(code: string?): string
@@ -416,6 +421,13 @@ function Text.events(events: { any }, save: any, master: any): string
 						then table.concat(got, "、")
 						else "なし"}`
 			)
+		elseif e.type == "Expanded" then
+			table.insert(
+				lines,
+				t .. `{master.expansions[e.expansionId].name}を拡張した（→ {e.value}、{e.gold}G）`
+			)
+		elseif e.type == "UniqueJoined" then
+			table.insert(lines, t .. `★ {master.uniques[e.uniqueId].name} が仲間に加わった！`)
 		elseif e.type == "Sold" then
 			table.insert(lines, t .. `売却して {e.gold}G を得た`)
 		end
@@ -516,6 +528,24 @@ function Text.rebirth(save: any, _master: any): string
 		lines,
 		`  無料の引き直し 残り{r.freeRerollsLeft}回 ／ チケット {save.state.items.itm_slot_ticket or 0}枚`
 	)
+	return table.concat(lines, "\n")
+end
+
+function Text.expansions(save: any, master: any): string
+	local lines = {}
+	for _, e in master.raw.Expansions do
+		local cur = save.state.expansions[e.kind]
+		local nextStep = Game.nextExpansionStep(save.state, e.id, master)
+		if nextStep then
+			local cond = `ギルドLv{nextStep.guildLevel}`
+			if nextStep.requiresClear then
+				cond ..= `・{master.dungeons[nextStep.requiresClear].name}を踏破`
+			end
+			table.insert(lines, `{e.id} {e.name}：{cur} → {nextStep.value}（{cond}、{nextStep.gold}G）`)
+		else
+			table.insert(lines, `{e.id} {e.name}：{cur}（最大）`)
+		end
+	end
 	return table.concat(lines, "\n")
 end
 

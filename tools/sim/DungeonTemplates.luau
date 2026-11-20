@@ -5,7 +5,8 @@
 --
 -- stage        : 想定パーティの段階（tools/sim/Stages.luau の番号）
 -- targetClear  : 想定パーティでの踏破率の目標
--- timeTarget   : 想定パーティでの所要秒の目標（難しいほど長く。最終盤で約150秒：D-069）
+-- timeTarget   : 想定パーティでの所要秒の目標（難しいほど長く：D-069。実際の周回は想定より強い状態で回るため、
+--                難度3以降は1.25倍に置く：D-075）
 -- ratios       : モンスター基準値の比率（hp・atk・pdef・mdef）。全体の大きさは calibrate が決める
 -- trapEvade    : 想定パーティの罠回避率の目標
 
@@ -63,7 +64,7 @@ return {
 		id = "dng_tower",
 		name = "封印の塔",
 		stage = 3,
-		timeTarget = 75,
+		timeTarget = 94,
 		floors = 11,
 		terrainTags = { "indoor" },
 		ratios = ARCANE,
@@ -82,7 +83,7 @@ return {
 		id = "dng_castle",
 		name = "騎士の古城",
 		stage = 4,
-		timeTarget = 85,
+		timeTarget = 106,
 		floors = 13,
 		terrainTags = { "indoor" },
 		ratios = ARMORED,
@@ -101,7 +102,7 @@ return {
 		id = "dng_sunken_temple",
 		name = "水没神殿",
 		stage = 5,
-		timeTarget = 95,
+		timeTarget = 119,
 		floors = 13,
 		terrainTags = { "indoor" },
 		ratios = BAL,
@@ -120,7 +121,7 @@ return {
 		id = "dng_mist_forest",
 		name = "霧の大森林",
 		stage = 6,
-		timeTarget = 105,
+		timeTarget = 131,
 		floors = 15,
 		terrainTags = { "outdoor" },
 		ratios = BEAST,
@@ -139,7 +140,7 @@ return {
 		id = "dng_labyrinth",
 		name = "地下大迷宮",
 		stage = 7,
-		timeTarget = 115,
+		timeTarget = 144,
 		floors = 15,
 		terrainTags = { "indoor" },
 		ratios = BAL,
@@ -160,7 +161,7 @@ return {
 		id = "dng_abbey",
 		name = "呪われた修道院",
 		stage = 8,
-		timeTarget = 125,
+		timeTarget = 156,
 		floors = 17,
 		terrainTags = { "indoor" },
 		ratios = ARCANE,
@@ -179,7 +180,7 @@ return {
 		id = "dng_iron_fortress",
 		name = "鋼鉄の要塞",
 		stage = 9,
-		timeTarget = 132,
+		timeTarget = 165,
 		floors = 17,
 		terrainTags = { "indoor" },
 		ratios = ARMORED,
@@ -198,7 +199,7 @@ return {
 		id = "dng_dragon_nest",
 		name = "竜の巣",
 		stage = 10,
-		timeTarget = 140,
+		timeTarget = 175,
 		floors = 19,
 		terrainTags = { "outdoor" },
 		ratios = DRAGON,
@@ -217,7 +218,7 @@ return {
 		id = "dng_demon_gate",
 		name = "魔界の門",
 		stage = 11,
-		timeTarget = 145,
+		timeTarget = 181,
 		floors = 19,
 		terrainTags = { "indoor" },
 		ratios = ARCANE,
@@ -236,7 +237,7 @@ return {
 		id = "dng_sky_throne",
 		name = "天空の玉座",
 		stage = 12,
-		timeTarget = 150,
+		timeTarget = 188,
 		floors = 21,
 		terrainTags = { "outdoor" },
 		ratios = DRAGON,

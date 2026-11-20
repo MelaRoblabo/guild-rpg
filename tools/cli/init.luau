@@ -120,7 +120,10 @@ local HELP = [[
   rb-choose <prev|cur>       転生スロットの結果を確定する
   jobchange <adv_uid> <job_id>   転職ポーションで転職する
   looks <adv_uid>            見た目変更ポーションを使う
-  looks-choose <prev|cur>    見た目を選ぶ（prev＝今の姿、cur＝新しい姿）]]
+  looks-choose <prev|cur>    見た目を選ぶ（prev＝今の姿、cur＝新しい姿）
+  expansions                 拡張の一覧（次の段階の条件と費用）
+  expand <exp_id>            拡張を買う
+  autosell <on|off> [最大レアリティ1-5] [keep|all]  自動売却（keep＝修飾語つきは残す）]]
 
 local function handle(tokens: { string }): (boolean, any)
 	local c = tokens[1]
@@ -241,6 +244,17 @@ local function handle(tokens: { string }): (boolean, any)
 	elseif c == "looks-choose" then
 		local which = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else tokens[2]
 		result = run({ type = "ChangeAppearanceChoose", which = which })
+	elseif c == "expansions" then
+		say(Text.expansions(save, master))
+	elseif c == "expand" then
+		result = run({ type = "BuyExpansion", expansionId = tokens[2] })
+	elseif c == "autosell" then
+		result = run({
+			type = "SetAutoSell",
+			enabled = tokens[2] == "on",
+			maxRarity = tonumber(tokens[3]),
+			keepModified = tokens[4] ~= "all",
+		})
 	elseif c == "dismiss" then
 		result = run({ type = "Dismiss", adventurerUid = tokens[2] })
 	elseif c == "lock" or c == "unlock" then

@@ -31,7 +31,7 @@ lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   
 | `hire` / `candidates` / `pick <n>` / `reroll` / `choose prev\|cur` / `cancel` | Hire 系（M3） |
 | `rename <uid> <名前>` / `dismiss <uid>` | Rename / Dismiss（M3） |
 | `rebirth <uid> [keep]` / `jobchange <uid> <job>` / `looks <uid>` | M4 |
-| `expand <id>` / `autosell ...` | M5 |
+| `expansions` / `expand <exp_id>` / `autosell <on\|off> [レアリティ] [keep\|all]` | M5 |
 | `log` | 直近のイベントを表示 |
 
 - 状態はコマンドごとに JSON ファイルへ保存する（中断・再開できる）。
@@ -58,7 +58,7 @@ lune run tools/sim -- sweep --dungeon all --party presets/* --runs 2000
 決まった方針（ポリシー）でゲーム全体を長時間遊び、指標を集計する。
 
 ```bash
-lune run tools/autoplay -- --policy greedy --hours 10 --seeds 50
+lune run tools/autoplay -- --hours 72 --seed 1
 ```
 
 - ポリシーは `tools/autoplay/policies/*.luau`。「次に何をするか」を状態から決める関数。

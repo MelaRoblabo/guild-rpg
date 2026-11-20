@@ -82,7 +82,7 @@ function Game.newState(master: any, seed: number, now: number): any
 		clearedDungeons = {},
 		hireSession = nil,
 		rebirthSession = nil,
-		settings = { autoSell = { enabled = false, maxRarity = 1 } },
+		settings = { autoSell = { enabled = false, maxRarity = 1, keepModified = true } },
 		stats = {},
 		createdAt = now,
 		lastAdvancedAt = now,
@@ -229,6 +229,28 @@ local function collect(state: any, e: any, master: any, events: { any })
 	end
 	if firstClear then
 		table.insert(events, { type = "FirstClear", at = e.returnAt, dungeonId = e.dungeonId })
+		-- ユニークキャラの初回踏破報酬（02章 §2、企画書§16.7）。所属枠を超えても加入する
+		for _, u in master.raw.Uniques do
+			if u.acquire == "firstClear:" .. e.dungeonId then
+				local owned = false
+				for _, a in state.adventurers do
+					owned = owned or a.uniqueId == u.id
+				end
+				if not owned then
+					local uid = newUid(state, "adv")
+					local cand = {
+						uniqueId = u.id,
+						name = u.name,
+						gender = u.gender,
+						appearanceId = u.appearanceId,
+						jobId = u.jobId,
+						giftIds = u.giftIds,
+					}
+					state.adventurers[uid] = Hiring.newAdventurer(uid, cand, u.baseStats, e.returnAt, master)
+					table.insert(events, { type = "UniqueJoined", at = e.returnAt, uid = uid, uniqueId = u.id })
+				end
+			end
+		end
 		for _, d in master.dungeonList do
 			if d.unlockAfterClear == e.dungeonId and not state.unlockedDungeons[d.id] then
 				state.unlockedDungeons[d.id] = true
@@ -443,6 +465,27 @@ handlers.OpenChests = function(state, cmd, ctx)
 		end
 		local rng = takeRng(state)
 		local opened = Chest.open(state, c, rng, ctx.master)
+		-- 自動売却（06章 §6）：保護中の品は対象外（開けたばかりの品は保護されていない）
+		local auto = state.settings.autoSell
+		if auto.enabled then
+			local kept = {}
+			opened.autoSold = {}
+			opened.autoSoldGold = 0
+			for _, uid in opened.equipmentUids do
+				local item = state.equipment[uid]
+				if item.rarity <= auto.maxRarity and not (auto.keepModified and item.modifierId) then
+					local price = Inventory.equipmentSellPrice(item, ctx.master)
+					state.gold += price
+					opened.autoSoldGold += price
+					table.insert(opened.autoSold, { baseId = item.baseId, rarity = item.rarity, grade = item.grade })
+					state.equipment[uid] = nil
+					bump(state, "goldFromSales", price)
+				else
+					table.insert(kept, uid)
+				end
+			end
+			opened.equipmentUids = kept
+		end
 		local idx = table.find(state.chests, c)
 		if idx then
 			table.remove(state.chests, idx)
@@ -866,6 +909,69 @@ handlers.ChangeAppearanceChoose = function(state, cmd, ctx)
 		ok = true,
 		events = { { type = "AppearanceChanged", at = ctx.now, uid = a.adventurerUid, appearanceId = id } },
 	}
+end
+
+-- 拡張・設定（08章 §4、06章 §6） --------------------------------------------
+
+-- 次に買える段階（なければ nil）
+function Game.nextExpansionStep(state: any, expansionId: string, master: any): any
+	local e = master.expansions[expansionId]
+	if not e then
+		return nil
+	end
+	local current = state.expansions[e.kind]
+	for _, s in e.steps do
+		if s.value > current then
+			return s
+		end
+	end
+	return nil
+end
+
+handlers.BuyExpansion = function(state, cmd, ctx)
+	local master = ctx.master
+	local e = master.expansions[cmd.expansionId]
+	if not e then
+		return fail("EXPANSION_NOT_FOUND")
+	end
+	local step = Game.nextExpansionStep(state, cmd.expansionId, master)
+	if not step then
+		return fail("EXPANSION_MAXED")
+	end
+	if state.guild.level < step.guildLevel then
+		return fail("GUILD_LEVEL_TOO_LOW")
+	end
+	if step.requiresClear and not state.clearedDungeons[step.requiresClear] then
+		return fail("DUNGEON_NOT_CLEARED")
+	end
+	if state.gold < step.gold then
+		return fail("NOT_ENOUGH_GOLD")
+	end
+	state.gold -= step.gold
+	state.expansions[e.kind] = step.value
+	if e.kind == "partySlots" then
+		for i = #state.parties + 1, step.value do
+			state.parties[i] = { index = i, slots = Party.newSlots(), autoRepeat = nil }
+		end
+	end
+	bump(state, "goldSpentOnExpansions", step.gold)
+	return {
+		ok = true,
+		events = { { type = "Expanded", at = ctx.now, expansionId = e.id, value = step.value, gold = step.gold } },
+	}
+end
+
+handlers.SetAutoSell = function(state, cmd, _ctx)
+	local r = tonumber(cmd.maxRarity) or state.settings.autoSell.maxRarity
+	if r < 1 or r > 5 then
+		return fail("INVALID_RARITY")
+	end
+	state.settings.autoSell = {
+		enabled = cmd.enabled == true,
+		maxRarity = r,
+		keepModified = if cmd.keepModified == nil then true else cmd.keepModified == true,
+	}
+	return { ok = true, events = {} }
 end
 
 Game.COMMANDS = {}

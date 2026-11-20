@@ -644,6 +644,37 @@ local function validateGuildLevels(c: Checker, d: any)
 	end
 end
 
+local function validateExpansions(c: Checker, d: any)
+	c:uniqueIds("Expansions", d.Expansions, "exp_")
+	if type(d.Expansions) ~= "table" then
+		return
+	end
+	for i, e in d.Expansions do
+		local p = `Expansions[{i}]`
+		oneOf(
+			c,
+			p .. ".kind",
+			e.kind,
+			{ partySlots = true, candidateSlots = true, rosterSize = true, warehouseSize = true }
+		)
+		if c:array(p .. ".steps", e.steps) then
+			local prev = -math.huge
+			for k, s in e.steps do
+				local q = `{p}.steps[{k}]`
+				if c:integer(q .. ".value", s.value, 1) and s.value <= prev then
+					c:error(q .. ".value", "昇順が必要")
+				end
+				prev = if type(s.value) == "number" then s.value else prev
+				c:integer(q .. ".guildLevel", s.guildLevel, 1)
+				c:integer(q .. ".gold", s.gold, 0)
+				if s.requiresClear ~= nil then
+					c:ref(q .. ".requiresClear", s.requiresClear, idSet(d.Dungeons))
+				end
+			end
+		end
+	end
+end
+
 -- id → 行 の索引を作る
 local function byId(rows: any): { [string]: any }
 	local m = {}
@@ -669,6 +700,7 @@ function MasterData.validate(data: any): { Issue }
 	validateLootAndStarter(c, data)
 	validateHiringData(c, data)
 	validateGuildLevels(c, data)
+	validateExpansions(c, data)
 	return c.issues
 end
 
@@ -708,6 +740,7 @@ function MasterData.load(data: any): any
 		dungeonList = data.Dungeons,
 		appearances = byId(data.Appearances),
 		uniques = byId(data.Uniques),
+		expansions = byId(data.Expansions),
 	})
 end
 
