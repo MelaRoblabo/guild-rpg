@@ -1,4 +1,5 @@
 --!strict
+local Chest = require("../src/core/Chest")
 local Game = require("../src/core/Game")
 local Guild = require("../src/core/Guild")
 local Inventory = require("../src/core/Inventory")
@@ -91,8 +92,8 @@ return function(t)
 		local function withChests(n: number, rank: number)
 			local s = Game.newState(master, 1, T0)
 			s.expansions.unlockRank = 5 -- 解錠技術は別のテスト（D-078）
-			for i = 1, n do
-				table.insert(s.chests, { uid = "ch_t" .. i, rank = rank, dungeonId = "dng_ruins", obtainedAt = T0 })
+			for _ = 1, n do
+				Chest.add(s, "dng_ruins", rank, 1)
 			end
 			return s
 		end
@@ -100,7 +101,7 @@ return function(t)
 			local s = withChests(50, 1)
 			exec(s, { type = "SetAutoSell", enabled = true, maxRarity = 1, keepModified = true })
 			local gold0 = s.gold
-			exec(s, { type = "OpenChests", chestUids = "all" })
+			exec(s, { type = "OpenChests" })
 			for _, e in s.equipment do
 				if e.equippedBy == nil then
 					expect(e.modifierId ~= nil).toBeTruthy()
@@ -111,12 +112,12 @@ return function(t)
 		it("指定より高いレアリティは売らない", function()
 			local s = withChests(10, 3)
 			exec(s, { type = "SetAutoSell", enabled = true, maxRarity = 2, keepModified = false })
-			exec(s, { type = "OpenChests", chestUids = "all" })
+			exec(s, { type = "OpenChests" })
 			expect(Inventory.warehouseUsage(s) > 0).toBeTruthy()
 		end)
 		it("無効なら売らない", function()
 			local s = withChests(10, 1)
-			exec(s, { type = "OpenChests", chestUids = "all" })
+			exec(s, { type = "OpenChests" })
 			expect(Inventory.warehouseUsage(s) >= 10).toBeTruthy()
 		end)
 	end)

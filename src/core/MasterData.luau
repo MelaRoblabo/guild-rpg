@@ -314,7 +314,6 @@ local function validateConstants(c: Checker, k: any)
 	c:number(p .. ".sellGradeCoef", k.sellGradeCoef, 0)
 	c:number(p .. ".equipGradeCoef", k.equipGradeCoef, 0)
 	c:number(p .. ".equipTierMult", k.equipTierMult, 1)
-	c:integer(p .. ".chestStorageMax", k.chestStorageMax, 1)
 
 	-- ギルド
 	c:integer(p .. ".guildExpPerFloor", k.guildExpPerFloor, 0)

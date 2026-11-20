@@ -82,7 +82,42 @@ function Chest.rollContents(rank: number, dungeon: any, rng: Rng.Rng, master: an
 	return contents
 end
 
--- 宝箱を開封して状態に反映する（倉庫の空きは呼び出し側で確認する）
+-- 宝箱の保管（D-084）：倉庫とは別に「ダンジョン×ランクごとの数」だけを持つ。上限なし
+-- state.chests[dungeonId] = { ランク1の数, …, ランク5の数 }
+function Chest.add(state: any, dungeonId: string, rank: number, n: number)
+	local row = state.chests[dungeonId]
+	if row == nil then
+		row = { 0, 0, 0, 0, 0 }
+		state.chests[dungeonId] = row
+	end
+	row[rank] += n
+end
+
+function Chest.count(state: any, dungeonId: string, rank: number): number
+	local row = state.chests[dungeonId]
+	return if row then row[rank] else 0
+end
+
+-- ランクごとの合計（画面はこの単位で表示する）
+function Chest.countByRank(state: any): { number }
+	local out = { 0, 0, 0, 0, 0 }
+	for _, row in state.chests do
+		for r = 1, 5 do
+			out[r] += row[r]
+		end
+	end
+	return out
+end
+
+function Chest.total(state: any): number
+	local n = 0
+	for _, v in Chest.countByRank(state) do
+		n += v
+	end
+	return n
+end
+
+-- 宝箱を1つ開封して状態に反映する（数を減らすのと倉庫の空き確認は呼び出し側）
 function Chest.open(state: any, chest: any, rng: Rng.Rng, master: any): any
 	local dungeon = master.dungeons[chest.dungeonId]
 	local contents = Chest.rollContents(chest.rank, dungeon, rng, master)
@@ -95,7 +130,7 @@ function Chest.open(state: any, chest: any, rng: Rng.Rng, master: any): any
 	end
 	state.gold += contents.gold
 	return {
-		chestUid = chest.uid,
+		dungeonId = chest.dungeonId,
 		rank = chest.rank,
 		equipmentUids = created,
 		items = contents.items,

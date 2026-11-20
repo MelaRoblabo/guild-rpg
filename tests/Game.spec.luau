@@ -1,6 +1,7 @@
 --!strict
 local serde = require("@lune/serde")
 
+local Chest = require("../src/core/Chest")
 local Game = require("../src/core/Game")
 local Growth = require("../src/core/Growth")
 local Inventory = require("../src/core/Inventory")
@@ -59,7 +60,7 @@ return function(t)
 				local e = firstExpedition(s)
 				expect(e.returnAt - T0 < 60).toBeTruthy()
 				Game.advance(s, ctx(e.returnAt))
-				expect(#s.chests >= 1).toBeTruthy()
+				expect(Chest.total(s) >= 1).toBeTruthy()
 			end
 		end)
 		it("D-026 帰還時刻の前は何も起きず、過ぎたら報酬が反映される", function()
@@ -113,7 +114,7 @@ return function(t)
 				{
 					{ type = "Dispatch", partyIndex = 1, dungeonId = "dng_castle" },
 					{ type = "Dispatch", partyIndex = 9, dungeonId = "dng_graveyard" },
-					{ type = "OpenChests", chestUids = "all" },
+					{ type = "OpenChests" },
 					{ type = "Sell", equipmentUids = { "eq_1" } },
 					{ type = "Nope" },
 				}
@@ -192,8 +193,8 @@ return function(t)
 		local function withChests(rank: number, n: number)
 			local s = newState()
 			s.expansions.unlockRank = 5 -- 解錠技術は別のテスト（D-078）
-			for i = 1, n do
-				table.insert(s.chests, { uid = "ch_test" .. i, rank = rank, dungeonId = "dng_castle", obtainedAt = T0 })
+			for _ = 1, n do
+				Chest.add(s, "dng_castle", rank, 1)
 			end
 			return s
 		end
@@ -201,9 +202,9 @@ return function(t)
 			"D-015 開封で中身を抽選。装備のレアリティ＝ランク、アイテムレベル＝ダンジョンの tier",
 			function()
 				local s = withChests(3, 5)
-				local r = Game.execute(s, { type = "OpenChests", chestUids = "all" }, ctx(T0))
+				local r = Game.execute(s, { type = "OpenChests" }, ctx(T0))
 				expect(r.ok).toBeTruthy()
-				expect(#s.chests).toBe(0)
+				expect(Chest.total(s)).toBe(0)
 				for _, ev in r.events :: any do
 					for _, uid in ev.result.equipmentUids do
 						expect(s.equipment[uid].rarity).toBe(3)
@@ -215,12 +216,12 @@ return function(t)
 		it("Q-020 倉庫の空きが足りなければ開けられない", function()
 			local s = withChests(1, 1)
 			s.expansions.warehouseSize = 1
-			expect(Game.execute(s, { type = "OpenChests", chestUids = "all" }, ctx(T0)).error).toBe("WAREHOUSE_FULL")
+			expect(Game.execute(s, { type = "OpenChests" }, ctx(T0)).error).toBe("WAREHOUSE_FULL")
 		end)
 		it("D-058 統計: レア以上の箱からポーションがおよそ5%で出る", function()
 			local s = withChests(3, 2000)
 			s.expansions.warehouseSize = 100000
-			Game.execute(s, { type = "OpenChests", chestUids = "all" }, ctx(T0))
+			Game.execute(s, { type = "OpenChests" }, ctx(T0))
 			local potions = 0
 			for id, n in s.items do
 				if string.find(id, "potion") then
@@ -269,7 +270,7 @@ return function(t)
 			end
 			expect(stopped).toBeTruthy()
 			expect(s.parties[1].autoRepeat).toBe(nil)
-			expect(#s.chests >= 1).toBeTruthy()
+			expect(Chest.total(s) >= 1).toBeTruthy()
 		end)
 	end)
 
@@ -315,7 +316,7 @@ return function(t)
 				Game.execute(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
 				Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
 				Game.advance(s, ctx(T0 + 1200))
-				Game.execute(s, { type = "OpenChests", chestUids = "all" }, ctx(T0 + 1200))
+				Game.execute(s, { type = "OpenChests" }, ctx(T0 + 1200))
 				return s
 			end
 			expect(play()).toEqual(play())

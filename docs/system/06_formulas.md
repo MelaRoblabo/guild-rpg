@@ -112,6 +112,6 @@
 ギルド経験値(帰還ごと) = 攻略フロア数 × guildExpPerFloor + (踏破なら guildExpClearBonus) + (初回踏破なら guildExpFirstClear)
 派遣費   = ダンジョンの dispatchFee（上級ダンジョンのみ。出発のたびに払う）                -- D-079
 開けられる宝箱 = ランク ≤ 解錠技術（expansions.unlockRank、初期2）。開けられない宝箱はギルドに残る   -- D-078
-宝箱の保管が chestStorageMax に達していたら、帰還時に入りきらない宝箱は持ち帰れない（出発は止めない）   -- D-083
+宝箱は倉庫とは別に「ダンジョン×ランクの数」で保管する。上限なし   -- D-084
 売却価格 = floor( 基本売却価格 × sellRarityMult[rarity] × (1 + sellGradeCoef × grade) × equipTierMult^(アイテムレベル − 1) )   -- D-069
 ```

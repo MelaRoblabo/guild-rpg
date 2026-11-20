@@ -1,6 +1,7 @@
 --!strict
 -- ゴールドの使い道（D-076〜D-080）と経験値補正の装備（D-082）
 local Formulas = require("../src/core/Formulas")
+local Chest = require("../src/core/Chest")
 local Game = require("../src/core/Game")
 local Growth = require("../src/core/Growth")
 local Inventory = require("../src/core/Inventory")
@@ -100,51 +101,76 @@ return function(t)
 		local function withChests(ranks: { number })
 			local s = newState()
 			s.expansions.warehouseSize = 100000
-			for i, rank in ranks do
-				table.insert(s.chests, { uid = "ch_t" .. i, rank = rank, dungeonId = "dng_ruins", obtainedAt = T0 })
+			for _, rank in ranks do
+				Chest.add(s, "dng_ruins", rank, 1)
 			end
 			return s
 		end
 		it("D-078 上限より高いランクの宝箱は開けられず、ギルドに残る", function()
 			local s = withChests({ 1, 2, 3, 5 })
-			expect(exec(s, { type = "OpenChests", chestUids = "all" }).ok).toBeTruthy()
-			expect(#s.chests).toBe(2)
-			for _, c in s.chests do
-				expect(c.rank > s.expansions.unlockRank).toBeTruthy()
-			end
+			expect(exec(s, { type = "OpenChests" }).ok).toBeTruthy()
+			expect(Chest.total(s)).toBe(2)
+			expect(Chest.count(s, "dng_ruins", 3)).toBe(1)
+			expect(Chest.count(s, "dng_ruins", 5)).toBe(1)
 		end)
 		it("D-078 開けられる宝箱がなければ CHEST_RANK_TOO_HIGH", function()
 			local s = withChests({ 4 })
-			expect(exec(s, { type = "OpenChests", chestUids = "all" }).error).toBe("CHEST_RANK_TOO_HIGH")
-			expect(exec(s, { type = "OpenChests", chestUids = { "ch_t1" } }).error).toBe("CHEST_RANK_TOO_HIGH")
+			expect(exec(s, { type = "OpenChests" }).error).toBe("CHEST_RANK_TOO_HIGH")
+			expect(exec(s, { type = "OpenChests", rank = 4 }).error).toBe("CHEST_RANK_TOO_HIGH")
 		end)
 		it(
-			"D-083 宝箱の保管が上限でも出発でき、入りきらない宝箱は持ち帰れない",
+			"D-084 宝箱は倉庫とは別に、ダンジョン×ランクの数だけを保存する（上限なし）",
 			function()
-				local ranks = {}
-				for i = 1, K.chestStorageMax do
-					ranks[i] = 5
-				end
-				local s = withChests(ranks)
+				local s = newState()
+				Chest.add(s, "dng_ruins", 2, 3000)
+				Chest.add(s, "dng_castle", 2, 5)
+				expect(s.chests.dng_ruins).toEqual({ 0, 3000, 0, 0, 0 })
+				expect(Chest.countByRank(s)).toEqual({ 0, 3005, 0, 0, 0 })
+				expect(Game.query.warehouse(s).used).toBe(Game.query.warehouse(newState()).used)
 				expect(exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }).ok).toBeTruthy()
 				local e = Game.query.expeditionOf(s, 1)
 				local brought = #e.log.rewards.chests
-				local left = 0
-				for _, ev in Game.advance(s, ctx(e.returnAt)) do
-					if ev.type == "ExpeditionReturned" then
-						left = ev.chestsLeftBehind
-					end
-				end
-				expect(#s.chests).toBe(K.chestStorageMax)
-				expect(left).toBe(brought)
+				Game.advance(s, ctx(e.returnAt))
+				expect(Chest.total(s)).toBe(3005 + brought)
 			end
 		)
+		it(
+			"D-084 ランク・個数を指定して開けられる。ダンジョンの並び順→ランクの低い順に開ける",
+			function()
+				local s = newState()
+				s.expansions.warehouseSize = 100000
+				Chest.add(s, "dng_castle", 2, 2)
+				Chest.add(s, "dng_graveyard", 2, 2)
+				Chest.add(s, "dng_graveyard", 1, 2)
+				local r = exec(s, { type = "OpenChests", rank = 2, count = 3 })
+				expect(#r.events).toBe(3)
+				expect(r.events[1].result.dungeonId).toBe("dng_graveyard")
+				expect(r.events[3].result.dungeonId).toBe("dng_castle")
+				expect(Chest.count(s, "dng_graveyard", 1)).toBe(2)
+				expect(Chest.count(s, "dng_castle", 2)).toBe(1)
+			end
+		)
+		it("D-084 セーブ v2 の宝箱一覧は数に変換される", function()
+			local Migration = require("../src/core/Migration")
+			local old = {
+				version = 2,
+				chests = {
+					{ uid = "ch_1", rank = 3, dungeonId = "dng_ruins", obtainedAt = T0 },
+					{ uid = "ch_2", rank = 3, dungeonId = "dng_ruins", obtainedAt = T0 },
+					{ uid = "ch_3", rank = 1, dungeonId = "dng_tower", obtainedAt = T0 },
+				},
+			}
+			Migration.migrate(old)
+			expect(old.version).toBe(Migration.CURRENT)
+			expect(old.chests.dng_ruins).toEqual({ 0, 0, 2, 0, 0 })
+			expect(old.chests.dng_tower).toEqual({ 1, 0, 0, 0, 0 })
+		end)
 		it("D-078 解錠技術を上げると開けられる", function()
 			local s = withChests({ 3 })
 			s.gold = 10 ^ 9
 			expect(exec(s, { type = "BuyExpansion", expansionId = "exp_unlock" }).ok).toBeTruthy()
-			expect(exec(s, { type = "OpenChests", chestUids = "all" }).ok).toBeTruthy()
-			expect(#s.chests).toBe(0)
+			expect(exec(s, { type = "OpenChests" }).ok).toBeTruthy()
+			expect(Chest.total(s)).toBe(0)
 		end)
 	end)
 

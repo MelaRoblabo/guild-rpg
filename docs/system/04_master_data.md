@@ -83,7 +83,7 @@
 | `equipGradeCoef` / `equipTierMult` | 0.10 / 1.30（仮） | Q-020, D-069 |
 | `guildExpPerFloor` / `guildExpClearBonus` / `guildExpFirstClear` | 1 / 5 / 50（仮） | Q-017 |
 | `guildLevelMax` | 20（仮） | Q-017 |
-| `chestStorageMax` | 500 | D-071 |
+| （宝箱の保管上限） | なし（旧 `chestStorageMax` 500 は廃止） | D-084 |
 
 ## 4. ダンジョン（D-068, D-069）
 

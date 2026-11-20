@@ -92,7 +92,13 @@ local function snapshotHour(h: number)
 		spentTrain = state.stats.goldSpentOnTraining or 0,
 		spentRebirth = state.stats.goldSpentOnRebirth or 0,
 		spentFees = state.stats.goldSpentOnFees or 0,
-		chests = #state.chests,
+		chests = (function()
+			local n = 0
+			for _, v in Game.query.chestsByRank(state) do
+				n += v
+			end
+			return n
+		end)(),
 		unlockRank = state.expansions.unlockRank,
 		trainingLevel = state.expansions.trainingLevel,
 	})

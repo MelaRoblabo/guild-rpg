@@ -139,7 +139,7 @@ return {
 	equipRarityMult = { 1.0, 1.3, 1.7, 2.2, 3.0 }, -- 仮（Q-020）
 	equipGradeCoef = 0.10, -- 仮（Q-020）
 	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
-	chestStorageMax = 500, -- D-071
+	-- 宝箱の保管は上限なし（D-084。旧 chestStorageMax は廃止）
 
 	-- ギルド（Q-017）
 	guildExpPerFloor = 1,

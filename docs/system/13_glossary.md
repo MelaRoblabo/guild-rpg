@@ -22,7 +22,7 @@
 | 探索ログ | expeditionLog | |
 | 踏破／撤退 | clear / retreat | |
 | 戦闘不能 | down | |
-| 宝箱／宝箱ランク | chest / rank | |
+| 宝箱／宝箱ランク | chest / rank | 保管は数だけ（chests[dungeonId][rank]、D-084） |
 | レアリティ | rarity | 1〜5 |
 | 基本アイテム | equipmentBase | |
 | 装備個体 | equipmentItem | uid を持つ |

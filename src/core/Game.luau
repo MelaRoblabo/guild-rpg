@@ -165,9 +165,6 @@ local function autoRepeatBlocker(state: any, master: any, dungeonId: string): st
 	if Inventory.warehouseFree(state) <= 0 then
 		return "WAREHOUSE_FULL"
 	end
-	if #state.chests >= master.K.chestStorageMax then
-		return "CHEST_STORAGE_FULL"
-	end
 	return nil
 end
 
@@ -182,19 +179,10 @@ local function collect(state: any, e: any, master: any, events: { any })
 	for itemId, c in r.items do
 		Inventory.addItem(state, itemId, c)
 	end
-	-- 保管が上限なら、入りきらない宝箱は持ち帰れない（D-083：出発を止めると詰むため）
-	local leftBehind = 0
+	-- 宝箱はギルドの宝箱置き場へ（倉庫とは別、上限なし：D-084）
 	for _, c in r.chests do
-		if #state.chests >= K.chestStorageMax then
-			leftBehind += 1
-		else
-			table.insert(
-				state.chests,
-				{ uid = newUid(state, "ch"), rank = c.rank, dungeonId = e.dungeonId, obtainedAt = e.returnAt }
-			)
-		end
+		Chest.add(state, e.dungeonId, c.rank, 1)
 	end
-	bump(state, "chestsLeftBehind", leftBehind)
 
 	-- 経験値（D-041：生存者で等分済み。個人倍率はここで掛ける）。順序を固定するため隊列順に処理
 	local levelUps = {}
@@ -234,8 +222,7 @@ local function collect(state: any, e: any, master: any, events: { any })
 		result = log.result,
 		retreatReason = log.retreatReason,
 		reachedFloor = log.reachedFloor,
-		chests = #r.chests - leftBehind,
-		chestsLeftBehind = leftBehind,
+		chests = #r.chests,
 		gold = r.gold,
 		items = r.items,
 		guildExp = guildExp,
@@ -464,31 +451,40 @@ end
 
 handlers.OpenChests = function(state, cmd, ctx)
 	-- 解錠技術（D-078）：開けられるのは unlockRank 以下の宝箱だけ。開けられない宝箱はギルドに残る
+	-- 宝箱は「ダンジョン×ランクの数」で持つ（D-084）。rank・dungeonId で絞り込み、count 個まで開ける（省略時はすべて）
+	-- 開ける順：ダンジョンの並び順 → ランクの低い順
+	local master = ctx.master
 	local unlockRank = state.expansions.unlockRank
+	if cmd.rank ~= nil and (type(cmd.rank) ~= "number" or cmd.rank < 1 or cmd.rank > 5) then
+		return fail("INVALID_RARITY")
+	end
+	if cmd.count ~= nil and (type(cmd.count) ~= "number" or cmd.count < 1 or cmd.count ~= math.floor(cmd.count)) then
+		return fail("INVALID_COUNT")
+	end
+	if cmd.rank and cmd.rank > unlockRank then
+		return fail("CHEST_RANK_TOO_HIGH")
+	end
+	local limit = cmd.count or math.huge
 	local targets = {}
-	if cmd.chestUids == "all" then
-		for _, c in state.chests do
-			if c.rank <= unlockRank then
-				table.insert(targets, c)
-			end
-		end
-		if #targets == 0 and #state.chests > 0 then
-			return fail("CHEST_RANK_TOO_HIGH")
-		end
-	else
-		for _, uid in cmd.chestUids do
-			for _, c in state.chests do
-				if c.uid == uid then
-					if c.rank > unlockRank then
-						return fail("CHEST_RANK_TOO_HIGH")
+	local lockedExists = false
+	for _, d in master.dungeonList do
+		if cmd.dungeonId == nil or cmd.dungeonId == d.id then
+			for r = 1, 5 do
+				if cmd.rank == nil or cmd.rank == r then
+					local n = Chest.count(state, d.id, r)
+					if n > 0 and r > unlockRank then
+						lockedExists = true
+					elseif n > 0 then
+						for _ = 1, math.min(n, limit - #targets) do
+							table.insert(targets, { dungeonId = d.id, rank = r })
+						end
 					end
-					table.insert(targets, c)
 				end
 			end
 		end
 	end
 	if #targets == 0 then
-		return fail("NO_CHEST")
+		return fail(if lockedExists then "CHEST_RANK_TOO_HIGH" else "NO_CHEST")
 	end
 	local perChest = Chest.maxEquipmentPerChest(ctx.master)
 	local events = {}
@@ -519,10 +515,7 @@ handlers.OpenChests = function(state, cmd, ctx)
 			end
 			opened.equipmentUids = kept
 		end
-		local idx = table.find(state.chests, c)
-		if idx then
-			table.remove(state.chests, idx)
-		end
+		Chest.add(state, c.dungeonId, c.rank, -1)
 		bump(state, "chestsOpened")
 		if state.stats.firstChestOpenedAt == nil then
 			state.stats.firstChestOpenedAt = ctx.now
@@ -1117,6 +1110,11 @@ end
 
 function Game.query.sellPrice(item: any, master: any): number
 	return Inventory.equipmentSellPrice(item, master)
+end
+
+-- 未開封の宝箱のランクごとの数（D-084）
+function Game.query.chestsByRank(state: any): { number }
+	return Chest.countByRank(state)
 end
 
 function Game.query.trainingQuote(state: any, uid: string, targetLevel: number, master: any)

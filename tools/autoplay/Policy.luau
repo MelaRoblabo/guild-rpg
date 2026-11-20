@@ -43,9 +43,7 @@ end
 Policy.itemScore = itemScore
 
 local function openAll(state: any, ctx: Ctx)
-	if #state.chests > 0 then
-		exec(state, { type = "OpenChests", chestUids = "all" }, ctx)
-	end
+	exec(state, { type = "OpenChests" }, ctx)
 end
 
 -- 遅れている冒険者（最も進んだ人より転生回数が2以上少ない）
@@ -395,12 +393,12 @@ local function savingForUnlock(state: any, master: any): boolean
 		return false
 	end
 	local locked = 0
-	for _, c in state.chests do
-		if c.rank > state.expansions.unlockRank then
-			locked += 1
+	for r, n in Game.query.chestsByRank(state) do
+		if r > state.expansions.unlockRank then
+			locked += n
 		end
 	end
-	return locked >= 300 -- 保管（500）が埋まりそうなときだけ
+	return locked >= 300 -- 開けられない宝箱がかなり溜まったときだけ
 end
 
 function Policy.manage(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)

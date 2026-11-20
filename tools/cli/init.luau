@@ -103,7 +103,7 @@ local HELP = [[
   repeat <n> <dng_id|off>    自動再派遣の設定
   watch <n>                  探索の様子（現在位置まで）
   wait <秒>                  仮想時計を進める
-  open [all|ch_uid...]       宝箱を開ける（省略時 all）
+  open [all|<ランク1-5>] [個数]  宝箱を開ける（省略時 開けられるものすべて）
   sell <eq_uid...>           装備を売る
   sell item <itm_id> [個数]   アイテムを売る
   lock <uid> / unlock <uid>  保護の切り替え
@@ -189,11 +189,8 @@ local function handle(tokens: { string }): (boolean, any)
 		collectAdvance()
 		say(`{sec} 秒経過しました（{Text.clock(save)}）`)
 	elseif c == "open" then
-		local uids: any = "all"
-		if tokens[2] and tokens[2] ~= "all" then
-			uids = table.move(tokens, 2, #tokens, 1, {})
-		end
-		result = run({ type = "OpenChests", chestUids = uids })
+		local rank = if tokens[2] and tokens[2] ~= "all" then tonumber(tokens[2]) else nil
+		result = run({ type = "OpenChests", rank = rank, count = tonumber(tokens[3]) })
 	elseif c == "sell" then
 		if tokens[2] == "item" then
 			result = run({ type = "Sell", itemId = tokens[3], count = tonumber(tokens[4]) or 1 })

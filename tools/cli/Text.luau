@@ -59,7 +59,6 @@ local ERRORS = {
 	GUILD_LEVEL_TOO_LOW = "ギルドレベルが足りません",
 	DUNGEON_NOT_CLEARED = "必要なダンジョンをまだ踏破していません",
 	INVALID_RARITY = "レアリティは1〜5です",
-	CHEST_STORAGE_FULL = "宝箱の保管がいっぱいです（宝箱を開けるか、解錠技術を上げてください）",
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
 	CHEST_RANK_TOO_HIGH = "解錠技術が足りず開けられない宝箱です（expand exp_unlock）",
@@ -126,9 +125,10 @@ function Text.status(save: any, master: any): string
 		local rep = if p.autoRepeat then ` ／ 自動再派遣：{master.dungeons[p.autoRepeat.dungeonId].name}` else ""
 		table.insert(lines, `パーティ{i} [{table.concat(names, " ")}] {partyStatus(save, i, master)}{rep}`)
 	end
-	local byRank = { 0, 0, 0, 0, 0 }
-	for _, c in s.chests do
-		byRank[c.rank] += 1
+	local byRank = Game.query.chestsByRank(s)
+	local totalChests = 0
+	for _, n in byRank do
+		totalChests += n
 	end
 	local chestText = {}
 	for r = 1, 5 do
@@ -139,7 +139,7 @@ function Text.status(save: any, master: any): string
 	local wh = Game.query.warehouse(s)
 	table.insert(
 		lines,
-		`未開封の宝箱 {#s.chests}個{if #chestText > 0
+		`未開封の宝箱 {totalChests}個{if #chestText > 0
 			then "（" .. table.concat(chestText, "、") .. "）"
 			else ""} ／ 開けられるのは{RANK_NAME[s.expansions.unlockRank]}まで ／ 倉庫 {wh.used}/{wh.size}`
 	)
@@ -606,7 +606,7 @@ function Text.view(save: any, master: any): any
 		gold = s.gold,
 		guildExp = s.guild.exp,
 		parties = parties,
-		unopenedChests = #s.chests,
+		unopenedChests = Game.query.chestsByRank(s),
 		warehouse = wh,
 		unlockedDungeons = unlocked,
 	}

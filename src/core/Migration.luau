@@ -4,7 +4,7 @@
 
 local Migration = {}
 
-Migration.CURRENT = 2
+Migration.CURRENT = 3
 
 local STEPS: { [number]: (any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -13,6 +13,16 @@ local STEPS: { [number]: (any) -> () } = {
 		state.expansions.trainingLevel = state.expansions.trainingLevel or 1
 		state.expansions.unlockRank = state.expansions.unlockRank or 2
 		state.version = 2
+	end,
+	-- v2 → v3：宝箱を「ダンジョン×ランクの数」で持つ（D-084）
+	[2] = function(state)
+		local counts = {}
+		for _, c in state.chests do
+			counts[c.dungeonId] = counts[c.dungeonId] or { 0, 0, 0, 0, 0 }
+			counts[c.dungeonId][c.rank] += 1
+		end
+		state.chests = counts
+		state.version = 3
 	end,
 }
 
