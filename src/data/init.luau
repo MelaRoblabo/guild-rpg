@@ -12,4 +12,6 @@ return {
 	Items = require("./Items"),
 	Monsters = require("./Monsters"),
 	Dungeons = require("./Dungeons"),
+	LootTables = require("./LootTables"),
+	StarterSet = require("./StarterSet"),
 }

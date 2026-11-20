@@ -145,8 +145,8 @@ local function simulateSet(dungeonId: string, presetName: string, n: number, see
 			s.items[id] = (s.items[id] or 0) + c
 		end
 		local prevHp = {}
-		for _, sn in snaps do
-			prevHp[sn.slot] = sn.maxHp
+		for mi, sn in snaps do
+			prevHp[mi] = sn.maxHp
 		end
 		for _, f in log.floors do
 			if f.kind == "battle" then
@@ -163,9 +163,9 @@ local function simulateSet(dungeonId: string, presetName: string, n: number, see
 			end
 			prevHp = f.hpAfter
 		end
-		for slot, hp in prevHp do
+		for mi, hp in prevHp do
 			if hp <= 0 then
-				s.downBySlot[slot] += 1
+				s.downBySlot[snaps[mi].slot] += 1
 			end
 		end
 	end
@@ -339,8 +339,8 @@ local function showLog(dungeonId: string, presetName: string, seed: number)
 			print(`[{f.floor}F] イベント: {f.event} {serde.encode("json", f.detail)}`)
 		end
 		local hp = {}
-		for slot = 1, #snaps do
-			table.insert(hp, `{jobName[slot]}{f.hpAfter[slot]}`)
+		for i, sn in snaps do
+			table.insert(hp, `{jobName[sn.slot]}{f.hpAfter[i]}`)
 		end
 		print("      HP: " .. table.concat(hp, " / "))
 	end

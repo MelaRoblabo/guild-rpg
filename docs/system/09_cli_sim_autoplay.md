@@ -7,9 +7,13 @@
 人間とAIエージェントがゲームを遊ぶための入口。
 
 ```bash
-lune run tools/cli -- --save out/save.json        # 対話モード
-lune run tools/cli -- --save out/save.json --json # 1行1コマンド、結果をJSONで返す（AIエージェント用）
+lune run tools/cli -- --save out/save.json status            # 1回の実行で1コマンド
+lune run tools/cli -- --save out/save.json --json go 1 dng_graveyard   # 結果をJSONで返す（AIエージェント用）
+lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   # 標準入力から複数行
 ```
+
+- 仮想時計はセーブファイルに保存される。`wait <秒>` で進めるまで時間は進まない。
+- `help` でコマンド一覧。
 
 | CLIコマンド | 対応する core コマンド／処理 |
 | --- | --- |

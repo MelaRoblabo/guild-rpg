@@ -485,6 +485,48 @@ local function validateContent(c: Checker, d: any)
 	end
 end
 
+local function validateLootAndStarter(c: Checker, d: any)
+	local L = if type(d.LootTables) == "table" then d.LootTables.chest else nil
+	if type(L) ~= "table" then
+		c:error("LootTables.chest", "テーブルが必要")
+	else
+		if c:weights("LootTables.chest.equipmentCountWeights", L.equipmentCountWeights, "weight", true) then
+			for i, e in L.equipmentCountWeights do
+				c:integer(`LootTables.chest.equipmentCountWeights[{i}].count`, e.count, 0)
+			end
+		end
+		c:weights("LootTables.chest.extraWeights", L.extraWeights, "weight", true)
+		c:number("LootTables.chest.goldMult", L.goldMult, 0)
+		c:integer("LootTables.chest.potionMinRank", L.potionMinRank, 1, 5)
+	end
+
+	local S = d.StarterSet
+	if type(S) ~= "table" then
+		c:error("StarterSet", "テーブルが必要")
+		return
+	end
+	c:integer("StarterSet.gold", S.gold, 0)
+	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize" } do
+		c:integer(`StarterSet.expansions.{key}`, if type(S.expansions) == "table" then S.expansions[key] else nil, 1)
+	end
+	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
+	if c:array("StarterSet.adventurers", S.adventurers) then
+		for i, a in S.adventurers do
+			local p = `StarterSet.adventurers[{i}]`
+			c:ref(p .. ".jobId", a.jobId, jobIds)
+			for _, s in Types.STAT_KEYS do
+				c:integer(`{p}.baseStats.{s}`, if type(a.baseStats) == "table" then a.baseStats[s] else nil, 0)
+			end
+			for k, g in a.giftIds or {} do
+				c:ref(`{p}.giftIds[{k}]`, g, giftIds)
+			end
+			for slot, e in a.equipment or {} do
+				c:ref(`{p}.equipment.{slot}`, e, equipIds)
+			end
+		end
+	end
+end
+
 -- id → 行 の索引を作る
 local function byId(rows: any): { [string]: any }
 	local m = {}
@@ -507,6 +549,7 @@ function MasterData.validate(data: any): { Issue }
 	end
 	validateConstants(c, data.Constants)
 	validateContent(c, data)
+	validateLootAndStarter(c, data)
 	return c.issues
 end
 

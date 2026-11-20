@@ -1,0 +1,16 @@
+# M2 完了確認：自動再派遣で仮想1時間遊ぶ
+new 1
+repeat 1 dng_graveyard
+go 1 dng_graveyard
+wait 600
+open all
+status
+wait 600
+open all
+wait 600
+open all
+repeat 1 dng_ruins
+wait 1800
+open all
+status
+roster

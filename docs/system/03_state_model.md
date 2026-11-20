@@ -38,7 +38,7 @@ export type Chest = { uid: string, rank: number, dungeonId: string, obtainedAt: 
 
 export type Party = {
 	index: number,                    -- 1〜（解放済みパーティ枠）
-	slots: { string? },               -- 隊列1〜4の冒険者 uid（D-035）
+	slots: { string },                -- 隊列1〜4の冒険者 uid（D-035）。空き枠は ""（JSON/DataStore で穴あき配列にしないため）
 	autoRepeat: { dungeonId: string }?, -- 自動再派遣の設定
 }
 
@@ -98,6 +98,7 @@ export type PlayerState = {
 ## ルール
 
 - `uid` は `nextUid` から払い出し、削除しても再利用しない。
+- 配列に穴（nil）を作らない。DataStore は穴あき配列を保存できない。探索ログの hpAfter もメンバー順の配列。
 - 冒険者・装備は辞書（uidキー）で持つ。将来の所有権移転（D-065）で、個体をそのまま移せる。
 - 倉庫の使用量＝`equipment` のうち `equippedBy == nil` の数（Q-020）。
 - 未開封宝箱は倉庫容量に含めない別枠（Q-020）。

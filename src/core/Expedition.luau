@@ -29,7 +29,7 @@ export type FloorLog = {
 	outcome: string?, -- battle: win / wipe / timeout
 	event: string?, -- event: chest / item / trap / fountain / none
 	detail: any?,
-	hpAfter: { [number]: number }, -- 隊列番号 → フロア終了時のHP
+	hpAfter: { number }, -- メンバー順（input.members の順）のフロア終了時のHP
 	giftTriggers: { { uid: string, giftId: string } },
 }
 
@@ -54,10 +54,11 @@ local function weightOf(e: any): number
 	return e.weight
 end
 
-local function hpSnapshot(members: { Combat.MemberState }): { [number]: number }
+-- メンバーの並び（input.members の順）で HP を返す。JSON にできるよう穴のない配列にする
+local function hpSnapshot(members: { Combat.MemberState }): { number }
 	local out = {}
-	for _, m in members do
-		out[m.slot] = m.hp
+	for i, m in members do
+		out[i] = m.hp
 	end
 	return out
 end

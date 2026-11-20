@@ -94,7 +94,7 @@ function Events.run(ctx: EventContext): (string, any, boolean)
 				if m.hp > 0 then
 					local d = Formulas.trapDamage(m.snap.maxHp, ctx.dungeon, K)
 					m.hp = math.max(0, m.hp - d)
-					damage[m.slot] = d
+					table.insert(damage, { slot = m.slot, amount = d })
 				end
 			end
 		end
@@ -107,7 +107,7 @@ function Events.run(ctx: EventContext): (string, any, boolean)
 			if m.hp > 0 then
 				local h = math.min(Formulas.fountainHeal(m.snap.maxHp, K), m.snap.maxHp - m.hp)
 				m.hp += h
-				healed[m.slot] = h
+				table.insert(healed, { slot = m.slot, amount = h })
 			end
 		end
 		return kind, { healed = healed }, false
