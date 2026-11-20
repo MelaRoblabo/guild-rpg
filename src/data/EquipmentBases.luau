@@ -4,6 +4,7 @@
 -- kind: 職業の equipKinds と照合する
 -- 性能値は rarity・grade の倍率を掛ける前の基本値（06章 §2）
 --   atk  攻撃力補正 / pdef 物理防御 / mdef 魔法防御 / stats 基礎ステータス補正
+--   expPct 獲得経験値の補正（D-082）。レアリティ・グレードの倍率は掛かるが、アイテムレベルでは伸びない
 -- minRarity: 宝箱から出る最低レアリティ（M2 で中身の抽選に使う）
 -- 試作用の最小セット（仮）。コンテンツは M2 以降で追加する
 
@@ -114,5 +115,14 @@ return {
 		minRarity = 1,
 		sellPrice = 15,
 		stats = { agi = 3 },
+	},
+	{
+		id = "eq_sub_amulet_learning",
+		name = "修練の護符",
+		slot = "sub",
+		kind = "accessory",
+		minRarity = 1,
+		sellPrice = 15,
+		expPct = 0.20, -- D-082（仮）
 	},
 }

@@ -251,14 +251,41 @@ local function validateConstants(c: Checker, k: any)
 	c:number(p .. ".rebirthBonusSkewBase", k.rebirthBonusSkewBase, 0)
 	c:number(p .. ".rebirthBonusSkewPerRebirth", k.rebirthBonusSkewPerRebirth, 0)
 	c:integer(p .. ".rebirthFreeRerolls", k.rebirthFreeRerolls, 0)
+	-- 転生費用（D-080）：転生できる回数ぶん必要
+	if
+		type(k.levelCapMax) == "number"
+		and type(k.levelCapInitial) == "number"
+		and type(k.levelCapPerRebirth) == "number"
+	then
+		local n = (k.levelCapMax - k.levelCapInitial) // k.levelCapPerRebirth
+		if c:array(p .. ".rebirthCost", k.rebirthCost, n) then
+			for i, v in k.rebirthCost do
+				c:integer(`{p}.rebirthCost[{i}]`, v, 0)
+			end
+		end
+	end
+	c:number(p .. ".expBonusCap", k.expBonusCap, 0)
+
+	-- トレーニング（D-076, D-077）
+	c:number(p .. ".trainGoldCoef", k.trainGoldCoef, 0)
+	c:number(p .. ".trainGoldExponent", k.trainGoldExponent, 0)
+	if c:array(p .. ".trainingFacility", k.trainingFacility) then
+		local prev = 0
+		for i, f in k.trainingFacility do
+			local q = `{p}.trainingFacility[{i}]`
+			if c:integer(q .. ".levelCap", f.levelCap, 1) and f.levelCap <= prev then
+				c:error(q .. ".levelCap", "昇順が必要")
+			end
+			prev = if type(f.levelCap) == "number" then f.levelCap else prev
+			c:integer(q .. ".expPerSession", f.expPerSession, 1)
+		end
+	end
 
 	-- 雇用
 	c:integer(p .. ".hireCost", k.hireCost, 0)
 	for _, s in Types.STAT_KEYS do
 		local r = if type(k.hireStatRange) == "table" then k.hireStatRange[s] else nil
-		if c:range(`{p}.hireStatRange.{s}`, r) then
-			c:number(`{p}.hireStatRange.{s}.maxPerGuildLevel`, r.maxPerGuildLevel, 0)
-		end
+		c:range(`{p}.hireStatRange.{s}`, r) -- D-081：ギルドレベルでは変わらない
 	end
 	c:integer(p .. ".hireFreeRerolls", k.hireFreeRerolls, 0)
 	c:probability(p .. ".specialVisitorChance", k.specialVisitorChance)
@@ -406,6 +433,9 @@ local function validateContent(c: Checker, d: any)
 					c:number(`{p}.{key}`, e[key], 0)
 				end
 			end
+			if e.expPct ~= nil then
+				c:number(p .. ".expPct", e.expPct, 0) -- D-082
+			end
 			if e.stats ~= nil then
 				for k, v in e.stats do
 					oneOf(c, `{p}.stats`, k, STAT_SET)
@@ -473,6 +503,9 @@ local function validateContent(c: Checker, d: any)
 			c:number(p .. ".refAgi", g.refAgi, 1)
 			c:integer(p .. ".tier", g.tier, 1)
 			c:integer(p .. ".minChestRank", g.minChestRank, 1, 5)
+			if g.dispatchFee ~= nil then
+				c:integer(p .. ".dispatchFee", g.dispatchFee, 0) -- D-079
+			end
 			c:integer(p .. ".battleReward.exp", if type(g.battleReward) == "table" then g.battleReward.exp else nil, 0)
 			c:integer(
 				p .. ".battleReward.gold",
@@ -518,7 +551,7 @@ local function validateLootAndStarter(c: Checker, d: any)
 		return
 	end
 	c:integer("StarterSet.gold", S.gold, 0)
-	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize" } do
+	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize", "trainingLevel", "unlockRank" } do
 		c:integer(`StarterSet.expansions.{key}`, if type(S.expansions) == "table" then S.expansions[key] else nil, 1)
 	end
 	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
@@ -651,12 +684,22 @@ local function validateExpansions(c: Checker, d: any)
 	end
 	for i, e in d.Expansions do
 		local p = `Expansions[{i}]`
-		oneOf(
-			c,
-			p .. ".kind",
-			e.kind,
-			{ partySlots = true, candidateSlots = true, rosterSize = true, warehouseSize = true }
-		)
+		oneOf(c, p .. ".kind", e.kind, {
+			partySlots = true,
+			candidateSlots = true,
+			rosterSize = true,
+			warehouseSize = true,
+			trainingLevel = true,
+			unlockRank = true,
+		})
+		local maxValue = if e.kind == "unlockRank"
+			then 5
+			elseif
+				e.kind == "trainingLevel"
+				and type(d.Constants) == "table"
+				and type(d.Constants.trainingFacility) == "table"
+			then #d.Constants.trainingFacility
+			else nil
 		if c:array(p .. ".steps", e.steps) then
 			local prev = -math.huge
 			for k, s in e.steps do
@@ -665,6 +708,9 @@ local function validateExpansions(c: Checker, d: any)
 					c:error(q .. ".value", "昇順が必要")
 				end
 				prev = if type(s.value) == "number" then s.value else prev
+				if maxValue and type(s.value) == "number" and s.value > maxValue then
+					c:error(q .. ".value", `{maxValue} 以下が必要`)
+				end
 				c:integer(q .. ".guildLevel", s.guildLevel, 1)
 				c:integer(q .. ".gold", s.gold, 0)
 				if s.requiresClear ~= nil then

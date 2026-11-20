@@ -191,6 +191,7 @@ return function(t)
 	describe("宝箱（D-015）", function()
 		local function withChests(rank: number, n: number)
 			local s = newState()
+			s.expansions.unlockRank = 5 -- 解錠技術は別のテスト（D-078）
 			for i = 1, n do
 				table.insert(s.chests, { uid = "ch_test" .. i, rank = rank, dungeonId = "dng_castle", obtainedAt = T0 })
 			end

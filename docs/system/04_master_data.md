@@ -63,8 +63,12 @@
 | `rebirthGiftAddAt` / `giftMax` | {2, 4, 6} / 4 | D-024 |
 | `rebirthBonusMaxRate` / `rebirthBonusSkewBase` / `rebirthBonusSkewPerRebirth` | 0.30 / 1.0 / 0.5 | D-072 |
 | `rebirthFreeRerolls` | 3（初回を含まない、仮） | Q-009 |
+| `rebirthCost` | 2千 / 5千 / 2万 / 8万 / 30万 / 100万 / 300万 / 800万G（転生1〜8回目、仮） | D-080 |
+| `expBonusCap` | 1.00（経験値補正の合計の上限、仮） | D-082 |
+| `trainGoldCoef` / `trainGoldExponent` | 10 / 2（1回 = 10 × Lv²、仮） | D-076 |
+| `trainingFacility` | Lv1〜5：上限 Lv10/20/30/40/50、1回の経験値 430/820/1200/1630/2060（仮） | D-077 |
 | `hireCost` | 300G（仮） | Q-006 |
-| `hireStatRange` | 4項目 5〜20、HP 30〜60。ギルドLvごとに上限+1（HP+3）（仮） | Q-006 |
+| `hireStatRange` | 4項目 5〜20、HP 30〜60。ギルドの成長に関係なく一定（仮） | Q-006, D-081 |
 | `hireFreeRerolls` | 3（初回を含まない、仮） | Q-006 |
 | `specialVisitorChance` | 0.005（仮） | 02章 |
 | `appearanceGenderWeights` | m 0.5 / f 0.5 | D-050 |
@@ -87,6 +91,7 @@
 - 調整の考え方：各ダンジョンに「想定段階」（`tools/sim/Stages.luau`。転生回数・レベル・装備）を割り当て、その段階のバランス編成で
   踏破率約60%（古い墓地は約97%）、所要秒が目標（50秒 → 150秒）になるよう、強さ・距離・罠レベル・経験値を自動で決める。
 - 数値を変えたいときは、テンプレートの目標値か段階の想定を変えて `lune run tools/sim/calibrate` を再実行する。
+- 派遣費 `dispatchFee`（D-079）はテンプレートに書き、calibrate がそのまま写す。難度7以降のみ（仮：1千〜3万G）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 
 ## 5. 職業（Jobs.luau）

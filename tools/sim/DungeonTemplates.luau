@@ -9,6 +9,7 @@
 --                難度3以降は1.25倍に置く：D-075）
 -- ratios       : モンスター基準値の比率（hp・atk・pdef・mdef）。全体の大きさは calibrate が決める
 -- trapEvade    : 想定パーティの罠回避率の目標
+-- dispatchFee  : 派遣費（D-079）。上級ダンジョンだけ。出発のたびにゴールドが減る（仮）
 
 local BAL = { hp = 8, atk = 0.9, pdef = 0.4, mdef = 0.4 }
 local ARMORED = { hp = 8, atk = 0.9, pdef = 1.0, mdef = 0.3 }
@@ -138,6 +139,7 @@ return {
 	},
 	{
 		id = "dng_labyrinth",
+		dispatchFee = 1000,
 		name = "地下大迷宮",
 		stage = 7,
 		timeTarget = 144,
@@ -159,6 +161,7 @@ return {
 	},
 	{
 		id = "dng_abbey",
+		dispatchFee = 2500,
 		name = "呪われた修道院",
 		stage = 8,
 		timeTarget = 156,
@@ -178,6 +181,7 @@ return {
 	},
 	{
 		id = "dng_iron_fortress",
+		dispatchFee = 5000,
 		name = "鋼鉄の要塞",
 		stage = 9,
 		timeTarget = 165,
@@ -197,6 +201,7 @@ return {
 	},
 	{
 		id = "dng_dragon_nest",
+		dispatchFee = 10000,
 		name = "竜の巣",
 		stage = 10,
 		timeTarget = 175,
@@ -216,6 +221,7 @@ return {
 	},
 	{
 		id = "dng_demon_gate",
+		dispatchFee = 18000,
 		name = "魔界の門",
 		stage = 11,
 		timeTarget = 181,
@@ -235,6 +241,7 @@ return {
 	},
 	{
 		id = "dng_sky_throne",
+		dispatchFee = 30000,
 		name = "天空の玉座",
 		stage = 12,
 		timeTarget = 188,

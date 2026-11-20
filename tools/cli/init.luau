@@ -122,7 +122,9 @@ local HELP = [[
   looks <adv_uid>            見た目変更ポーションを使う
   looks-choose <prev|cur>    見た目を選ぶ（prev＝今の姿、cur＝新しい姿）
   expansions                 拡張の一覧（次の段階の条件と費用）
-  expand <exp_id>            拡張を買う
+  expand <exp_id>            拡張を買う（トレーニング場・解錠技術もここ）
+  train <adv_uid> [回数|max] トレーニング（ゴールドで経験値。既定1回）
+  trainquote <adv_uid> <Lv>  そのレベルまでのトレーニング費用の見積もり
   autosell <on|off> [最大レアリティ1-5] [keep|all]  自動売却（keep＝修飾語つきは残す）]]
 
 local function handle(tokens: { string }): (boolean, any)
@@ -248,6 +250,11 @@ local function handle(tokens: { string }): (boolean, any)
 		say(Text.expansions(save, master))
 	elseif c == "expand" then
 		result = run({ type = "BuyExpansion", expansionId = tokens[2] })
+	elseif c == "train" then
+		local n = if tokens[3] == "max" then 1000000 else tonumber(tokens[3]) or 1
+		result = run({ type = "Train", adventurerUid = tokens[2], sessions = n })
+	elseif c == "trainquote" then
+		say(Text.trainQuote(save, tokens[2], tonumber(tokens[3]) or 1, master))
 	elseif c == "autosell" then
 		result = run({
 			type = "SetAutoSell",

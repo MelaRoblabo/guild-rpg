@@ -4,10 +4,16 @@
 
 local Migration = {}
 
-Migration.CURRENT = 1
+Migration.CURRENT = 2
 
 local STEPS: { [number]: (any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
+	-- v1 → v2：トレーニング場（D-077）と解錠技術（D-078）
+	[1] = function(state)
+		state.expansions.trainingLevel = state.expansions.trainingLevel or 1
+		state.expansions.unlockRank = state.expansions.unlockRank or 2
+		state.version = 2
+	end,
 }
 
 function Migration.migrate(state: any): any

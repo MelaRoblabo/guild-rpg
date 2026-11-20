@@ -5,7 +5,14 @@
 
 return {
 	gold = 500,
-	expansions = { partySlots = 1, candidateSlots = 3, rosterSize = 8, warehouseSize = 300 },
+	expansions = {
+		partySlots = 1,
+		candidateSlots = 3,
+		rosterSize = 8,
+		warehouseSize = 300,
+		trainingLevel = 1, -- D-077
+		unlockRank = 2, -- D-078：開けられる宝箱のランクの上限
+	},
 	adventurers = {
 		{
 			name = "アルド",

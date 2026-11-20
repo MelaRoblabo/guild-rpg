@@ -77,7 +77,11 @@ export type PlayerState = {
 	nextUid: number,
 	gold: number,
 	guild: { level: number, exp: number },
-	expansions: { partySlots: number, candidateSlots: number, rosterSize: number, warehouseSize: number },
+	expansions: {
+		partySlots: number, candidateSlots: number, rosterSize: number, warehouseSize: number,
+		trainingLevel: number, -- トレーニング場のレベル（D-077、初期1）
+		unlockRank: number,    -- 解錠技術：開けられる宝箱のランクの上限（D-078、初期2）
+	},                         -- version 2 で trainingLevel・unlockRank を追加（Migration v1→v2）
 	adventurers: { [string]: Adventurer },
 	parties: { Party },
 	equipment: { [string]: EquipmentItem },

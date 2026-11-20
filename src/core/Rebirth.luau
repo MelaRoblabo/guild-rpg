@@ -95,4 +95,9 @@ function Rebirth.apply(adv: any, session: any, bonus: Types.StatBlock, rng: Rng.
 	return nil
 end
 
+-- 転生費用（D-080）：転生回数に応じて rebirthCost から引く
+function Rebirth.cost(adv: any, master: any): number
+	return master.K.rebirthCost[adv.rebirthCount + 1] or 0
+end
+
 return Rebirth

@@ -59,6 +59,10 @@ local ERRORS = {
 	GUILD_LEVEL_TOO_LOW = "ギルドレベルが足りません",
 	DUNGEON_NOT_CLEARED = "必要なダンジョンをまだ踏破していません",
 	INVALID_RARITY = "レアリティは1〜5です",
+	CHEST_STORAGE_FULL = "宝箱の保管がいっぱいです（宝箱を開けるか、解錠技術を上げてください）",
+	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
+	INVALID_COUNT = "回数は1以上の整数です",
+	CHEST_RANK_TOO_HIGH = "解錠技術が足りず開けられない宝箱です（expand exp_unlock）",
 }
 
 function Text.errorText(code: string?): string
@@ -137,7 +141,12 @@ function Text.status(save: any, master: any): string
 		lines,
 		`未開封の宝箱 {#s.chests}個{if #chestText > 0
 			then "（" .. table.concat(chestText, "、") .. "）"
-			else ""} ／ 倉庫 {wh.used}/{wh.size}`
+			else ""} ／ 開けられるのは{RANK_NAME[s.expansions.unlockRank]}まで ／ 倉庫 {wh.used}/{wh.size}`
+	)
+	local fac = master.K.trainingFacility[s.expansions.trainingLevel]
+	table.insert(
+		lines,
+		`トレーニング場 Lv{s.expansions.trainingLevel}（Lv{fac.levelCap}まで、1回 経験値{fac.expPerSession}）`
 	)
 	return table.concat(lines, "\n")
 end
@@ -188,6 +197,10 @@ function Text.adventurer(save: any, uid: string, master: any): string
 		`実効：HP{snap.maxHp} 攻撃力{snap.atk} 物理防御{snap.pdef} 魔法防御{snap.mdef} 俊敏{snap.agi} 技巧{snap.dex}`,
 		`成長の型：{table.concat(growth, " ")}`,
 		`ギフト：{if #gifts > 0 then table.concat(gifts, "・") else "なし"}`,
+		`経験値補正：+{math.floor(snap.expRate * 100 + 0.5)}% ／ トレーニング1回 {Game.query.trainingSessionCost(
+			a.level,
+			master
+		)}G ／ 転生費用 {Game.query.rebirthCost(save.state, uid, master)}G`,
 	}
 	for _, slot in { "weapon", "armor", "sub" } do
 		local eu = a.equipment[slot]
@@ -252,7 +265,8 @@ function Text.dungeons(save: any, master: any): string
 			then "踏破済"
 			elseif s.unlockedDungeons[d.id] then "解放済"
 			else "未解放"
-		table.insert(lines, `{d.id} {d.name}（{d.floors}F・難度{d.tier}）{mark}`)
+		local fee = if d.dispatchFee then `・派遣費{d.dispatchFee}G` else ""
+		table.insert(lines, `{d.id} {d.name}（{d.floors}F・難度{d.tier}{fee}）{mark}`)
 	end
 	return table.concat(lines, "\n")
 end
@@ -426,6 +440,13 @@ function Text.events(events: { any }, save: any, master: any): string
 				lines,
 				t .. `{master.expansions[e.expansionId].name}を拡張した（→ {e.value}、{e.gold}G）`
 			)
+		elseif e.type == "Trained" then
+			table.insert(
+				lines,
+				t .. `{advName(save, e.uid)} がトレーニング{e.sessions}回（{e.gold}G）→ Lv{e.level}`
+			)
+		elseif e.type == "RebirthStarted" and (e.cost or 0) > 0 then
+			table.insert(lines, t .. `転生費用 {e.cost}G を払った`)
 		elseif e.type == "UniqueJoined" then
 			table.insert(lines, t .. `★ {master.uniques[e.uniqueId].name} が仲間に加わった！`)
 		elseif e.type == "Sold" then
@@ -547,6 +568,15 @@ function Text.expansions(save: any, master: any): string
 		end
 	end
 	return table.concat(lines, "\n")
+end
+
+function Text.trainQuote(save: any, uid: string, target: number, master: any): string
+	local a = save.state.adventurers[uid]
+	if not a then
+		return Text.errorText("ADVENTURER_NOT_FOUND")
+	end
+	local q = Game.query.trainingQuote(save.state, uid, target, master)
+	return `{a.name}：Lv{a.level} → Lv{q.toLevel} トレーニング{q.sessions}回 {q.gold}G`
 end
 
 -- JSON モード用の要約（AIエージェントが毎回 status を叩かなくてよいように）

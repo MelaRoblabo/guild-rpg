@@ -60,6 +60,7 @@ for i, t in Templates do
 		bosses = t.bosses,
 		trapLevel = 1,
 		trapDamageRate = t.trapDamageRate,
+		dispatchFee = t.dispatchFee,
 		minChestRank = t.minChestRank,
 		battleReward = { exp = 100, gold = math.floor(GOLD_BASE * GOLD_GROWTH ^ (i - 1) + 0.5) },
 		sellableItems = t.sellableItems,
@@ -235,6 +236,9 @@ for _, r in lines do
 		table.insert(out, `\t\ttrapDamageRate = {r.trapDamageRate},`)
 	end
 	table.insert(out, `\t\tminChestRank = {r.minChestRank},`)
+	if r.dispatchFee then
+		table.insert(out, `\t\tdispatchFee = {r.dispatchFee},`)
+	end
 	table.insert(out, `\t\tbattleReward = \{ exp = {r.battleReward.exp}, gold = {r.battleReward.gold} \},`)
 	table.insert(out, `\t\tsellableItems = {weighted(r.sellableItems)},`)
 	table.insert(out, `\t\tjobPotionTargets = {list(r.jobPotionTargets)},`)

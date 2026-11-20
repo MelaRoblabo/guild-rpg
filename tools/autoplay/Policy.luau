@@ -1,7 +1,8 @@
 --!strict
 -- 自動プレイヤーの方針（docs/system/09_cli_sim_autoplay.md §3）
 -- greedy：行ける中で1秒あたりの経験値が最も多いダンジョンへ。良い装備は即装備、不要品は売却、
---         買える拡張はすぐ買う、パーティは雇用で埋める、上限レベルに達したら転生する。
+--         買える拡張はすぐ買う、パーティは雇用で埋める、上限レベルに達したら転生する（費用が払えれば）。
+--         遅れている冒険者には修練の護符を持たせ（D-082）、余ったゴールドでトレーニングする（D-076）。
 
 local Expedition = require("../../src/core/Expedition")
 local Formulas = require("../../src/core/Formulas")
@@ -10,12 +11,15 @@ local Inventory = require("../../src/core/Inventory")
 local Party = require("../../src/core/Party")
 local Rebirth = require("../../src/core/Rebirth")
 local Rng = require("../../src/core/Rng")
+local Training = require("../../src/core/Training")
 
 local Policy = {}
 
 local LINE_ORDER = { warrior = 1, scout = 2, mage = 3, support = 4 }
 local WANT_LINES = { "warrior", "scout", "mage", "support" }
-local EXPANSION_PRIORITY = { "exp_party", "exp_warehouse", "exp_roster", "exp_candidate" }
+local EXPANSION_PRIORITY = { "exp_party", "exp_unlock", "exp_warehouse", "exp_roster", "exp_training", "exp_candidate" }
+-- トレーニングに使うのは「転生の備え」を除いた所持金のこの割合まで
+local TRAIN_BUDGET_SHARE = 0.5
 
 export type Ctx = { now: number, master: any, online: boolean }
 
@@ -44,20 +48,37 @@ local function openAll(state: any, ctx: Ctx)
 	end
 end
 
+-- 遅れている冒険者（最も進んだ人より転生回数が2以上少ない）
+local function isCatchingUp(state: any, adv: any): boolean
+	local maxReb = 0
+	for _, a in state.adventurers do
+		maxReb = math.max(maxReb, a.rebirthCount)
+	end
+	return adv.rebirthCount <= maxReb - 2
+end
+
 local function equipBest(state: any, ctx: Ctx)
 	local master = ctx.master
 	for uid in table.clone(state.adventurers) do
 		local adv = state.adventurers[uid]
 		if adv and not Party.isAdventurerBusy(state, uid) then
+			local catching = isCatchingUp(state, adv)
 			for _, slot in Inventory.SLOTS do
 				adv = state.adventurers[uid]
 				local cur = adv.equipment[slot]
-				local curScore = if cur then itemScore(state.equipment[cur], master) else -1
+				local function score(e: any): number
+					if catching and slot == "sub" then
+						-- 遅れている人は補助枠に経験値補正を優先（D-082）
+						return Formulas.equipExpPct(e, master) * 10000 + itemScore(e, master)
+					end
+					return itemScore(e, master)
+				end
+				local curScore = if cur then score(state.equipment[cur]) else -1
 				local best, bestScore = nil, curScore
 				for euid, e in state.equipment do
 					if e.equippedBy == nil and master.equipmentBases[e.baseId].slot == slot then
 						if Inventory.canEquip(adv.jobId, e.baseId, master) then
-							local sc = itemScore(e, master)
+							local sc = score(e)
 							if sc > bestScore then
 								best, bestScore = euid, sc
 							end
@@ -79,7 +100,7 @@ local function sellJunk(state: any, ctx: Ctx)
 	for uid, e in state.equipment do
 		if e.equippedBy == nil and not e.locked then
 			local b = master.equipmentBases[e.baseId]
-			local key = b.slot .. ":" .. b.kind
+			local key = b.slot .. ":" .. b.kind .. (if b.expPct then ":exp" else "")
 			groups[key] = groups[key] or {}
 			table.insert(groups[key], { uid = uid, score = itemScore(e, master) })
 		end
@@ -132,7 +153,7 @@ local function rebirthCapped(state: any, ctx: Ctx, stats: any)
 	table.sort(capped)
 	for i, uid in capped do
 		if not exec(state, { type = "RebirthStart", adventurerUid = uid }, ctx).ok then
-			continue
+			continue -- 転生費用が足りなければ待つ（D-080）
 		end
 		local budget = ctx.master.K.rebirthFreeRerolls
 			+ math.floor((state.items.itm_slot_ticket or 0) / (#capped - i + 1))
@@ -163,6 +184,74 @@ local function rosterCount(state: any): number
 		n += 1
 	end
 	return n
+end
+
+-- 転生の備え：上限まで残り10レベル以内の人の転生費用の合計＋条件を満たした解錠技術・パーティ枠の費用
+local function rebirthReserve(state: any, master: any): number
+	local sum = 0
+	for _, id in { "exp_unlock", "exp_party" } do
+		local step = Game.nextExpansionStep(state, id, master)
+		if
+			step
+			and state.guild.level >= step.guildLevel
+			and (step.requiresClear == nil or state.clearedDungeons[step.requiresClear])
+		then
+			sum += step.gold
+		end
+	end
+	for _, a in state.adventurers do
+		if a.levelCap < master.K.levelCapMax and a.level >= a.levelCap - 10 then
+			sum += Rebirth.cost(a, master)
+		end
+	end
+	return sum
+end
+
+-- トレーニング（D-076）：レベルの低い人から、予算内で上げられるところまで
+local function trainBehind(state: any, ctx: Ctx, stats: any)
+	local master = ctx.master
+	local list = {}
+	for uid, a in state.adventurers do
+		if
+			not Party.isAdventurerBusy(state, uid)
+			and not (state.rebirthSession and state.rebirthSession.adventurerUid == uid)
+			and a.level < Training.levelCap(a, state, master)
+		then
+			table.insert(list, uid)
+		end
+	end
+	table.sort(list, function(x, y)
+		local a, b = state.adventurers[x], state.adventurers[y]
+		if a.level ~= b.level then
+			return a.level < b.level
+		end
+		return x < y
+	end)
+	for _, uid in list do
+		local budget = math.floor((state.gold - rebirthReserve(state, master)) * TRAIN_BUDGET_SHARE)
+		if budget <= 0 then
+			return
+		end
+		local adv = state.adventurers[uid]
+		local cap = Training.levelCap(adv, state, master)
+		-- 予算で届く最も高いレベル（二分探索）
+		local lo, hi, best = adv.level + 1, cap, nil
+		while lo <= hi do
+			local mid = (lo + hi) // 2
+			local q = Training.quote(state, adv, mid, master)
+			if q.gold <= budget then
+				best, lo = q, mid + 1
+			else
+				hi = mid - 1
+			end
+		end
+		if best and best.sessions > 0 then
+			local r = exec(state, { type = "Train", adventurerUid = uid, sessions = best.sessions }, ctx)
+			if r.ok then
+				stats.trainedLevels += r.events[1].levelsGained
+			end
+		end
+	end
 end
 
 -- パーティに入っていない冒険者の系統ごとの数と、空き枠が求める系統
@@ -258,9 +347,12 @@ local function chooseDungeon(state: any, partyIndex: number, ctx: Ctx, rng: Rng.
 	end
 	local unlocked = {}
 	for _, d in master.dungeonList do
-		if state.unlockedDungeons[d.id] then
+		if state.unlockedDungeons[d.id] and (d.dispatchFee or 0) <= state.gold then -- 派遣費（D-079）
 			table.insert(unlocked, d)
 		end
+	end
+	if #unlocked == 0 then
+		return nil
 	end
 	-- 深い方から試算し、踏破率50%以上のダンジョンが2つ見つかったら打ち切る
 	local best, bestScore, push = unlocked[1].id, -1, nil
@@ -296,13 +388,36 @@ local function chooseDungeon(state: any, partyIndex: number, ctx: Ctx, rng: Rng.
 	return push or best
 end
 
+-- 開けられない宝箱が溜まっていて、解錠技術の次の段階の条件を満たしているなら、そのための貯金を優先する
+local function savingForUnlock(state: any, master: any): boolean
+	local step = Game.nextExpansionStep(state, "exp_unlock", master)
+	if not step or state.guild.level < step.guildLevel then
+		return false
+	end
+	local locked = 0
+	for _, c in state.chests do
+		if c.rank > state.expansions.unlockRank then
+			locked += 1
+		end
+	end
+	return locked >= 300 -- 保管（500）が埋まりそうなときだけ
+end
+
 function Policy.manage(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
 	openAll(state, ctx)
 	equipBest(state, ctx)
 	sellJunk(state, ctx)
 	buyExpansions(state, ctx)
-	rebirthCapped(state, ctx, stats)
+	local saving = savingForUnlock(state, ctx.master)
+	if saving then
+		stats.savingTicks = (stats.savingTicks or 0) + 1
+	else
+		rebirthCapped(state, ctx, stats)
+	end
 	hireIfNeeded(state, ctx, stats)
+	if not saving then
+		trainBehind(state, ctx, stats)
+	end
 	arrangeParties(state, ctx)
 	equipBest(state, ctx)
 	for i = 1, #state.parties do

@@ -2,6 +2,8 @@
 -- 拡張（ゲーム仕様書08章 §4、Q-018 仮採用、D-071）
 -- steps は順に購入する。value＝購入後の値、guildLevel＝必要なギルドレベル、gold＝費用
 -- requiresClear＝そのダンジョンの踏破が必要（パーティ枠：所要時間÷パーティ数≒30秒になる時点で開く。D-075）
+-- trainingLevel＝トレーニング場（D-077。各レベルの効果は Constants.trainingFacility）
+-- unlockRank＝解錠技術（D-078。開けられる宝箱のランクの上限）
 -- 金額は仮。tools/autoplay の実測で調整する（docs/reports/M5_economy.md）
 
 return {
@@ -53,6 +55,27 @@ return {
 			{ value = 800, guildLevel = 45, gold = 1000000 },
 			{ value = 900, guildLevel = 55, gold = 2500000 },
 			{ value = 1000, guildLevel = 65, gold = 5000000 },
+		},
+	},
+	{
+		id = "exp_training",
+		name = "トレーニング場",
+		kind = "trainingLevel",
+		steps = {
+			{ value = 2, guildLevel = 10, gold = 20000 },
+			{ value = 3, guildLevel = 30, gold = 300000 },
+			{ value = 4, guildLevel = 50, gold = 3000000 },
+			{ value = 5, guildLevel = 70, gold = 20000000 },
+		},
+	},
+	{
+		id = "exp_unlock",
+		name = "解錠技術",
+		kind = "unlockRank",
+		steps = {
+			{ value = 3, guildLevel = 1, gold = 5000 },
+			{ value = 4, guildLevel = 20, gold = 200000 },
+			{ value = 5, guildLevel = 40, gold = 1000000 },
 		},
 	},
 }

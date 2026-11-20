@@ -48,6 +48,8 @@ return {
 
 	-- 個体補正（D-033）
 	personalBonusCap = 0.50, -- D-070
+	-- 経験値補正（ギフト＋装備）の合計の上限（D-082）。personalBonusCap とは別枠
+	expBonusCap = 1.00, -- 仮
 
 	-- 成長（D-043, 07章）
 	growthVariance = 1,
@@ -73,15 +75,31 @@ return {
 	rebirthBonusSkewBase = 2.073,
 	rebirthBonusSkewPerRebirth = 0.116,
 	rebirthFreeRerolls = 3,
+	-- 転生費用（D-080）：[i] = 転生回数 i−1 → i の転生にかかるゴールド。RebirthStart で払う（仮）
+	rebirthCost = { 2000, 5000, 20000, 80000, 300000, 1000000, 3000000, 8000000 },
 
-	-- 雇用（Q-006）
+	-- トレーニング（D-076, D-077）
+	--   1回の費用 = floor(trainGoldCoef × Lv ^ trainGoldExponent)（Lv が上がるほど跳ね上がる）
+	--   1回の経験値 = trainingFacility[トレーニング場のレベル].expPerSession（転生・ギフト・装備の倍率は掛けない）
+	--   トレーニングで上げられるのは trainingFacility[...].levelCap まで（本人の上限レベルも超えない）
+	trainGoldCoef = 10, -- 仮
+	trainGoldExponent = 2, -- 仮
+	trainingFacility = {
+		{ levelCap = 10, expPerSession = 430 },
+		{ levelCap = 20, expPerSession = 820 },
+		{ levelCap = 30, expPerSession = 1200 },
+		{ levelCap = 40, expPerSession = 1630 },
+		{ levelCap = 50, expPerSession = 2060 },
+	},
+
+	-- 雇用（Q-006）。ステータスの範囲はギルドの成長に関係なく一定（D-081）
 	hireCost = 300,
 	hireStatRange = {
-		str = { min = 5, max = 20, maxPerGuildLevel = 1 },
-		mag = { min = 5, max = 20, maxPerGuildLevel = 1 },
-		agi = { min = 5, max = 20, maxPerGuildLevel = 1 },
-		dex = { min = 5, max = 20, maxPerGuildLevel = 1 },
-		hp = { min = 30, max = 60, maxPerGuildLevel = 3 },
+		str = { min = 5, max = 20 },
+		mag = { min = 5, max = 20 },
+		agi = { min = 5, max = 20 },
+		dex = { min = 5, max = 20 },
+		hp = { min = 30, max = 60 },
 	},
 	hireFreeRerolls = 3,
 	specialVisitorChance = 0.005, -- 仮

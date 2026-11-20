@@ -96,13 +96,15 @@ return function(t)
 			end
 			expect(r.hp).toBeBetween(K.hireStatRange.hp.min, K.hireStatRange.hp.max)
 		end)
-		it("Q-006 ギルドレベルが上がると上限が上がる", function()
+		it("D-081 ステータスの範囲はギルドレベルに関係なく一定", function()
+			local s = started()
+			s.guild.level = 100
 			local rng = Rng.new(3)
 			local maxStr = 0
 			for _ = 1, 2000 do
-				maxStr = math.max(maxStr, Hiring.rollStats(11, rng, master).str)
+				maxStr = math.max(maxStr, Hiring.rollStats(rng, master).str)
 			end
-			expect(maxStr).toBe(K.hireStatRange.str.max + 10)
+			expect(maxStr).toBe(K.hireStatRange.str.max)
 		end)
 		it("面接する候補は1人だけ（選び直せない）", function()
 			local s = started()

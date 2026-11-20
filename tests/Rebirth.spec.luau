@@ -26,6 +26,7 @@ return function(t)
 		local adv = s.adventurers[uid]
 		adv.level = adv.levelCap
 		adv.baseStats = { str = 100, mag = 20, agi = 40, dex = 30, hp = 200 }
+		s.gold = 10 ^ 9 -- 転生費用（D-080）
 		return s, uid, adv
 	end
 
@@ -35,6 +36,18 @@ return function(t)
 			expect(exec(s, { type = "RebirthStart", adventurerUid = s.parties[1].slots[1] }).error).toBe(
 				"LEVEL_NOT_AT_CAP"
 			)
+		end)
+		it("D-080 転生には転生回数に応じたゴールドが要る", function()
+			local s, uid, adv = atCap()
+			adv.rebirthCount = 2
+			adv.levelCap = K.levelCapInitial + 2 * K.levelCapPerRebirth
+			adv.level = adv.levelCap
+			local cost = K.rebirthCost[3]
+			s.gold = cost - 1
+			expect(exec(s, { type = "RebirthStart", adventurerUid = uid }).error).toBe("NOT_ENOUGH_GOLD")
+			s.gold = cost
+			expect(exec(s, { type = "RebirthStart", adventurerUid = uid }).ok).toBeTruthy()
+			expect(s.gold).toBe(0)
 		end)
 		it("D-071 上限100では転生できない", function()
 			local s, uid, adv = atCap()
@@ -182,6 +195,7 @@ return function(t)
 			adv.uniqueId = "uni_garrett"
 			adv.appearanceId = "uni_garrett"
 			adv.level = adv.levelCap
+			s.gold = 10 ^ 9
 			s.items.itm_potion_appearance_keep = 1
 			expect(exec(s, { type = "RebirthStart", adventurerUid = uid, useKeepPotion = true }).error).toBe(
 				"UNIQUE_APPEARANCE_FIXED"

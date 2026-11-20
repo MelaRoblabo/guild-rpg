@@ -26,7 +26,7 @@ export type MemberSnapshot = {
 	lucky: boolean,
 	trapDexMult: number, -- 罠師の勘
 	travel: { { terrainTag: string, value: number, giftId: string } }, -- 道案内
-	expRate: number, -- 大食らい
+	expRate: number, -- 大食らい＋装備の経験値補正（D-082。上限 expBonusCap）
 	giftIds: { string },
 }
 
@@ -56,6 +56,16 @@ function Formulas.equipMult(rarity: number, grade: number, itemLevel: number, K:
 	return K.equipRarityMult[rarity] * (1 + K.equipGradeCoef * grade) * K.equipTierMult ^ (itemLevel - 1)
 end
 
+-- D-082：装備の経験値補正 = expPct × レアリティ係数 × (1 + 0.1×グレード)。アイテムレベルでは伸びない
+function Formulas.equipExpPct(inst: any, master: any): number
+	local base = master.equipmentBases[inst.baseId]
+	if not base or not base.expPct then
+		return 0
+	end
+	local K = master.K
+	return base.expPct * K.equipRarityMult[inst.rarity] * (1 + K.equipGradeCoef * inst.grade)
+end
+
 -- 06章 §1：実効ステータスと探索用の実効値を作る
 function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 	local K = master.K
@@ -67,6 +77,7 @@ function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 	local tagRates: { [string]: number } = {}
 	local healRate = 0
 	local weaponAtk, pdef, mdef = 0, 0, 0
+	local equipExp = 0
 
 	for _, slot in { "weapon", "armor", "sub" } do
 		local inst = (def.equipment :: any)[slot]
@@ -74,6 +85,7 @@ function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 			local base = master.equipmentBases[inst.baseId]
 			assert(base, `未知の装備: {inst.baseId}`)
 			local mult = Formulas.equipMult(inst.rarity, inst.grade, inst.itemLevel or 1, K)
+			equipExp += Formulas.equipExpPct(inst, master)
 			if slot == "weapon" then
 				weaponAtk += math.floor((base.atk or 0) * mult)
 			end
@@ -123,6 +135,8 @@ function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 			expRate += e.value
 		end
 	end
+
+	expRate = math.min(expRate + equipExp, K.expBonusCap) -- D-082
 
 	-- 個体補正は1性能あたり personalBonusCap まで（D-033）
 	local cap = K.personalBonusCap

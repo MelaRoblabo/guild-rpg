@@ -9,8 +9,9 @@ local Types = require("./Types")
 
 local Growth = {}
 
--- 個人の経験値倍率（転生回数・大食らい）
-function Growth.expMultiplier(adv: any, master: any): number
+-- 個人の経験値倍率（転生回数 × (1 + 大食らい＋装備の経験値補正)。補正の合計は expBonusCap まで：D-082）
+-- equipment は state.equipment（装備の補正を数えるとき）
+function Growth.expMultiplier(adv: any, master: any, equipment: any?): number
 	local K = master.K
 	local rate = 0
 	for _, g in adv.giftIds do
@@ -19,7 +20,16 @@ function Growth.expMultiplier(adv: any, master: any): number
 			rate += gift.effect.value
 		end
 	end
-	return (1 + K.rebirthExpBonusPerCount * adv.rebirthCount) * (1 + math.min(rate, K.personalBonusCap))
+	if equipment then
+		for _, slot in { "weapon", "armor", "sub" } do
+			local uid = adv.equipment[slot]
+			local item = uid and equipment[uid]
+			if item then
+				rate += Formulas.equipExpPct(item, master)
+			end
+		end
+	end
+	return (1 + K.rebirthExpBonusPerCount * adv.rebirthCount) * (1 + math.min(rate, K.expBonusCap))
 end
 
 -- 1レベル分の成長を抽選する（乱数の消費順：STAT_KEYS の順）
@@ -34,17 +44,11 @@ function Growth.rollGrowth(jobId: string, rng: Rng.Rng, master: any): Types.Stat
 	return out
 end
 
--- 経験値を加え、レベルアップを処理する。上がったレベルの一覧を返す
--- 上限レベルでは経験値を貯めない（07章）
-function Growth.addExp(adv: any, rawAmount: number, rng: Rng.Rng, master: any): { number }
+-- 貯まった経験値で capLevel までレベルを上げる。capLevel に達したら経験値は捨てる
+function Growth.levelUpTo(adv: any, capLevel: number, rng: Rng.Rng, master: any): { number }
 	local K = master.K
 	local levels = {}
-	if adv.level >= adv.levelCap then
-		adv.exp = 0
-		return levels
-	end
-	adv.exp += math.floor(rawAmount * Growth.expMultiplier(adv, master))
-	while adv.level < adv.levelCap do
+	while adv.level < capLevel do
 		local need = Formulas.expToNext(adv.level, K, adv.rebirthCount)
 		if adv.exp < need then
 			break
@@ -57,10 +61,21 @@ function Growth.addExp(adv: any, rawAmount: number, rng: Rng.Rng, master: any): 
 		end
 		table.insert(levels, adv.level)
 	end
-	if adv.level >= adv.levelCap then
+	if adv.level >= capLevel then
 		adv.exp = 0
 	end
 	return levels
+end
+
+-- 経験値を加え、レベルアップを処理する。上がったレベルの一覧を返す
+-- 上限レベルでは経験値を貯めない（07章）
+function Growth.addExp(adv: any, rawAmount: number, rng: Rng.Rng, master: any, equipment: any?): { number }
+	if adv.level >= adv.levelCap then
+		adv.exp = 0
+		return {}
+	end
+	adv.exp += math.floor(rawAmount * Growth.expMultiplier(adv, master, equipment))
+	return Growth.levelUpTo(adv, adv.levelCap, rng, master)
 end
 
 return Growth

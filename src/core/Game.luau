@@ -19,6 +19,7 @@ local Migration = require("./Migration")
 local Party = require("./Party")
 local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
+local Training = require("./Training")
 
 local Game = {}
 
@@ -127,7 +128,11 @@ function Game.newState(master: any, seed: number, now: number): any
 end
 
 -- 派遣（D-026）。departAt を指定できる（自動再派遣は帰還時刻から出発する）
+-- 派遣費（D-079）は呼び出し側で払えることを確かめてから呼ぶ
 local function dispatch(state: any, partyIndex: number, dungeonId: string, departAt: number, master: any): any
+	local fee = master.dungeons[dungeonId].dispatchFee or 0
+	state.gold -= fee
+	bump(state, "goldSpentOnFees", fee)
 	local _, seed = takeRng(state)
 	local snaps = Party.snapshots(state, partyIndex, master)
 	local log =
@@ -153,7 +158,10 @@ local function dispatch(state: any, partyIndex: number, dungeonId: string, depar
 end
 
 -- 自動再派遣できない理由（できるなら nil）
-local function autoRepeatBlocker(state: any, master: any): string?
+local function autoRepeatBlocker(state: any, master: any, dungeonId: string): string?
+	if state.gold < (master.dungeons[dungeonId].dispatchFee or 0) then
+		return "NOT_ENOUGH_GOLD" -- D-079
+	end
 	if Inventory.warehouseFree(state) <= 0 then
 		return "WAREHOUSE_FULL"
 	end
@@ -174,12 +182,19 @@ local function collect(state: any, e: any, master: any, events: { any })
 	for itemId, c in r.items do
 		Inventory.addItem(state, itemId, c)
 	end
+	-- 保管が上限なら、入りきらない宝箱は持ち帰れない（D-083：出発を止めると詰むため）
+	local leftBehind = 0
 	for _, c in r.chests do
-		table.insert(
-			state.chests,
-			{ uid = newUid(state, "ch"), rank = c.rank, dungeonId = e.dungeonId, obtainedAt = e.returnAt }
-		)
+		if #state.chests >= K.chestStorageMax then
+			leftBehind += 1
+		else
+			table.insert(
+				state.chests,
+				{ uid = newUid(state, "ch"), rank = c.rank, dungeonId = e.dungeonId, obtainedAt = e.returnAt }
+			)
+		end
 	end
+	bump(state, "chestsLeftBehind", leftBehind)
 
 	-- 経験値（D-041：生存者で等分済み。個人倍率はここで掛ける）。順序を固定するため隊列順に処理
 	local levelUps = {}
@@ -187,7 +202,7 @@ local function collect(state: any, e: any, master: any, events: { any })
 		local amount = r.exp[uid]
 		local adv = state.adventurers[uid]
 		if amount and amount > 0 and adv then
-			local levels = Growth.addExp(adv, amount, rng, master)
+			local levels = Growth.addExp(adv, amount, rng, master, state.equipment)
 			if #levels > 0 then
 				table.insert(levelUps, { uid = uid, level = adv.level })
 			end
@@ -219,7 +234,8 @@ local function collect(state: any, e: any, master: any, events: { any })
 		result = log.result,
 		retreatReason = log.retreatReason,
 		reachedFloor = log.reachedFloor,
-		chests = #r.chests,
+		chests = #r.chests - leftBehind,
+		chestsLeftBehind = leftBehind,
 		gold = r.gold,
 		items = r.items,
 		guildExp = guildExp,
@@ -289,7 +305,7 @@ function Game.advance(state: any, ctx: Ctx): { any }
 
 		local party = state.parties[nextE.partyIndex]
 		if party and party.autoRepeat then
-			local blocker = autoRepeatBlocker(state, master)
+			local blocker = autoRepeatBlocker(state, master, party.autoRepeat.dungeonId)
 			if not ctx.online then
 				-- オフライン中は再派遣しない（企画書§16.8 案A）。設定は残す
 				continue
@@ -407,6 +423,10 @@ handlers.Dispatch = function(state, cmd, ctx)
 	if Party.isEmpty(p) then
 		return fail("PARTY_EMPTY")
 	end
+	local fee = ctx.master.dungeons[cmd.dungeonId].dispatchFee or 0
+	if state.gold < fee then
+		return fail("NOT_ENOUGH_GOLD") -- D-079
+	end
 	local e = dispatch(state, cmd.partyIndex, cmd.dungeonId, ctx.now, ctx.master)
 	return {
 		ok = true,
@@ -417,6 +437,7 @@ handlers.Dispatch = function(state, cmd, ctx)
 				partyIndex = cmd.partyIndex,
 				dungeonId = cmd.dungeonId,
 				returnAt = e.returnAt,
+				fee = fee,
 			},
 		},
 	}
@@ -442,13 +463,25 @@ handlers.SetAutoRepeat = function(state, cmd, ctx)
 end
 
 handlers.OpenChests = function(state, cmd, ctx)
+	-- 解錠技術（D-078）：開けられるのは unlockRank 以下の宝箱だけ。開けられない宝箱はギルドに残る
+	local unlockRank = state.expansions.unlockRank
 	local targets = {}
 	if cmd.chestUids == "all" then
-		targets = table.clone(state.chests)
+		for _, c in state.chests do
+			if c.rank <= unlockRank then
+				table.insert(targets, c)
+			end
+		end
+		if #targets == 0 and #state.chests > 0 then
+			return fail("CHEST_RANK_TOO_HIGH")
+		end
 	else
 		for _, uid in cmd.chestUids do
 			for _, c in state.chests do
 				if c.uid == uid then
+					if c.rank > unlockRank then
+						return fail("CHEST_RANK_TOO_HIGH")
+					end
 					table.insert(targets, c)
 				end
 			end
@@ -600,7 +633,7 @@ handlers.HirePick = function(state, cmd, ctx)
 	if c.kind == "unique" then
 		h.currentRoll = Hiring.uniqueStats(c.uniqueId, ctx.master)
 	else
-		h.currentRoll = Hiring.rollStats(state.guild.level, takeRng(state), ctx.master)
+		h.currentRoll = Hiring.rollStats(takeRng(state), ctx.master)
 	end
 	return { ok = true, events = { { type = "StatsRolled", at = ctx.now, stats = h.currentRoll } } }
 end
@@ -629,7 +662,7 @@ handlers.HireReroll = function(state, cmd, ctx)
 	end
 	-- Q-021：残す方（keep）と新しい結果を並べる。指定がなければ合計値の高い方を残す
 	h.previousRoll = Rebirth.pickKept(h.previousRoll, h.currentRoll, cmd.keep)
-	h.currentRoll = Hiring.rollStats(state.guild.level, takeRng(state), ctx.master)
+	h.currentRoll = Hiring.rollStats(takeRng(state), ctx.master)
 	bump(state, "hireRerolls")
 	return {
 		ok = true,
@@ -742,6 +775,10 @@ handlers.RebirthStart = function(state, cmd, ctx)
 	if err then
 		return fail(err)
 	end
+	local cost = Rebirth.cost(adv, master) -- D-080
+	if state.gold < cost then
+		return fail("NOT_ENOUGH_GOLD")
+	end
 	local rng = takeRng(state)
 	local newAppearanceId = adv.appearanceId
 	if adv.uniqueId then
@@ -758,6 +795,8 @@ handlers.RebirthStart = function(state, cmd, ctx)
 		local outfit = Appearance.outfitClassOf(adv.jobId, master)
 		newAppearanceId = Appearance.roll(adv.gender, outfit, rng, master, adv.appearanceId).appearanceId
 	end
+	state.gold -= cost
+	bump(state, "goldSpentOnRebirth", cost)
 	state.rebirthSession = {
 		adventurerUid = adv.uid,
 		inherited = Rebirth.inherited(adv.baseStats),
@@ -767,7 +806,7 @@ handlers.RebirthStart = function(state, cmd, ctx)
 		freeRerollsLeft = master.K.rebirthFreeRerolls,
 		newAppearanceId = newAppearanceId,
 	}
-	return { ok = true, events = { { type = "RebirthStarted", at = ctx.now, uid = adv.uid } } }
+	return { ok = true, events = { { type = "RebirthStarted", at = ctx.now, uid = adv.uid, cost = cost } } }
 end
 
 handlers.RebirthReroll = function(state, cmd, ctx)
@@ -911,6 +950,49 @@ handlers.ChangeAppearanceChoose = function(state, cmd, ctx)
 	}
 end
 
+-- トレーニング（D-076, D-077） ----------------------------------------------
+
+handlers.Train = function(state, cmd, ctx)
+	local master = ctx.master
+	local adv = state.adventurers[cmd.adventurerUid]
+	if not adv then
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	local n = cmd.sessions
+	if type(n) ~= "number" or n < 1 or n ~= math.floor(n) then
+		return fail("INVALID_COUNT")
+	end
+	if Party.isAdventurerBusy(state, adv.uid) then
+		return fail("ADVENTURER_ON_EXPEDITION")
+	end
+	if state.rebirthSession and state.rebirthSession.adventurerUid == adv.uid then
+		return fail("ADVENTURER_IN_REBIRTH")
+	end
+	if adv.level >= Training.levelCap(adv, state, master) then
+		return fail("TRAINING_CAP")
+	end
+	if state.gold < Training.sessionCost(adv.level, master.K) then
+		return fail("NOT_ENOUGH_GOLD")
+	end
+	local r = Training.run(state, adv, n, takeRng(state), master)
+	bump(state, "goldSpentOnTraining", r.gold)
+	bump(state, "trainingSessions", r.sessions)
+	return {
+		ok = true,
+		events = {
+			{
+				type = "Trained",
+				at = ctx.now,
+				uid = adv.uid,
+				sessions = r.sessions,
+				gold = r.gold,
+				level = adv.level,
+				levelsGained = #r.levels,
+			},
+		},
+	}
+end
+
 -- 拡張・設定（08章 §4、06章 §6） --------------------------------------------
 
 -- 次に買える段階（なければ nil）
@@ -1035,6 +1117,18 @@ end
 
 function Game.query.sellPrice(item: any, master: any): number
 	return Inventory.equipmentSellPrice(item, master)
+end
+
+function Game.query.trainingQuote(state: any, uid: string, targetLevel: number, master: any)
+	return Training.quote(state, state.adventurers[uid], targetLevel, master)
+end
+
+function Game.query.trainingSessionCost(level: number, master: any): number
+	return Training.sessionCost(level, master.K)
+end
+
+function Game.query.rebirthCost(state: any, uid: string, master: any): number
+	return Rebirth.cost(state.adventurers[uid], master)
 end
 
 function Game.query.expToNext(level: number, master: any, rebirthCount: number?): number

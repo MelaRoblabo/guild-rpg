@@ -74,12 +74,26 @@
 
 ```
 勝利時の経験値 = 戦闘報酬の経験値を勝利時点の生存者で等分（端数切り捨て）            -- D-041
-  個人倍率 = (1 + rebirthExpBonusPerCount × 転生回数) × (1 + 大食らい 0.10)
+  個人倍率 = (1 + rebirthExpBonusPerCount × 転生回数) × (1 + min(経験値補正, expBonusCap))
+  経験値補正 = 大食らい 0.25 ＋ 装備の経験値補正の合計                                     -- D-082
+  装備の経験値補正 = expPct × equipRarityMult[rarity] × (1 + equipGradeCoef × grade)       -- アイテムレベルでは伸びない
 必要経験値(Lv→Lv+1) = floor(100 × Lv^1.5 × expCycleMult[転生回数+1])   -- D-071
 レベルアップ時の成長(各項目) = max(0, 職業の基準値 + rng:int(−growthVariance, +growthVariance))   -- D-043
   成長は baseStats に加算。転職後は新しい職業の基準値を使う                            -- D-045
 レベル上限に達したら経験値は貯めない
 ```
+
+## 8b. トレーニング（D-076, D-077）
+
+```
+1回の費用   = floor(trainGoldCoef × Lv ^ trainGoldExponent)          -- Lv は行う時点のレベル
+1回の経験値 = trainingFacility[トレーニング場のレベル].expPerSession -- 倍率（転生・ギフト・装備）は掛けない
+上げられる上限 = min(本人の levelCap, trainingFacility[...].levelCap)
+上限に達したら余った経験値は捨てる。ゴールドが1回の費用に足りなくなったら止める
+```
+
+必要経験値は周回の倍率（expCycleMult）で増えるので、転生を重ねた冒険者ほど必要な回数が増える。
+新しく雇った冒険者の育成を短縮するのが主な使い道。
 
 ## 9. 転生（企画書§9, Q-009 仮）
 
@@ -87,6 +101,7 @@
 引き継ぎ = floor(転生前 baseStats.s / 2)        -- 装備・ギフト補正を含まない素の値
 加算分   = floor( floor(転生前の値 × rebirthBonusMaxRate) × u^p )   u は [0,1) の一様乱数     -- D-072
            p = rebirthBonusSkewBase + rebirthBonusSkewPerRebirth × (転生後の回数 − 1)
+転生費用 = rebirthCost[転生前の回数 + 1]（RebirthStart で払う）                         -- D-080
 転生後   = 引き継ぎ + 加算分。Lv1、levelCap = min(levelCap + levelCapPerRebirth, levelCapMax)
 ギフト追加：転生後の rebirthCount が rebirthGiftAddAt に含まれれば、未所持のギフトから1つ抽選
 ```
@@ -95,5 +110,8 @@
 
 ```
 ギルド経験値(帰還ごと) = 攻略フロア数 × guildExpPerFloor + (踏破なら guildExpClearBonus) + (初回踏破なら guildExpFirstClear)
+派遣費   = ダンジョンの dispatchFee（上級ダンジョンのみ。出発のたびに払う）                -- D-079
+開けられる宝箱 = ランク ≤ 解錠技術（expansions.unlockRank、初期2）。開けられない宝箱はギルドに残る   -- D-078
+宝箱の保管が chestStorageMax に達していたら、帰還時に入りきらない宝箱は持ち帰れない（出発は止めない）   -- D-083
 売却価格 = floor( 基本売却価格 × sellRarityMult[rarity] × (1 + sellGradeCoef × grade) × equipTierMult^(アイテムレベル − 1) )   -- D-069
 ```

@@ -81,13 +81,13 @@ function Hiring.rollCandidates(state: any, rng: Rng.Rng, master: any): { any }
 	return out
 end
 
--- 面接のステータス抽選（Q-006：ギルドレベルで上限が上がる）。乱数の消費順は STAT_KEYS の順
-function Hiring.rollStats(guildLevel: number, rng: Rng.Rng, master: any): Types.StatBlock
+-- 面接のステータス抽選（Q-006）。範囲はギルドの成長に関係なく一定（D-081）。乱数の消費順は STAT_KEYS の順
+function Hiring.rollStats(rng: Rng.Rng, master: any): Types.StatBlock
 	local K = master.K
 	local out: any = {}
 	for _, s in Types.STAT_KEYS do
 		local r = K.hireStatRange[s]
-		out[s] = rng:int(r.min, r.max + math.floor(r.maxPerGuildLevel * (guildLevel - 1)))
+		out[s] = rng:int(r.min, r.max)
 	end
 	return out
 end

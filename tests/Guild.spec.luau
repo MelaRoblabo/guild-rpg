@@ -90,6 +90,7 @@ return function(t)
 	describe("自動売却（06章 §6）", function()
 		local function withChests(n: number, rank: number)
 			local s = Game.newState(master, 1, T0)
+			s.expansions.unlockRank = 5 -- 解錠技術は別のテスト（D-078）
 			for i = 1, n do
 				table.insert(s.chests, { uid = "ch_t" .. i, rank = rank, dungeonId = "dng_ruins", obtainedAt = T0 })
 			end

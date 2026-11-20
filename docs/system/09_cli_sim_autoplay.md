@@ -32,6 +32,7 @@ lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   
 | `rename <uid> <名前>` / `dismiss <uid>` | Rename / Dismiss（M3） |
 | `rebirth <uid> [keep]` / `jobchange <uid> <job>` / `looks <uid>` | M4 |
 | `expansions` / `expand <exp_id>` / `autosell <on\|off> [レアリティ] [keep\|all]` | M5 |
+| `train <uid> [回数\|max]` / `trainquote <uid> <Lv>` | Train（D-076）／見積もり |
 | `log` | 直近のイベントを表示 |
 
 - 状態はコマンドごとに JSON ファイルへ保存する（中断・再開できる）。
