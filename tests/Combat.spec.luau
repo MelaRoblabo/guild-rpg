@@ -91,9 +91,9 @@ return function(t)
 			Combat.run(phys, Fixtures.monster({ hp = 100000, atk = 10, attackType = "physical" }), Rng.new(1), K)
 			local mag = { M({ maxHp = 1000, pdef = 0, mdef = 8 }) }
 			Combat.run(mag, Fixtures.monster({ hp = 100000, atk = 10, attackType = "magic" }), Rng.new(1), K)
-			-- 1ターンあたり 2 ダメージ × 30 ターン
-			expect(phys[1].hp).toBe(1000 - 60)
-			expect(mag[1].hp).toBe(1000 - 60)
+			-- 1ターンあたり floor(100/18)=5 ダメージ × 30 ターン（D-068）
+			expect(phys[1].hp).toBe(1000 - 150)
+			expect(mag[1].hp).toBe(1000 - 150)
 		end)
 		it("D-037 魔法攻撃職は魔法防御を引く", function()
 			local r = Combat.run(
@@ -102,7 +102,7 @@ return function(t)
 				Rng.new(1),
 				K
 			)
-			expect(r.turns[1].actions[1].amount).toBe(10)
+			expect(r.turns[1].actions[1].amount).toBe(27)
 		end)
 	end)
 

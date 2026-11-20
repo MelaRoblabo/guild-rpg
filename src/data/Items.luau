@@ -78,4 +78,12 @@ return {
 	{ id = "itm_old_gear", name = "古代の歯車", kind = "sellable", sellPrice = 18 },
 	{ id = "itm_magic_shard", name = "魔力の欠片", kind = "sellable", sellPrice = 24 },
 	{ id = "itm_knight_crest", name = "騎士の紋章", kind = "sellable", sellPrice = 32 },
+	{ id = "itm_tide_pearl", name = "潮の真珠", kind = "sellable", sellPrice = 50 },
+	{ id = "itm_amber_sap", name = "琥珀の樹液", kind = "sellable", sellPrice = 70 },
+	{ id = "itm_labyrinth_coin", name = "迷宮金貨", kind = "sellable", sellPrice = 100 },
+	{ id = "itm_holy_relic", name = "聖遺物の欠片", kind = "sellable", sellPrice = 140 },
+	{ id = "itm_steel_cog", name = "鋼鉄の歯車", kind = "sellable", sellPrice = 200 },
+	{ id = "itm_dragon_scale", name = "竜の鱗", kind = "sellable", sellPrice = 290 },
+	{ id = "itm_demon_horn", name = "魔族の角", kind = "sellable", sellPrice = 420 },
+	{ id = "itm_sky_feather", name = "天空の羽根", kind = "sellable", sellPrice = 600 },
 }

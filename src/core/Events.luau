@@ -92,7 +92,7 @@ function Events.run(ctx: EventContext): (string, any, boolean)
 		if not evaded then
 			for _, m in ctx.members do
 				if m.hp > 0 then
-					local d = Formulas.trapDamage(m.snap.maxHp, ctx.dungeon.trapLevel, K)
+					local d = Formulas.trapDamage(m.snap.maxHp, ctx.dungeon, K)
 					m.hp = math.max(0, m.hp - d)
 					damage[m.slot] = d
 				end

@@ -33,6 +33,7 @@ export type MemberSnapshot = {
 -- 装備個体（03章 EquipmentItem のうち性能に関わる部分）
 export type EquipmentInstance = {
 	baseId: string,
+	itemLevel: number, -- アイテムレベル＝入手したダンジョンの tier（D-069）
 	rarity: number,
 	grade: number,
 	modifierId: string?,
@@ -50,8 +51,9 @@ export type MemberDef = {
 }
 
 -- 06章 §2：装備性能の倍率（Q-020 仮）
-function Formulas.equipMult(rarity: number, grade: number, K: any): number
-	return K.equipRarityMult[rarity] * (1 + K.equipGradeCoef * grade)
+-- 性能 = 基本値 × レアリティ係数 × (1 + 0.1×グレード) × equipTierMult^(アイテムレベル−1)（Q-020, D-069）
+function Formulas.equipMult(rarity: number, grade: number, itemLevel: number, K: any): number
+	return K.equipRarityMult[rarity] * (1 + K.equipGradeCoef * grade) * K.equipTierMult ^ (itemLevel - 1)
 end
 
 -- 06章 §1：実効ステータスと探索用の実効値を作る
@@ -71,7 +73,7 @@ function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 		if inst then
 			local base = master.equipmentBases[inst.baseId]
 			assert(base, `未知の装備: {inst.baseId}`)
-			local mult = Formulas.equipMult(inst.rarity, inst.grade, K)
+			local mult = Formulas.equipMult(inst.rarity, inst.grade, inst.itemLevel or 1, K)
 			if slot == "weapon" then
 				weaponAtk += math.floor((base.atk or 0) * mult)
 			end
@@ -167,8 +169,12 @@ function Formulas.attackAgainst(snap: MemberSnapshot, raceTag: string): number
 	return math.floor(snap.atk * (1 + (snap.tagAtkRates[raceTag] or 0)))
 end
 
-function Formulas.damage(atk: number, def: number, K: any): number
-	return math.max(atk - def, math.floor(atk * K.minDamageRate), 1) -- D-007
+-- D-068：ダメージ = 攻撃力² ÷ (攻撃力 + 防御)。防御が攻撃力と同じなら半分。最低1
+function Formulas.damage(atk: number, def: number, _K: any): number
+	if atk <= 0 then
+		return 1
+	end
+	return math.max(math.floor(atk * atk / (atk + math.max(def, 0))), 1)
 end
 
 function Formulas.critRate(dex: number, K: any): number
@@ -211,8 +217,9 @@ function Formulas.trapEvadeRate(dexSum: number, trapLevel: number, K: any): numb
 	return dexSum / denom
 end
 
-function Formulas.trapDamage(maxHp: number, trapLevel: number, K: any): number
-	return math.floor(maxHp * K.trapDamageRate * (1 + K.trapLevelCoefStep * (trapLevel - 1)))
+-- 罠のダメージ = 最大HP × 罠ダメージ率（ダンジョンごとに上書き可。D-067）
+function Formulas.trapDamage(maxHp: number, dungeon: any, K: any): number
+	return math.floor(maxHp * (dungeon.trapDamageRate or K.trapDamageRate))
 end
 
 function Formulas.fountainHeal(maxHp: number, K: any): number
@@ -249,7 +256,11 @@ function Formulas.travelSeconds(snaps: { MemberSnapshot }, dungeon: any, K: any)
 			end
 		end
 	end
-	local seconds = dungeon.distance * K.travelSecondsPerDistance / (1 + avgAgi / K.travelAgiDivisor) * mult
+	-- D-069：基準俊敏より速ければ短く、遅ければ長く（上下限あり）
+	local speed = if avgAgi > 0
+		then math.clamp(dungeon.refAgi / avgAgi, K.travelSpeedMin, K.travelSpeedMax)
+		else K.travelSpeedMax
+	local seconds = dungeon.distance * K.travelSecondsPerDistance * speed * mult
 	return math.ceil(seconds), giftId
 end
 

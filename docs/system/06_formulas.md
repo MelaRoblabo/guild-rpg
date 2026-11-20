@@ -10,10 +10,11 @@
 最大HP = 実効 hp
 ```
 
-## 2. 装備の性能（Q-020 仮）
+## 2. 装備の性能（Q-020 仮、D-069）
 
 ```
-性能値 = 基本値 × equipRarityMult[rarity] × (1 + equipGradeCoef × grade)   -- 端数切り捨て
+性能値 = 基本値 × equipRarityMult[rarity] × (1 + equipGradeCoef × grade) × equipTierMult^(アイテムレベル − 1)   -- 端数切り捨て
+アイテムレベル = 入手したダンジョンの tier（1〜12）
 ```
 対象は攻撃力補正・物理防御・魔法防御・ステータス補正。
 
@@ -22,11 +23,11 @@
 ```
 攻撃力 = (攻撃区分が physical なら 実効str、magic なら 実効mag) + 武器の攻撃力補正     -- D-037, D-047
          ※ 退魔の才・退魔の修飾語は、相手がアンデッドのとき攻撃力に +率 を乗算（個体補正の上限内）
-与ダメージ = max( 攻撃力 − 相手の対応防御, floor(攻撃力 × minDamageRate), 1 )        -- D-007
+与ダメージ = max( floor(攻撃力² ÷ (攻撃力 + 相手の対応防御)), 1 )                       -- D-068（D-007 を置き換え）
          対応防御：physical → 物理防御、magic → 魔法防御
 クリティカル率 = min( 実効dex / (実効dex + critCoef), critCap )                       -- D-010
 クリティカル時 与ダメージ = floor(与ダメージ × critMult)
-被ダメージ = max( モンスター攻撃力 − 対象の対応防御, floor(モンスター攻撃力 × minDamageRate), 1 )
+被ダメージ = max( floor(モンスター攻撃力² ÷ (モンスター攻撃力 + 対象の対応防御)), 1 )    -- D-068
          対応防御：モンスターの攻撃種別が physical → 物理防御、magic → 魔法防御        -- D-008
 モンスター強さ倍率(n番目の戦闘) = 1 + monsterScalePerBattle × (n − 1)                 -- D-003
 モンスターの各パラメータ = floor(ダンジョン基準値 × 倍率)
@@ -48,7 +49,7 @@
 ```
 罠の回避率 = 技巧合計 / (技巧合計 + 罠Lv × trapK)                                     -- D-017
   技巧合計 = 生存者の 実効dex の合計。罠師の勘の所持者は本人分を2倍で数える
-罠ダメージ(各生存者) = floor( 最大HP × trapDamageRate × (1 + trapLevelCoefStep × (罠Lv − 1)) )
+罠ダメージ(各生存者) = floor( 最大HP × (ダンジョンの trapDamageRate または Constants.trapDamageRate) )   -- D-067
 泉の回復(各生存者) = floor( 最大HP × fountainHealRate )                               -- D-018
 宝箱ランク = min( ダンジョンの最低ランク + chestRankOffsets から抽選, 5 )              -- D-015
 ```
@@ -60,11 +61,11 @@
 宝箱を1個確保するたびに1回判定。成功で同じ抽選の宝箱をもう1個（追加分では再判定しない）
 ```
 
-## 7. 移動と所要時間（D-021, D-026, Q-004 仮）
+## 7. 移動と所要時間（D-021, D-026, D-069）
 
 ```
-片道秒 = ceil( 距離 × travelSecondsPerDistance / (1 + 平均実効agi / travelAgiDivisor) )
-  道案内：対象地形なら × 0.8（パーティ内で重複しない）
+片道秒 = ceil( 距離 × travelSecondsPerDistance × clamp(ダンジョンの refAgi ÷ 平均実効agi, travelSpeedMin, travelSpeedMax) × 道案内 )
+  道案内：対象地形なら × 0.7（パーティ内で重複しない。D-070）
 再生秒 = 戦闘ターン数合計 × replaySecondsPerTurn + イベント数 × replaySecondsPerEvent
 所要秒 = 片道秒 × 2 + 再生秒                       -- 撤退時も同じ式（再生は撤退したフロアまで）
 ```

@@ -6,7 +6,6 @@
 return {
 	-- 戦闘（D-005, D-007, D-009, D-010, D-003）
 	hitWeights = { 0.45, 0.25, 0.20, 0.10 },
-	minDamageRate = 0.10,
 	critCoef = 200,
 	critCap = 0.30,
 	critMult = 1.5,
@@ -28,26 +27,27 @@ return {
 		{ id = "+3", offset = 3, weight = 0.05 },
 	},
 	fountainHealRate = 0.25,
-	trapK = 10, -- 仮（Q-004）
-	trapDamageRate = 0.15,
-	trapLevelCoefStep = 0.25, -- 仮（Q-004）
+	trapK = 40, -- D-067
+	trapDamageRate = 0.20, -- D-067。ダンジョンごとに上書き可（Dungeons.trapDamageRate）
 
 	-- 支援系（D-034, Q-004）
 	healThreshold = 0.70,
 	healCoef = 0.30, -- 仮
 
 	-- 幸運（D-019, Q-004）
-	luckyChancePerHolder = 0.15, -- 仮
-	luckyChanceCap = 0.40, -- 仮
+	luckyChancePerHolder = 0.30, -- D-070
+	luckyChanceCap = 0.60, -- D-070
 
 	-- 移動・再生（D-021, D-026, Q-004）
 	travelSecondsPerDistance = 10, -- 仮
-	travelAgiDivisor = 50, -- 仮
+	-- 片道秒 = 距離 × travelSecondsPerDistance × clamp(ダンジョンの基準俊敏 ÷ 平均俊敏, Min, Max)（D-069）
+	travelSpeedMin = 0.6,
+	travelSpeedMax = 1.4,
 	replaySecondsPerTurn = 1,
 	replaySecondsPerEvent = 2,
 
 	-- 個体補正（D-033）
-	personalBonusCap = 0.30,
+	personalBonusCap = 0.50, -- D-070
 
 	-- 成長（D-043, 07章）
 	growthVariance = 1,
@@ -116,6 +116,7 @@ return {
 	sellGradeCoef = 0.5, -- 仮
 	equipRarityMult = { 1.0, 1.3, 1.7, 2.2, 3.0 }, -- 仮（Q-020）
 	equipGradeCoef = 0.10, -- 仮（Q-020）
+	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
 	chestStorageMax = 200, -- 仮（Q-020）
 
 	-- ギルド（Q-017）

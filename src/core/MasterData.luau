@@ -169,7 +169,6 @@ local function validateConstants(c: Checker, k: any)
 	if c:array(p .. ".hitWeights", k.hitWeights, 4) then
 		c:weights(p .. ".hitWeights", k.hitWeights, nil, true)
 	end
-	c:probability(p .. ".minDamageRate", k.minDamageRate)
 	c:number(p .. ".critCoef", k.critCoef, 0)
 	c:probability(p .. ".critCap", k.critCap)
 	c:number(p .. ".critMult", k.critMult, 1)
@@ -186,7 +185,6 @@ local function validateConstants(c: Checker, k: any)
 	c:probability(p .. ".fountainHealRate", k.fountainHealRate)
 	c:number(p .. ".trapK", k.trapK, 0)
 	c:probability(p .. ".trapDamageRate", k.trapDamageRate)
-	c:number(p .. ".trapLevelCoefStep", k.trapLevelCoefStep, 0)
 
 	-- 支援・幸運
 	c:probability(p .. ".healThreshold", k.healThreshold)
@@ -196,7 +194,8 @@ local function validateConstants(c: Checker, k: any)
 
 	-- 移動・再生
 	c:number(p .. ".travelSecondsPerDistance", k.travelSecondsPerDistance, 0)
-	c:number(p .. ".travelAgiDivisor", k.travelAgiDivisor, 1)
+	c:number(p .. ".travelSpeedMin", k.travelSpeedMin, 0)
+	c:number(p .. ".travelSpeedMax", k.travelSpeedMax, 0)
 	c:number(p .. ".replaySecondsPerTurn", k.replaySecondsPerTurn, 0)
 	c:number(p .. ".replaySecondsPerEvent", k.replaySecondsPerEvent, 0)
 
@@ -274,6 +273,7 @@ local function validateConstants(c: Checker, k: any)
 	end
 	c:number(p .. ".sellGradeCoef", k.sellGradeCoef, 0)
 	c:number(p .. ".equipGradeCoef", k.equipGradeCoef, 0)
+	c:number(p .. ".equipTierMult", k.equipTierMult, 1)
 	c:integer(p .. ".chestStorageMax", k.chestStorageMax, 1)
 
 	-- ギルド
@@ -455,6 +455,11 @@ local function validateContent(c: Checker, d: any)
 			weightedRefs(c, p .. ".monsters", g.monsters, monsterIds)
 			weightedRefs(c, p .. ".bosses", g.bosses, monsterIds)
 			c:integer(p .. ".trapLevel", g.trapLevel, 1)
+			if g.trapDamageRate ~= nil then
+				c:probability(p .. ".trapDamageRate", g.trapDamageRate)
+			end
+			c:number(p .. ".refAgi", g.refAgi, 1)
+			c:integer(p .. ".tier", g.tier, 1)
 			c:integer(p .. ".minChestRank", g.minChestRank, 1, 5)
 			c:integer(p .. ".battleReward.exp", if type(g.battleReward) == "table" then g.battleReward.exp else nil, 0)
 			c:integer(

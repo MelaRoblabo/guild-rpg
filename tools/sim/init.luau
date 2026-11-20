@@ -1,9 +1,10 @@
 --!strict
 -- 探索シミュレーター（docs/system/09_cli_sim_autoplay.md §2）
+-- パーティ名は s<段階>[_<編成>]（tools/sim/Stages.luau）。例 s1、s5_magic
 -- 使い方:
---   lune run tools/sim -- expedition --dungeon dng_graveyard --party starter --runs 10000 --seed 1
+--   lune run tools/sim -- expedition --dungeon dng_graveyard --party s1 --runs 10000 --seed 1
 --   lune run tools/sim -- sweep --runs 2000 [--dungeon <id>] [--party <name>]
---   lune run tools/sim -- show --dungeon dng_graveyard --party starter --seed 1   （ログ1件を文章で表示）
+--   lune run tools/sim -- show --dungeon dng_graveyard --party s1 --seed 1   （ログ1件を文章で表示）
 -- 結果は out/sim/ に Markdown と JSON で保存する。
 
 local fs = require("@lune/fs")
@@ -15,7 +16,7 @@ local Expedition = require("../../src/core/Expedition")
 local Formulas = require("../../src/core/Formulas")
 local MasterData = require("../../src/core/MasterData")
 local Rng = require("../../src/core/Rng")
-local Presets = require("./Presets")
+local Stages = require("./Stages")
 
 -- 引数 -----------------------------------------------------------------
 local positional, opts = {}, {}
@@ -80,9 +81,11 @@ local function percentile(sorted: { number }, p: number): number
 end
 
 local function simulateSet(dungeonId: string, presetName: string, n: number, seed: number)
-	local preset = Presets.get(presetName)
-	assert(preset, `未知のプリセット: {presetName}`)
-	local defs = preset.build(master)
+	local stageIndex, comp = Stages.parse(presetName)
+	local defs = Stages.party(master, stageIndex, comp)
+	local preset = {
+		desc = `段階{stageIndex}（転生{Stages.list[stageIndex].k}回・Lv{Stages.list[stageIndex].level}） {Stages.COMPOSITIONS[comp].desc}`,
+	}
 	local snaps = {}
 	for _, d in defs do
 		table.insert(snaps, Formulas.memberSnapshot(d, master))
@@ -312,10 +315,9 @@ end
 
 -- ログ1件を文章で表示 ----------------------------------------------------
 local function showLog(dungeonId: string, presetName: string, seed: number)
-	local preset = Presets.get(presetName)
-	assert(preset, `未知のプリセット: {presetName}`)
+	local stageIndex, comp = Stages.parse(presetName)
 	local snaps = {}
-	for _, d in preset.build(master) do
+	for _, d in Stages.party(master, stageIndex, comp) do
 		table.insert(snaps, Formulas.memberSnapshot(d, master))
 	end
 	local log = Expedition.simulate({ seed = seed, departAt = 0, dungeonId = dungeonId, members = snaps }, master)
@@ -350,22 +352,37 @@ end
 
 -- 実行 -----------------------------------------------------------------
 if mode == "expedition" then
-	local r = simulateSet(opts.dungeon or "dng_graveyard", opts.party or "starter", runs, baseSeed)
+	local r = simulateSet(opts.dungeon or "dng_graveyard", opts.party or "s1", runs, baseSeed)
 	writeReport(`{r.dungeon}-{r.party}`, { r })
 elseif mode == "sweep" then
+	-- 各ダンジョンを「想定段階の前・想定・次」のバランス編成と、想定段階の各編成で回す
 	local results = {}
 	for _, d in master.dungeonList do
 		if opts.dungeon == nil or opts.dungeon == d.id then
-			for _, p in Presets.list do
-				if opts.party == nil or opts.party == p.name then
-					table.insert(results, simulateSet(d.id, p.name, runs, baseSeed))
+			local names = {}
+			if opts.party then
+				names = { opts.party }
+			else
+				local i = d.tier
+				if i > 1 then
+					table.insert(names, `s{i - 1}`)
 				end
+				table.insert(names, `s{i}`)
+				if Stages.list[i + 1] then
+					table.insert(names, `s{i + 1}`)
+				end
+				for _, c in { "phys", "magic", "nohealer", "gifts" } do
+					table.insert(names, `s{i}_{c}`)
+				end
+			end
+			for _, name in names do
+				table.insert(results, simulateSet(d.id, name, runs, baseSeed))
 			end
 		end
 	end
 	writeReport("sweep", results)
 elseif mode == "show" then
-	showLog(opts.dungeon or "dng_graveyard", opts.party or "starter", baseSeed)
+	showLog(opts.dungeon or "dng_graveyard", opts.party or "s1", baseSeed)
 else
 	print("使い方: lune run tools/sim -- expedition|sweep|show [--dungeon id] [--party name] [--runs n] [--seed n]")
 	process.exit(1)

@@ -43,19 +43,18 @@
 | キー | 値 | 根拠 |
 | --- | --- | --- |
 | `hitWeights` | {0.45, 0.25, 0.20, 0.10} | D-005 |
-| `minDamageRate` | 0.10（最低1） | D-007 |
 | `critCoef` / `critCap` / `critMult` | 200 / 0.30 / 1.5 | D-010 |
 | `maxTurns` | 30 | D-009 |
 | `monsterScalePerBattle` | 0.20 | D-003 |
 | `eventWeights` | 宝箱0.40 / アイテム0.15 / 罠0.20 / 泉0.10 / なし0.15 | D-014 |
 | `chestRankOffsets` | +0:0.60 / +1:0.25 / +2:0.10 / +3:0.05 | D-015 |
 | `fountainHealRate` | 0.25 | D-018 |
-| `trapK` / `trapDamageRate` / `trapLevelCoefStep` | 10 / 0.15 / 0.25（仮） | D-017, Q-004 |
+| `trapK` / `trapDamageRate` | 40 / 0.20（ダンジョンごとに上書き可） | D-017, D-067 |
 | `healThreshold` / `healCoef` | 0.70 / 0.30（仮） | D-034, Q-004 |
-| `luckyChancePerHolder` / `luckyChanceCap` | 0.15 / 0.40（仮） | Q-004 |
-| `travelSecondsPerDistance` / `travelAgiDivisor` | 10 / 50（仮） | Q-004 |
+| `luckyChancePerHolder` / `luckyChanceCap` | 0.30 / 0.60 | D-070 |
+| `travelSecondsPerDistance` / `travelSpeedMin` / `travelSpeedMax` | 10 / 0.6 / 1.4 | D-069 |
 | `replaySecondsPerTurn` / `replaySecondsPerEvent` | 1 / 2 | D-026 |
-| `personalBonusCap` | 0.30 | D-033 |
+| `personalBonusCap` | 0.50 | D-070 |
 | （道案内・大食らいの効果量はギフトのデータに持つ） | — | 04章 §5 |
 | `growthVariance` | 1（±1、最低0） | D-043 |
 | `expCurve` | 必要経験値＝floor(100 × Lv^1.5)（仮） | 07章 |
@@ -77,23 +76,18 @@
 | `sellRarityMult` | 1 / 1.5 / 2.5 / 4 / 7（仮） | 06章 |
 | `sellGradeCoef` | 0.5（仮） | 06章 |
 | `equipRarityMult` | 1.0 / 1.3 / 1.7 / 2.2 / 3.0（仮） | Q-020 |
-| `equipGradeCoef` | 0.10（仮） | Q-020 |
+| `equipGradeCoef` / `equipTierMult` | 0.10 / 1.30（仮） | Q-020, D-069 |
 | `guildExpPerFloor` / `guildExpClearBonus` / `guildExpFirstClear` | 1 / 5 / 50（仮） | Q-017 |
 | `guildLevelMax` | 20（仮） | Q-017 |
 | `chestStorageMax` | 200（仮） | Q-020 |
 
-## 4. ダンジョンの初期値（仮、M1で調整）
+## 4. ダンジョン（D-068, D-069）
 
-| ID | 名前 | フロア | 距離 | 基準 HP/攻/物防/魔防 | 攻撃種別（物理:魔法） | 種族 | 罠Lv | 最低宝箱 | 戦闘1回の経験値/G |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| dng_graveyard | 古い墓地 | 7 | 3 | 60/14/4/4 | 70:30 | アンデッド80% | 1 | 1（コモン） | 10/15 |
-| dng_ruins | 罠の遺跡 | 9 | 5 | 90/18/6/5 | 80:20 | 獣・魔物 | 3 | 1 | 14/20 |
-| dng_tower | 封印の塔 | 11 | 7 | 120/22/6/14 | 30:70 | 魔物・精霊 | 2 | 2（アンコモン） | 18/26 |
-| dng_castle | 騎士の古城 | 13 | 9 | 170/26/16/8 | 90:10 | 騎士・魔物 | 2 | 2 | 24/34 |
-
-- 戦闘の経験値・ゴールドもモンスター強さ倍率で増やす（06章）。
-- 解放：古い墓地は最初から。以降は前のダンジョンの初回踏破で解放（Q-017）。
-- 転職ポーションの対象職業：古い墓地＝僧侶・司祭、罠の遺跡＝盗賊・忍者、封印の塔＝魔法使い・賢者、騎士の古城＝戦士・ナイト。
+- 12ダンジョン。`src/data/Dungeons.luau` は **`tools/sim/calibrate.luau` が `tools/sim/DungeonTemplates.luau` から生成する**（手で編集しない）。
+- 調整の考え方：各ダンジョンに「想定段階」（`tools/sim/Stages.luau`。転生回数・レベル・装備）を割り当て、その段階のバランス編成で
+  踏破率約60%（古い墓地は約97%）、所要秒が目標（50秒 → 150秒）になるよう、強さ・距離・罠レベル・経験値を自動で決める。
+- 数値を変えたいときは、テンプレートの目標値か段階の想定を変えて `lune run tools/sim/calibrate` を再実行する。
+- 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 
 ## 5. 職業（Jobs.luau）
 
