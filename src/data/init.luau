@@ -4,4 +4,12 @@
 
 return {
 	Constants = require("./Constants"),
+	Rarities = require("./Rarities"),
+	Jobs = require("./Jobs"),
+	Gifts = require("./Gifts"),
+	Modifiers = require("./Modifiers"),
+	EquipmentBases = require("./EquipmentBases"),
+	Items = require("./Items"),
+	Monsters = require("./Monsters"),
+	Dungeons = require("./Dungeons"),
 }

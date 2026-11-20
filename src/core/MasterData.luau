@@ -197,7 +197,6 @@ local function validateConstants(c: Checker, k: any)
 	-- 移動・再生
 	c:number(p .. ".travelSecondsPerDistance", k.travelSecondsPerDistance, 0)
 	c:number(p .. ".travelAgiDivisor", k.travelAgiDivisor, 1)
-	c:number(p .. ".guideTravelMult", k.guideTravelMult, 0, 1)
 	c:number(p .. ".replaySecondsPerTurn", k.replaySecondsPerTurn, 0)
 	c:number(p .. ".replaySecondsPerEvent", k.replaySecondsPerEvent, 0)
 
@@ -218,7 +217,6 @@ local function validateConstants(c: Checker, k: any)
 		c:error(p .. ".levelCapInitial", "levelCapMax 以下が必要")
 	end
 	c:number(p .. ".rebirthExpBonusPerCount", k.rebirthExpBonusPerCount, 0)
-	c:number(p .. ".gluttonExpBonus", k.gluttonExpBonus, 0)
 
 	-- 転生
 	c:integer(p .. ".giftMax", k.giftMax, 1)
@@ -285,6 +283,214 @@ local function validateConstants(c: Checker, k: any)
 	c:integer(p .. ".guildLevelMax", k.guildLevelMax, 1)
 end
 
+local STAT_SET = { str = true, mag = true, agi = true, dex = true, hp = true }
+local SLOTS = { weapon = true, armor = true, sub = true }
+local ATTACK_TYPES = { physical = true, magic = true }
+local JOB_LINES = { warrior = true, scout = true, mage = true, support = true }
+
+local function idSet(rows: any): { [string]: boolean }
+	local s = {}
+	if type(rows) == "table" then
+		for _, r in rows do
+			if type(r) == "table" and type(r.id) == "string" then
+				s[r.id] = true
+			end
+		end
+	end
+	return s
+end
+
+local function oneOf(c: Checker, path: string, v: any, set: { [string]: boolean })
+	if type(v) ~= "string" or not set[v] then
+		c:error(path, `許可されていない値: {tostring(v)}`)
+	end
+end
+
+local function weightedRefs(c: Checker, path: string, list: any, known: { [string]: boolean })
+	if c:weights(path, list, "weight") then
+		for i, e in list do
+			c:ref(`{path}[{i}].id`, e.id, known)
+		end
+	end
+end
+
+local function validateContent(c: Checker, d: any)
+	-- レアリティ
+	c:uniqueIds("Rarities", d.Rarities, "rar_")
+	if c:array("Rarities", d.Rarities, 5) then
+		for i, r in d.Rarities do
+			if r.rank ~= i then
+				c:error(`Rarities[{i}].rank`, "rank は 1〜5 の連番")
+			end
+		end
+	end
+
+	-- 職業
+	c:uniqueIds("Jobs", d.Jobs, "job_")
+	if type(d.Jobs) == "table" then
+		for i, j in d.Jobs do
+			local p = `Jobs[{i}]`
+			oneOf(c, p .. ".line", j.line, JOB_LINES)
+			oneOf(c, p .. ".attackType", j.attackType, ATTACK_TYPES)
+			oneOf(c, p .. ".outfitClass", j.outfitClass, { phy = true, mag = true })
+			for _, s in Types.STAT_KEYS do
+				c:integer(`{p}.growth.{s}`, if type(j.growth) == "table" then j.growth[s] else nil, 0)
+			end
+			c:array(p .. ".equipKinds", j.equipKinds)
+		end
+	end
+
+	-- ギフト
+	local giftKinds =
+		{ statPct = true, lucky = true, atkVsTagPct = true, travelMult = true, trapDexMult = true, expPct = true }
+	c:uniqueIds("Gifts", d.Gifts, "gift_")
+	if type(d.Gifts) == "table" then
+		for i, g in d.Gifts do
+			local p = `Gifts[{i}]`
+			c:number(p .. ".weight", g.weight, 0)
+			local e = g.effect
+			if type(e) ~= "table" then
+				c:error(p .. ".effect", "effect が必要")
+			else
+				oneOf(c, p .. ".effect.kind", e.kind, giftKinds)
+				if e.kind == "statPct" then
+					oneOf(c, p .. ".effect.stat", e.stat, STAT_SET)
+				end
+				if e.kind ~= "lucky" then
+					c:number(p .. ".effect.value", e.value, 0)
+				end
+			end
+		end
+	end
+
+	-- 修飾語
+	c:uniqueIds("Modifiers", d.Modifiers, "mod_")
+	if type(d.Modifiers) == "table" then
+		for i, m in d.Modifiers do
+			local p = `Modifiers[{i}]`
+			if type(m.effect) ~= "table" then
+				c:error(p .. ".effect", "effect が必要")
+			else
+				oneOf(c, p .. ".effect.kind", m.effect.kind, { flatStat = true, atkVsTagPct = true, healPct = true })
+				if m.effect.kind == "flatStat" then
+					oneOf(c, p .. ".effect.stat", m.effect.stat, STAT_SET)
+				end
+			end
+			c:range(p .. ".range", m.range)
+		end
+	end
+
+	-- 基本アイテム
+	local equipIds = c:uniqueIds("EquipmentBases", d.EquipmentBases, "eq_")
+	local _ = equipIds
+	if type(d.EquipmentBases) == "table" then
+		for i, e in d.EquipmentBases do
+			local p = `EquipmentBases[{i}]`
+			oneOf(c, p .. ".slot", e.slot, SLOTS)
+			c:integer(p .. ".minRarity", e.minRarity, 1, 5)
+			c:integer(p .. ".sellPrice", e.sellPrice, 0)
+			for _, key in { "atk", "pdef", "mdef" } do
+				if e[key] ~= nil then
+					c:number(`{p}.{key}`, e[key], 0)
+				end
+			end
+			if e.stats ~= nil then
+				for k, v in e.stats do
+					oneOf(c, `{p}.stats`, k, STAT_SET)
+					c:number(`{p}.stats.{k}`, v)
+				end
+			end
+		end
+	end
+
+	-- アイテム
+	local jobIds = idSet(d.Jobs)
+	local itemIds = c:uniqueIds("Items", d.Items, "itm_")
+	if type(d.Items) == "table" then
+		for i, it in d.Items do
+			local p = `Items[{i}]`
+			oneOf(c, p .. ".kind", it.kind, {
+				ticket = true,
+				potion_appearance_change = true,
+				potion_appearance_keep = true,
+				potion_job = true,
+				sellable = true,
+			})
+			if it.kind == "potion_job" then
+				c:ref(p .. ".jobId", it.jobId, jobIds)
+			end
+			c:integer(p .. ".sellPrice", it.sellPrice, 0)
+		end
+	end
+
+	-- モンスター
+	local monsterIds = c:uniqueIds("Monsters", d.Monsters, "mon_")
+	if type(d.Monsters) == "table" then
+		for i, m in d.Monsters do
+			oneOf(c, `Monsters[{i}].attackType`, m.attackType, ATTACK_TYPES)
+			if type(m.raceTag) ~= "string" then
+				c:error(`Monsters[{i}].raceTag`, "文字列が必要")
+			end
+		end
+	end
+
+	-- ダンジョン
+	local dungeonIds = c:uniqueIds("Dungeons", d.Dungeons, "dng_")
+	local modIds = idSet(d.Modifiers)
+	if type(d.Dungeons) == "table" then
+		for i, g in d.Dungeons do
+			local p = `Dungeons[{i}]`
+			if c:integer(p .. ".floors", g.floors, 1) and g.floors % 2 == 0 then
+				c:error(p .. ".floors", "フロア数は奇数（最終フロアはボス戦：D-001）")
+			end
+			c:number(p .. ".distance", g.distance, 0)
+			c:array(p .. ".terrainTags", g.terrainTags)
+			for _, key in { "hp", "atk", "pdef", "mdef" } do
+				c:number(
+					`{p}.base.{key}`,
+					if type(g.base) == "table" then g.base[key] else nil,
+					if key == "hp" then 1 else 0
+				)
+			end
+			weightedRefs(c, p .. ".monsters", g.monsters, monsterIds)
+			weightedRefs(c, p .. ".bosses", g.bosses, monsterIds)
+			c:integer(p .. ".trapLevel", g.trapLevel, 1)
+			c:integer(p .. ".minChestRank", g.minChestRank, 1, 5)
+			c:integer(p .. ".battleReward.exp", if type(g.battleReward) == "table" then g.battleReward.exp else nil, 0)
+			c:integer(
+				p .. ".battleReward.gold",
+				if type(g.battleReward) == "table" then g.battleReward.gold else nil,
+				0
+			)
+			weightedRefs(c, p .. ".sellableItems", g.sellableItems, itemIds)
+			if c:array(p .. ".jobPotionTargets", g.jobPotionTargets) then
+				for k, j in g.jobPotionTargets do
+					c:ref(`{p}.jobPotionTargets[{k}]`, j, jobIds)
+				end
+			end
+			if c:array(p .. ".modifierPool", g.modifierPool) then
+				for k, m in g.modifierPool do
+					c:ref(`{p}.modifierPool[{k}]`, m, modIds)
+				end
+			end
+			if g.unlockAfterClear ~= nil then
+				c:ref(p .. ".unlockAfterClear", g.unlockAfterClear, dungeonIds)
+			end
+		end
+	end
+end
+
+-- id → 行 の索引を作る
+local function byId(rows: any): { [string]: any }
+	local m = {}
+	if type(rows) == "table" then
+		for _, r in rows do
+			m[r.id] = r
+		end
+	end
+	return m
+end
+
 -- 公開 API ----------------------------------------------------------------
 
 -- data（src/data の束）を検証し、問題の一覧を返す
@@ -295,6 +501,7 @@ function MasterData.validate(data: any): { Issue }
 		return c.issues
 	end
 	validateConstants(c, data.Constants)
+	validateContent(c, data)
 	return c.issues
 end
 
@@ -318,7 +525,21 @@ function MasterData.load(data: any): any
 	if #errors > 0 then
 		error("マスターデータの検証に失敗しました:\n" .. MasterData.formatIssues(errors), 2)
 	end
-	return table.freeze(data)
+	-- core が使う形にまとめる（読み取り専用）
+	return table.freeze({
+		raw = data,
+		K = data.Constants,
+		rarities = data.Rarities,
+		jobs = byId(data.Jobs),
+		gifts = byId(data.Gifts),
+		giftList = data.Gifts,
+		modifiers = byId(data.Modifiers),
+		equipmentBases = byId(data.EquipmentBases),
+		items = byId(data.Items),
+		monsters = byId(data.Monsters),
+		dungeons = byId(data.Dungeons),
+		dungeonList = data.Dungeons,
+	})
 end
 
 -- テスト用に検証の補助を公開する

@@ -43,7 +43,6 @@ return {
 	-- 移動・再生（D-021, D-026, Q-004）
 	travelSecondsPerDistance = 10, -- 仮
 	travelAgiDivisor = 50, -- 仮
-	guideTravelMult = 0.8, -- 道案内
 	replaySecondsPerTurn = 1,
 	replaySecondsPerEvent = 2,
 
@@ -58,7 +57,6 @@ return {
 	levelCapPerRebirth = 10, -- 仮
 	levelCapMax = 100, -- 仮
 	rebirthExpBonusPerCount = 0.5, -- 仮
-	gluttonExpBonus = 0.10, -- 大食らい
 
 	-- 転生（D-024, Q-009）
 	rebirthGiftAddAt = { 2, 4, 6 },

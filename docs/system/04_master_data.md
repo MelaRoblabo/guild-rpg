@@ -56,6 +56,7 @@
 | `travelSecondsPerDistance` / `travelAgiDivisor` | 10 / 50（仮） | Q-004 |
 | `replaySecondsPerTurn` / `replaySecondsPerEvent` | 1 / 2 | D-026 |
 | `personalBonusCap` | 0.30 | D-033 |
+| （道案内・大食らいの効果量はギフトのデータに持つ） | — | 04章 §5 |
 | `growthVariance` | 1（±1、最低0） | D-043 |
 | `expCurve` | 必要経験値＝floor(100 × Lv^1.5)（仮） | 07章 |
 | `levelCapInitial` / `levelCapPerRebirth` / `levelCapMax` | 30 / 10 / 100（仮） | 07章 |
