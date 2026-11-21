@@ -241,7 +241,7 @@ return {
 		dispatchFee = 18000,
 		name = "魔界の門",
 		stage = 11,
-		timeTarget = 217, -- D-092：パーティ5つで帰還間隔約30秒（×1.2）
+		timeTarget = 247, -- D-092／D-093：パーティ5つで帰還間隔約30秒。撤退も長くなるよう移動を延ばす
 		floors = 19,
 		terrainTags = { "indoor" },
 		ratios = ARCANE,
@@ -262,7 +262,7 @@ return {
 		dispatchFee = 30000,
 		name = "天空の玉座",
 		stage = 12,
-		timeTarget = 235, -- D-092：パーティ5つで帰還間隔約30秒（×1.25）
+		timeTarget = 265, -- D-092／D-093：同上
 		floors = 21,
 		terrainTags = { "outdoor" },
 		ratios = DRAGON,

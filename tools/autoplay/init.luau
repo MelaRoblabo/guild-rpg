@@ -42,6 +42,7 @@ local stats = {
 	timeline = {},
 }
 local returnsTimes = {}
+local lastReturns: { [string]: any } = {}
 local hourly = {}
 
 local function ctx(t: number)
@@ -133,6 +134,13 @@ while now < endAt do
 	for _, ev in Game.advance(state, ctx(now)) do
 		if ev.type == "ExpeditionReturned" then
 			table.insert(returnsTimes, ev.at)
+			-- 最後の12時間のパーティごとの帰還（帰還間隔の内訳を見るため）
+			if ev.at > endAt - 12 * 3600 then
+				local key = `{ev.partyIndex}`
+				lastReturns[key] = lastReturns[key] or { count = 0, dungeons = {} }
+				lastReturns[key].count += 1
+				lastReturns[key].dungeons[ev.dungeonId] = (lastReturns[key].dungeons[ev.dungeonId] or 0) + 1
+			end
 			if state.stats.firstReturnLogged == nil then
 				state.stats.firstReturnLogged = 1
 				table.insert(stats.timeline, { at = ev.at, what = "最初の帰還" })
@@ -231,6 +239,25 @@ for _, h in hourly do
 end
 for _, l in spendLines do
 	table.insert(lines, l)
+end
+table.insert(lines, "")
+table.insert(lines, "## 最後の12時間：パーティごとの帰還")
+table.insert(lines, "")
+table.insert(lines, "| パーティ | 帰還回数 | 1回あたり(秒) | 行き先（回数） |")
+table.insert(lines, "| --- | --- | --- | --- |")
+for i = 1, #state.parties do
+	local r = lastReturns[`{i}`]
+	if r then
+		local ds = {}
+		for id, n in r.dungeons do
+			table.insert(ds, `{master.dungeons[id].name}×{n}`)
+		end
+		table.sort(ds)
+		table.insert(
+			lines,
+			string.format("| %d | %d | %.0f | %s |", i, r.count, 12 * 3600 / r.count, table.concat(ds, "、"))
+		)
+	end
 end
 table.insert(lines, "")
 table.insert(lines, "## 出来事")

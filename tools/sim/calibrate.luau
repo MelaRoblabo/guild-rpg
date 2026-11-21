@@ -117,6 +117,8 @@ end
 
 local lines = {}
 local EXP_PER_SEC_GROWTH = 1.08 -- D-092
+-- ダンジョンの経験値の基準にする倍率（M6 時点の周回1の倍率で固定）
+local EXP_REF_MULT = 1.31
 local prevExpPerSec: number? = nil
 for i, t in Templates do
 	local row = master.dungeons[t.id]
@@ -169,7 +171,8 @@ for i, t in Templates do
 	local cap = math.min(K.levelCapInitial + K.levelCapPerRebirth * stage.k, K.levelCapMax)
 	local targetLevel = if nextStage and nextStage.k == stage.k then nextStage.level - 1 else cap - 1
 	local bonus = 1 + K.rebirthExpBonusPerCount * stage.k
-	local wantPerRun = Formulas.expToNext(targetLevel, K) / RUNS_PER_LEVEL / bonus
+	-- 周回の倍率（expCycleMult）とは切り離す。倍率を調整するたびにダンジョンの経験値が動かないように（M6）
+	local wantPerRun = math.floor(K.expBase * targetLevel ^ K.expExponent * EXP_REF_MULT) / RUNS_PER_LEVEL / bonus
 	row.battleReward.exp = math.max(1, math.floor(100 * wantPerRun / math.max(expPer, 0.001) + 0.5))
 
 	local _, _, median2 = runMany(t.id, snaps, RUNS)
