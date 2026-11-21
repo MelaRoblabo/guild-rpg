@@ -15,6 +15,18 @@
 | M4 成長・転生・転職 | 05（M4行）, 06§8-9 | `src/core/{Rebirth,JobChange,Appearance,Growth}`、`tools/cli`、`tests/` | 転生・転職・見た目変更が仕様どおり |
 | M5 ギルド・経済 | 05（M5行）, 06§10 | `src/core/{Guild,Game}`、`src/data/{GuildLevels,Expansions}`、`tools/cli`、`tools/autoplay`、`tests/` | 複数パーティ・自動再派遣・倉庫満杯時の停止・オフライン復帰 |
 | M6 検証・調整 | 09§3-4 | `src/data/`（数値のみ）、`tools/autoplay`、`out/` | 企画書§14の検証項目に回答。仮の数値を決定ログで確定 |
+| M7 Roblox統合 | 03, 05, 08, 11 | `src/server`、`src/client`、`src/core/{Protocol,CommandText}`（新規）、`tools/cli`（書式の解析を CommandText へ移す）、`tools/check`、`default.project.json`、`selene.toml`、`rokit.toml`、`tests/`、`docs/system/11`・`12` | Roblox 上で M2〜M5b の全コマンドがデバッグ画面から実行でき、再参加で状態が戻る（11章 §7）。`lune run tools/check` が通る |
+
+### M7 の進め方
+
+| 段階 | 内容 | 状態 |
+| --- | --- | --- |
+| M7-0 | ツール更新と require 方式の検証（D-102） | 済 |
+| M7-1 | 11章・12章の詳細化（保存・通信・クライアント） | 本書 |
+| M7-2 | 保存：`SessionLock`（純粋）＋ DataStore の読み書き・定期保存・退出時保存 | |
+| M7-3 | サーバー権限と通信：`Protocol`（検証・要約・差分 D-103）、Remotes、プレイヤーのセッション、定期の時間経過 | |
+| M7-4 | デバッグ画面：`CommandText` の切り出し、状態一覧と入力欄 | |
+| M7-5 | 確認：Studio で全コマンド・再参加・オフライン帰還、`tools/check` | |
 
 ## 2. 1回の作業の流れ（AI）
 
