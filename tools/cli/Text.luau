@@ -134,12 +134,7 @@ function Text.status(save: any, master: any): string
 	local chestText = {}
 	for _, c in piles do
 		totalChests += c.count
-		table.insert(
-			chestText,
-			`{master.dungeons[c.dungeonId].name}×{c.count}{if c.unlocked
-				then ""
-				else "（解錠技術が足りない）"}`
-		)
+		table.insert(chestText, `{master.dungeons[c.dungeonId].name}×{c.count}`)
 	end
 	local wh = Game.query.warehouse(s)
 	table.insert(

@@ -349,12 +349,15 @@ if opts.writeGuild then
 	for lv = 1, maxLevel do
 		levels[lv] = { level = lv, expToNext = 0, rewards = {} }
 	end
+	local prevPerLevel = 0
 	for k = 1, cycles do
 		local startLv = if k == 1 then 1 else LEVELS_PER_CYCLE * (k - 1)
 		local endLv = LEVELS_PER_CYCLE * k
 		local ups = endLv - startLv
 		local gexp = lastGuildExp[k] or lastGuildExp[#lastGuildExp]
-		local perLevel = math.max(1, math.floor(gexp / ups + 0.5))
+		-- 必要経験値はレベルが上がるほど減らない（M6 テストプレイの指摘）
+		local perLevel = math.max(1, math.floor(gexp / ups + 0.5), prevPerLevel)
+		prevPerLevel = perLevel
 		local n = math.min(k, 8)
 		local need = ticketsNeededForRebirth(n) - (lastTickets[k] or 0)
 		local perLevelTickets = math.max(1, math.ceil(need / ups))
