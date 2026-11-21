@@ -4,9 +4,8 @@
 guild-rpg/
 ├─ CLAUDE.md                 AI向け開発ルール（最初に読む）
 ├─ README.md
-├─ rokit.toml                ツールのバージョン固定（rojo / lune / darklua / selene / stylua）
-├─ default.project.json      Rojo 設定（build/ を Roblox に同期）
-├─ .darklua.json             require 変換設定（文字列パス → Roblox インスタンス）
+├─ rokit.toml                ツールのバージョン固定（rojo / lune / selene / stylua）
+├─ default.project.json      Rojo 設定（src/ を変換せずに Roblox に同期。D-102）
 ├─ selene.toml / stylua.toml
 ├─ docs/
 │  ├─ system/                システム仕様書（本書）
@@ -41,7 +40,6 @@ guild-rpg/
 │  ├─ test/                  テストランナー（10章）
 │  └─ check/                 format・lint・test をまとめて実行
 ├─ tests/                    テスト（*.spec.luau）
-├─ build/                    darklua の出力（git管理外）
 └─ out/                      シミュレーション結果・レポート（git管理外）
 ```
 

@@ -31,7 +31,9 @@
 ## 3. コーディング規約
 
 - 言語：Luau（`--!strict` を全ファイル先頭に付ける）。
-- require は**相対パスの文字列**（例：`require("../core/Rng")`）。Roblox向けには darklua で変換する（`docs/system/11_roblox_integration.md`）。
+- require は**文字列**で書き、変換せずに Roblox でもそのまま動かす（D-102、`docs/system/11_roblox_integration.md`）。
+  - `src/core`・`src/data`・`tools`・`tests`（Lune でも動くコード）は `./`・`../`・`@self` だけを使う（例：`require("./Rng")`、フォルダの入口 `init.luau` から子は `require("@self/Constants")`）。
+  - `src/server`・`src/client` から core・data を呼ぶときは `require("@game/ReplicatedStorage/Core/Game")` のように書く（Lune では動かないので、Lune でテストしたい処理は `src/core` に置く）。
 - 命名：モジュールとファイルは PascalCase、関数・変数は camelCase、マスターデータのIDは snake_case（例：`job_warrior`）。
 - 1モジュール1責務。`src/core/` のモジュールは状態を持たない（関数の集合）。
 - フォーマットは StyLua、静的解析は selene。コミット前に `lune run tools/check` を通す。
