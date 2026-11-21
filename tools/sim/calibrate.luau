@@ -116,7 +116,7 @@ local function avgAtk(snaps: { any }): number
 end
 
 local lines = {}
-local EXP_PER_SEC_GROWTH = 1.08 -- D-092
+local EXP_PER_SEC_GROWTH = 1.08 -- D-097
 -- ダンジョンの経験値の基準にする倍率（M6 時点の周回1の倍率で固定）
 local EXP_REF_MULT = 1.31
 local prevExpPerSec: number? = nil
@@ -176,7 +176,7 @@ for i, t in Templates do
 	row.battleReward.exp = math.max(1, math.floor(100 * wantPerRun / math.max(expPer, 0.001) + 0.5))
 
 	local _, _, median2 = runMany(t.id, snaps, RUNS)
-	-- 5. 深いダンジョンほど1秒あたりの経験値が多い（D-092：浅い所を回り続けないように）
+	-- 5. 深いダンジョンほど1秒あたりの経験値が多い（D-097：浅い所を回り続けないように）
 	--    前のダンジョンの EXP_PER_SEC_GROWTH 倍を下回るなら経験値を引き上げる
 	local perSec = expPer * row.battleReward.exp / 100 / math.max(median2, 1)
 	if prevExpPerSec and perSec < prevExpPerSec * EXP_PER_SEC_GROWTH then

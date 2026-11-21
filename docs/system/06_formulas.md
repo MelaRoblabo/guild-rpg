@@ -6,7 +6,7 @@
 
 ```
 実効ステータス s' = floor( (baseStats.s + 装備のステータス補正.s) × (1 + 個体補正率.s) )
-個体補正率 = ギフト補正 + 修飾語補正 の合計。1性能あたり personalBonusCap（+30%）まで      -- D-033
+個体補正率 = ギフト補正 + 修飾語補正 の合計。1性能あたり personalBonusCap（+50%）まで      -- D-033, D-070
 最大HP = 実効 hp
 ```
 
@@ -48,7 +48,7 @@
 
 ```
 罠の回避率 = 技巧合計 / (技巧合計 + 罠Lv × trapK)                                     -- D-017
-  技巧合計 = 生存者の 実効dex の合計。罠師の勘の所持者は本人分を2倍で数える
+  技巧合計 = 生存者の 実効dex の合計。罠師の勘の所持者は本人分を3倍で数える（D-070）
 罠ダメージ(各生存者) = floor( 最大HP × (ダンジョンの trapDamageRate または Constants.trapDamageRate) )   -- D-067
 泉の回復(各生存者) = floor( 最大HP × fountainHealRate )                               -- D-018
 宝箱ランク（＝中の装備のレアリティ）= ダンジョンの chestRarityWeights から重み付き抽選   -- D-015, D-085

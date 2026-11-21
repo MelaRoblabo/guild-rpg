@@ -28,7 +28,7 @@
 | 装備個体 | equipmentItem | uid を持つ |
 | 修飾語 | modifier | |
 | グレード | grade | 0〜3 |
-| 個体補正 | personalBonus | 上限 +30% |
+| 個体補正 | personalBonus | 上限 +50%（D-070） |
 | 面接 | interview / hireSession | |
 | ステータススロット | statSlot | |
 | ステータススロットチケット | itm_slot_ticket | |

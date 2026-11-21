@@ -126,7 +126,7 @@ return {
 		{ id = "appearance_keep", weight = 0.30 },
 	},
 	itemEventWeights = {
-		{ id = "ticket", weight = 0.02 }, -- D-074 で約1/10、D-092 でさらに1/3（M6 テストプレイで余ったため）
+		{ id = "ticket", weight = 0.02 }, -- D-074 で約1/10、D-097 でさらに1/3（M6 テストプレイで余ったため）
 		{ id = "sellable", weight = 0.98 },
 	},
 	sellRarityMult = { 1, 1.5, 2.5, 4, 7, 12 }, -- 仮。レアリティの数だけ並べる（D-085）

@@ -40,7 +40,7 @@ local JOB_GEAR = {
 --   D-086 で「良い方を自動で残す」は廃止したが、チケットで上限比7割を狙うプレイ（D-074）ならこの水準に届くので、
 --   想定はこのままにする
 -- 初期値は雇用の範囲から取らず、初期の4人に近い固定値にする（D-086 で雇用の範囲を広げても序盤の想定を変えない）
-local STAGE_BASE = { str = 20, mag = 20, agi = 20, dex = 20, hp = 52 } -- D-092：初期の4人（合計約80）に合わせる
+local STAGE_BASE = { str = 20, mag = 20, agi = 20, dex = 20, hp = 52 } -- D-097：初期の4人（合計約80）に合わせる
 function Stages.baseStats(master: any, jobId: string, k: number, level: number)
 	local K = master.K
 	local job = master.jobs[jobId]

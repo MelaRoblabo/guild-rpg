@@ -20,7 +20,7 @@ local ARMORED = { hp = 8, atk = 0.9, pdef = 1.0, mdef = 0.3 }
 local ARCANE = { hp = 8, atk = 0.9, pdef = 0.3, mdef = 1.0 }
 local BEAST = { hp = 7, atk = 1.1, pdef = 0.3, mdef = 0.3 }
 local DRAGON = { hp = 11, atk = 1.0, pdef = 0.6, mdef = 0.6 }
--- D-092：魔法・物理への強さをはっきりさせる（M6 の編成比較で封印の塔は魔法、鋼鉄の要塞は物理が有利すぎた）
+-- D-097：魔法・物理への強さをはっきりさせる（M6 の編成比較で封印の塔は魔法、鋼鉄の要塞は物理が有利すぎた）
 local ARCANE_STRONG = { hp = 8, atk = 0.9, pdef = 0.2, mdef = 1.6 }
 local ARMORED_STRONG = { hp = 8, atk = 0.9, pdef = 1.6, mdef = 0.2 }
 
@@ -241,7 +241,7 @@ return {
 		dispatchFee = 18000,
 		name = "魔界の門",
 		stage = 11,
-		timeTarget = 247, -- D-092／D-093：パーティ5つで帰還間隔約30秒。撤退も長くなるよう移動を延ばす
+		timeTarget = 247, -- D-097／D-098：パーティ5つで帰還間隔約30秒。撤退も長くなるよう移動を延ばす
 		floors = 19,
 		terrainTags = { "indoor" },
 		ratios = ARCANE,
@@ -262,7 +262,7 @@ return {
 		dispatchFee = 30000,
 		name = "天空の玉座",
 		stage = 12,
-		timeTarget = 265, -- D-092／D-093：同上
+		timeTarget = 265, -- D-097／D-098：同上
 		floors = 21,
 		terrainTags = { "outdoor" },
 		ratios = DRAGON,
