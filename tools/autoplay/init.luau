@@ -13,12 +13,14 @@ local MasterData = require("../../src/core/MasterData")
 local Rng = require("../../src/core/Rng")
 local Policy = require("./Policy")
 
-local opts = { hours = 10, seed = 1 }
+local opts = { hours = 10, seed = 1, policy = "greedy" }
 do
 	local a = process.args
 	for i = 1, #a do
 		if a[i] == "--hours" then
 			opts.hours = tonumber(a[i + 1]) or opts.hours
+		elseif a[i] == "--policy" then
+			opts.policy = a[i + 1] or opts.policy
 		elseif a[i] == "--seed" then
 			opts.seed = tonumber(a[i + 1]) or opts.seed
 		end
@@ -26,6 +28,7 @@ do
 end
 
 local master = MasterData.load(Data)
+Policy.use(opts.policy)
 local T0 = 1767225600
 local state = Game.newState(master, opts.seed, T0)
 local rng = Rng.new(opts.seed * 31337)
@@ -159,7 +162,7 @@ local function hms(sec: number): string
 end
 
 local lines = {
-	`# 自動プレイ（方針 greedy、seed {opts.seed}、{opts.hours}時間）`,
+	`# 自動プレイ（方針 {opts.policy}、seed {opts.seed}、{opts.hours}時間）`,
 	"",
 	`最初の宝箱を開けた時刻：{if state.stats.firstChestOpenedAt
 		then hms(state.stats.firstChestOpenedAt - T0)
@@ -238,11 +241,11 @@ end
 table.insert(lines, "")
 table.insert(
 	lines,
-	`雇用 {stats.hired}人 ／ 転生 {stats.rebirths}回（引き直し {stats.rebirthRerolls}回） ／ トレーニングで上げたレベル {stats.trainedLevels}`
+	`雇用 {stats.hired}人（引き直し {stats.hireRerolls or 0}回） ／ 転生 {stats.rebirths}回（引き直し {stats.rebirthRerolls}回） ／ トレーニングで上げたレベル {stats.trainedLevels}`
 )
 local md = table.concat(lines, "\n") .. "\n"
 fs.writeDir("out/autoplay")
-local path = `out/autoplay/{os.date("%Y%m%d-%H%M%S")}-seed{opts.seed}-{opts.hours}h.md`
+local path = `out/autoplay/{os.date("%Y%m%d-%H%M%S")}-{opts.policy}-seed{opts.seed}-{opts.hours}h.md`
 fs.writeFile(path, md)
 print(md)
 print("保存: " .. path)

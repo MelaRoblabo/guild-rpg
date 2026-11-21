@@ -15,6 +15,22 @@ local Training = require("../../src/core/Training")
 
 local Policy = {}
 
+-- 方針ごとの設定（docs/system/09_cli_sim_autoplay.md §3）
+--   greedy    行ける中で1秒あたりの経験値が最も多い所（踏破率50%以上）。雇用は無料の引き直しのみ
+--   cautious  踏破率80%以上の所だけ。未踏破への挑戦も70%以上から
+--   collector 雇用でもチケットを使って粘る（合計130以上が出るまで、1人あたり最大30枚）。転生の目標も高め
+local PRESETS = {
+	greedy = { clearMin = 0.5, pushMin = 0.4, hireGood = 110, hireTickets = 0, rebirthGood = 0.7 },
+	cautious = { clearMin = 0.8, pushMin = 0.7, hireGood = 110, hireTickets = 0, rebirthGood = 0.7 },
+	collector = { clearMin = 0.5, pushMin = 0.4, hireGood = 130, hireTickets = 30, rebirthGood = 0.75 },
+}
+local params = PRESETS.greedy
+
+function Policy.use(name: string)
+	assert(PRESETS[name], `未知の方針: {name}`)
+	params = PRESETS[name]
+end
+
 local LINE_ORDER = { warrior = 1, scout = 2, mage = 3, support = 4 }
 local WANT_LINES = { "warrior", "scout", "mage", "support" }
 local EXPANSION_PRIORITY = { "exp_party", "exp_warehouse", "exp_roster", "exp_training", "exp_candidate" }
@@ -144,7 +160,6 @@ local function buyExpansions(state: any, ctx: Ctx)
 end
 
 -- 加算分の上限比（4項目の平均。D-074 の「良い結果」の定義）
-local REBIRTH_GOOD = 0.7
 local function bonusRatio(bonus: any, maxs: any): number
 	local sum, n = 0, 0
 	for _, k in { "str", "mag", "agi", "dex" } do
@@ -173,13 +188,13 @@ local function rebirthCapped(state: any, ctx: Ctx, stats: any)
 		if not exec(state, { type = "RebirthStart", adventurerUid = uid }, ctx).ok then
 			continue -- 転生費用が足りなければ待つ（D-080）
 		end
-		-- D-086：上限比の平均が REBIRTH_GOOD 以上の結果が出たらその場で採用。予算を使い切ったら前回・今回の良い方
+		-- D-086：上限比の平均が rebirthGood 以上の結果が出たらその場で採用。予算を使い切ったら前回・今回の良い方
 		local budget = ctx.master.K.rebirthFreeRerolls
 			+ math.floor((state.items.itm_slot_ticket or 0) / (#capped - i + 1))
 		local which = nil
 		for _ = 0, budget do
 			local r = state.rebirthSession
-			if bonusRatio(r.currentBonus, r.bonusMax) >= REBIRTH_GOOD then
+			if bonusRatio(r.currentBonus, r.bonusMax) >= params.rebirthGood then
 				which = "current"
 				break
 			end
@@ -281,9 +296,6 @@ local function trainBehind(state: any, ctx: Ctx, stats: any)
 	end
 end
 
--- 雇用の面接で即採用する合計値（4項目 1〜40 の合計の上位1割ほど）
-local HIRE_GOOD = 110
-
 -- パーティに入っていない冒険者の系統ごとの数と、空き枠が求める系統
 local function hireIfNeeded(state: any, ctx: Ctx, stats: any)
 	local master = ctx.master
@@ -315,17 +327,18 @@ local function hireIfNeeded(state: any, ctx: Ctx, stats: any)
 			end
 		end
 		exec(state, { type = "HirePick", candidateIndex = pick }, ctx)
-		-- D-086：合計が HIRE_GOOD 以上ならその場で採用。無料の引き直しを使い切ったら前回・今回の良い方
+		-- D-086：合計が hireGood 以上ならその場で採用。無料の引き直しを使い切ったら前回・今回の良い方
 		local which = nil
-		for _ = 0, master.K.hireFreeRerolls do
+		for _ = 0, master.K.hireFreeRerolls + params.hireTickets do
 			local h = state.hireSession
-			if h.currentRoll and Rebirth.total(h.currentRoll) >= HIRE_GOOD then
+			if h.currentRoll and Rebirth.total(h.currentRoll) >= params.hireGood then
 				which = "current"
 				break
 			end
 			if not exec(state, { type = "HireReroll" }, ctx).ok then
 				break
 			end
+			stats.hireRerolls = (stats.hireRerolls or 0) + 1
 		end
 		local h = state.hireSession
 		if which == nil then
@@ -413,10 +426,10 @@ local function chooseDungeon(state: any, partyIndex: number, ctx: Ctx, rng: Rng.
 			secs += log.totalSeconds
 		end
 		local rate = clears / 12
-		if not state.clearedDungeons[d.id] and rate >= 0.4 then
+		if not state.clearedDungeons[d.id] and rate >= params.pushMin then
 			push = d.id
 		end
-		if rate >= 0.5 then
+		if rate >= params.clearMin then
 			qualified += 1
 			if exp / secs > bestScore then
 				best, bestScore = d.id, exp / secs

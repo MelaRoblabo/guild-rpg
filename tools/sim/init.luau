@@ -371,7 +371,7 @@ elseif mode == "sweep" then
 				if Stages.list[i + 1] then
 					table.insert(names, `s{i + 1}`)
 				end
-				for _, c in { "phys", "magic", "nohealer", "gifts" } do
+				for _, c in { "phys", "magic", "nohealer", "reversed", "gifts" } do
 					table.insert(names, `s{i}_{c}`)
 				end
 			end

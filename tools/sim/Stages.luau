@@ -92,6 +92,10 @@ Stages.COMPOSITIONS = {
 		jobs = { "job_warrior", "job_thief", "job_mage", "job_mage" },
 		desc = "回復なし（戦士・盗賊・魔法使い2）",
 	},
+	reversed = {
+		jobs = { "job_priest", "job_mage", "job_thief", "job_warrior" },
+		desc = "隊列を逆順（僧侶・魔法使い・盗賊・戦士。D-049 隊列の検証）",
+	},
 	gifts = {
 		jobs = { "job_warrior", "job_thief", "job_mage", "job_priest" },
 		gifts = { { "gift_sturdy" }, { "gift_trapsense" }, { "gift_exorcist" }, { "gift_lucky" } },
