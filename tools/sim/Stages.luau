@@ -84,6 +84,10 @@ Stages.COMPOSITIONS = {
 		jobs = { "job_warrior", "job_warrior", "job_thief", "job_thief" },
 		desc = "物理偏重（戦士2・盗賊2）",
 	},
+	physheal = {
+		jobs = { "job_warrior", "job_warrior", "job_thief", "job_priest" },
+		desc = "物理寄り＋回復（戦士2・盗賊・僧侶。魔法偏重と対になる）",
+	},
 	magic = {
 		jobs = { "job_warrior", "job_mage", "job_mage", "job_priest" },
 		desc = "魔法偏重（戦士・魔法使い2・僧侶）",

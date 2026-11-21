@@ -101,7 +101,7 @@ local function simulateSet(dungeonId: string, presetName: string, n: number, see
 		reachedHist = {},
 		times = {},
 		chestTotal = 0,
-		chestByRank = { 0, 0, 0, 0, 0 },
+		chestByRank = table.create(master.rarityCount, 0), -- D-085：レアリティの数だけ
 		runsWithChest = 0,
 		gold = 0,
 		exp = 0,
