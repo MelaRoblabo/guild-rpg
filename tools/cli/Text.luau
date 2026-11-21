@@ -65,7 +65,6 @@ local ERRORS = {
 	INVALID_RARITY = "レアリティは1〜5です",
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
-	CHEST_LOCKED = "解錠技術が足りず、このダンジョンの宝箱は開けられません（expand exp_unlock）",
 }
 
 function Text.errorText(code: string?): string
@@ -149,13 +148,6 @@ function Text.status(save: any, master: any): string
 			then "（" .. table.concat(chestText, "、") .. "）"
 			else ""} ／ 倉庫 {wh.used}/{wh.size}`
 	)
-	local maxName = "-"
-	for _, d in master.dungeonList do
-		if d.tier <= s.expansions.unlockTier then
-			maxName = d.name
-		end
-	end
-	table.insert(lines, `解錠技術：{maxName}の宝箱まで開けられる`)
 	local fac = master.K.trainingFacility[s.expansions.trainingLevel]
 	table.insert(
 		lines,

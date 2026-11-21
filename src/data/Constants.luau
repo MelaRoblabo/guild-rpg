@@ -136,6 +136,8 @@ return {
 	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
 	-- 宝箱の保管は上限なし（D-084。旧 chestStorageMax は廃止）
 	chestBatchOpen = 100, -- D-089：「まとめて開く」の個数（残りが少なければその数）
+	-- 開封演出が入る割合の基準（D-090）：各ダンジョンで chestEffectMinRarity 以上が出る確率をこの範囲に収める
+	chestEffectRate = { min = 0.10, max = 0.15 },
 
 	-- ギルド（Q-017）
 	guildExpPerFloor = 1,

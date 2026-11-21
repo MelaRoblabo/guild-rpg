@@ -43,9 +43,8 @@
 | 拡張 | expansion | |
 | トレーニング | training / Train | ゴールドで経験値を得る（D-076） |
 | トレーニング場 | trainingLevel / trainingFacility | 拡張の一つ（D-077） |
-| 解錠技術 | unlockTier | 開けられる宝箱のダンジョンの難度の上限。拡張の一つ（D-078、D-088）。「鍵付き宝箱」とは別物 |
 | まとめて開く | OpenChests / chestBatchOpen | ダンジョンの宝箱を最大100個まとめて開ける（D-089） |
-| 開封演出 | effect / chestEffectMinRarity | 発生ライン以上のレアリティの宝箱で入る演出（D-089） |
+| 開封演出 | effect / chestEffectMinRarity / chestEffectRate | 発生ライン以上のレアリティの宝箱で入る演出。演出率10〜15%（D-089, D-090） |
 | 派遣費 | dispatchFee | 上級ダンジョンの出発時の費用（D-079） |
 | 転生費用 | rebirthCost | D-080 |
 | 経験値補正 | expRate / expPct | ギフト＋装備（修練の護符）。上限 expBonusCap（D-082） |

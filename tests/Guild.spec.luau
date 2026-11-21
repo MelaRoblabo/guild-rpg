@@ -91,7 +91,6 @@ return function(t)
 	describe("自動売却（06章 §6）", function()
 		local function withChests(n: number, rank: number)
 			local s = Game.newState(master, 1, T0)
-			s.expansions.unlockTier = 12 -- 解錠技術は別のテスト（D-088）
 			for _ = 1, n do
 				Chest.add(s, "dng_ruins", rank, 1)
 			end

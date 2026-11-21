@@ -4,7 +4,7 @@
 
 local Migration = {}
 
-Migration.CURRENT = 4
+Migration.CURRENT = 5
 
 local STEPS: { [number]: (any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -32,6 +32,13 @@ local STEPS: { [number]: (any) -> () } = {
 			ex.unlockRank = nil
 		end
 		state.version = 4
+	end,
+	-- v4 → v5：解錠技術を廃止（D-091）
+	[4] = function(state)
+		if state.expansions then
+			state.expansions.unlockTier = nil
+		end
+		state.version = 5
 	end,
 }
 

@@ -192,7 +192,6 @@ return function(t)
 	describe("宝箱（D-015）", function()
 		local function withChests(rank: number, n: number)
 			local s = newState()
-			s.expansions.unlockTier = 12 -- 解錠技術は別のテスト（D-088）
 			for _ = 1, n do
 				Chest.add(s, "dng_castle", rank, 1)
 			end

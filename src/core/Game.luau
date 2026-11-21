@@ -451,7 +451,6 @@ end
 
 handlers.OpenChests = function(state, cmd, ctx)
 	-- D-087：プレイヤーに見えるのは「どのダンジョンの宝箱が何個」だけ。レアリティは開けるまで分からない
-	-- D-088：解錠技術はダンジョン単位。tier が unlockTier 以下のダンジョンの宝箱だけ開けられる
 	-- D-089：まとめ開き。指定ダンジョンの山から最大 count 個（省略時 chestBatchOpen）を、残り数で重み付けして1つずつ引く
 	local master = ctx.master
 	local d = master.dungeons[cmd.dungeonId]
@@ -464,9 +463,6 @@ handlers.OpenChests = function(state, cmd, ctx)
 	local available = Chest.dungeonTotal(state, d.id)
 	if available == 0 then
 		return fail("NO_CHEST")
-	end
-	if d.tier > state.expansions.unlockTier then
-		return fail("CHEST_LOCKED")
 	end
 	local n = math.min(cmd.count or master.K.chestBatchOpen, available)
 	local perChest = Chest.maxEquipmentPerChest(master)
@@ -1128,7 +1124,7 @@ function Game.query.chestsByDungeon(state: any, master: any): { any }
 	for _, d in master.dungeonList do
 		local n = Chest.dungeonTotal(state, d.id)
 		if n > 0 then
-			table.insert(out, { dungeonId = d.id, count = n, unlocked = d.tier <= state.expansions.unlockTier })
+			table.insert(out, { dungeonId = d.id, count = n })
 		end
 	end
 	return out

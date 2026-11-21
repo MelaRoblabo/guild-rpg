@@ -179,6 +179,10 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	c:weights(p .. ".eventWeights", k.eventWeights, "weight", true)
 	c:probability(p .. ".fountainHealRate", k.fountainHealRate)
 	c:integer(p .. ".chestBatchOpen", k.chestBatchOpen, 1) -- D-089
+	if c:range(p .. ".chestEffectRate", k.chestEffectRate) then -- D-090
+		c:probability(p .. ".chestEffectRate.min", k.chestEffectRate.min)
+		c:probability(p .. ".chestEffectRate.max", k.chestEffectRate.max)
+	end
 	c:number(p .. ".trapK", k.trapK, 0)
 	c:probability(p .. ".trapDamageRate", k.trapDamageRate)
 
@@ -515,6 +519,31 @@ local function validateContent(c: Checker, d: any)
 				end
 				if sum <= 0 then
 					c:error(p .. ".chestRarityWeights", "合計が0より大きいことが必要")
+				elseif
+					type(g.chestEffectMinRarity) == "number"
+					and type(d.Constants) == "table"
+					and type(d.Constants.chestEffectRate) == "table"
+				then
+					-- 開封演出が入る割合を基準の範囲に収める（D-090）
+					local tail = 0
+					for r, w in g.chestRarityWeights do
+						if r >= g.chestEffectMinRarity and type(w) == "number" then
+							tail += w
+						end
+					end
+					local rate = tail / sum
+					local band = d.Constants.chestEffectRate
+					if rate < band.min - 1e-9 or rate > band.max + 1e-9 then
+						c:error(
+							p .. ".chestEffectMinRarity",
+							string.format(
+								"演出が入る割合 %.1f%% が基準 %.0f〜%.0f%% の外",
+								rate * 100,
+								band.min * 100,
+								band.max * 100
+							)
+						)
+					end
 				end
 			end
 			if g.dispatchFee ~= nil then
@@ -565,7 +594,7 @@ local function validateLootAndStarter(c: Checker, d: any)
 		return
 	end
 	c:integer("StarterSet.gold", S.gold, 0)
-	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize", "trainingLevel", "unlockTier" } do
+	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize", "trainingLevel" } do
 		c:integer(`StarterSet.expansions.{key}`, if type(S.expansions) == "table" then S.expansions[key] else nil, 1)
 	end
 	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
@@ -704,7 +733,6 @@ local function validateExpansions(c: Checker, d: any)
 			rosterSize = true,
 			warehouseSize = true,
 			trainingLevel = true,
-			unlockTier = true,
 		})
 		local maxValue = if e.kind == "unlockRank"
 			then (if type(d.Rarities) == "table" then rarityCount(d) else 0)

@@ -194,14 +194,14 @@ return function(t)
 			end
 		end)
 		it(
-			"D-085 最も深いダンジョンでも最上位のレアリティは1割未満（ハズレがある）",
+			"D-085 最も深いダンジョンでも最上位のレアリティは1割まで（ハズレがある）",
 			function()
 				local d = master.dungeonList[#master.dungeonList]
 				local total = 0
 				for _, x in d.chestRarityWeights do
 					total += x
 				end
-				expect((d.chestRarityWeights[master.rarityCount] or 0) / total < 0.1).toBeTruthy()
+				expect((d.chestRarityWeights[master.rarityCount] or 0) / total <= 0.1 + 1e-9).toBeTruthy()
 				expect((d.chestRarityWeights[master.rarityCount] or 0) / total > 0).toBeTruthy()
 			end
 		)

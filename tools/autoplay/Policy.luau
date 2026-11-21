@@ -17,7 +17,7 @@ local Policy = {}
 
 local LINE_ORDER = { warrior = 1, scout = 2, mage = 3, support = 4 }
 local WANT_LINES = { "warrior", "scout", "mage", "support" }
-local EXPANSION_PRIORITY = { "exp_party", "exp_unlock", "exp_warehouse", "exp_roster", "exp_training", "exp_candidate" }
+local EXPANSION_PRIORITY = { "exp_party", "exp_warehouse", "exp_roster", "exp_training", "exp_candidate" }
 -- トレーニングに使うのは「転生の備え」を除いた所持金のこの割合まで
 local TRAIN_BUDGET_SHARE = 0.5
 
@@ -45,11 +45,9 @@ Policy.itemScore = itemScore
 -- 開けられるダンジョンの宝箱を、まとめ開き（D-089）で開けられるだけ開ける
 local function openAll(state: any, ctx: Ctx)
 	for _, c in Game.query.chestsByDungeon(state, ctx.master) do
-		if c.unlocked then
-			for _ = 1, 1000 do
-				if not exec(state, { type = "OpenChests", dungeonId = c.dungeonId }, ctx).ok then
-					break
-				end
+		for _ = 1, 1000 do
+			if not exec(state, { type = "OpenChests", dungeonId = c.dungeonId }, ctx).ok then
+				break
 			end
 		end
 	end
@@ -215,10 +213,10 @@ local function rosterCount(state: any): number
 	return n
 end
 
--- 転生の備え：上限まで残り10レベル以内の人の転生費用の合計＋条件を満たした解錠技術・パーティ枠の費用
+-- 転生の備え：上限まで残り10レベル以内の人の転生費用の合計＋条件を満たしたパーティ枠の費用
 local function rebirthReserve(state: any, master: any): number
 	local sum = 0
-	for _, id in { "exp_unlock", "exp_party" } do
+	for _, id in { "exp_party" } do
 		local step = Game.nextExpansionStep(state, id, master)
 		if
 			step
@@ -431,36 +429,14 @@ local function chooseDungeon(state: any, partyIndex: number, ctx: Ctx, rng: Rng.
 	return push or best
 end
 
--- 開けられない宝箱が溜まっていて、解錠技術の次の段階の条件を満たしているなら、そのための貯金を優先する
-local function savingForUnlock(state: any, master: any): boolean
-	local step = Game.nextExpansionStep(state, "exp_unlock", master)
-	if not step or state.guild.level < step.guildLevel then
-		return false
-	end
-	local locked = 0
-	for _, c in Game.query.chestsByDungeon(state, master) do
-		if not c.unlocked then
-			locked += c.count
-		end
-	end
-	return locked >= 300 -- 開けられない宝箱がかなり溜まったときだけ
-end
-
 function Policy.manage(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
 	openAll(state, ctx)
 	equipBest(state, ctx)
 	sellJunk(state, ctx)
 	buyExpansions(state, ctx)
-	local saving = savingForUnlock(state, ctx.master)
-	if saving then
-		stats.savingTicks = (stats.savingTicks or 0) + 1
-	else
-		rebirthCapped(state, ctx, stats)
-	end
+	rebirthCapped(state, ctx, stats)
 	hireIfNeeded(state, ctx, stats)
-	if not saving then
-		trainBehind(state, ctx, stats)
-	end
+	trainBehind(state, ctx, stats)
 	arrangeParties(state, ctx)
 	equipBest(state, ctx)
 	for i = 1, #state.parties do

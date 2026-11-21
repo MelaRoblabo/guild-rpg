@@ -97,11 +97,10 @@ return function(t)
 		end)
 	end)
 
-	describe("宝箱の保管・解錠技術・まとめ開き（D-084, D-087〜D-089）", function()
+	describe("宝箱の保管・まとめ開き（D-084, D-087, D-089〜D-091）", function()
 		local function pile(dungeonId: string, counts: { number })
 			local s = newState()
 			s.expansions.warehouseSize = 100000
-			s.expansions.unlockTier = 12
 			for r, n in counts do
 				if n > 0 then
 					Chest.add(s, dungeonId, r, n)
@@ -137,23 +136,18 @@ return function(t)
 				Chest.add(s, "dng_castle", 2, 4)
 				local list = Game.query.chestsByDungeon(s, master)
 				expect(list).toEqual({
-					{ dungeonId = "dng_ruins", count = 3, unlocked = true },
-					{ dungeonId = "dng_castle", count = 4, unlocked = false },
+					{ dungeonId = "dng_ruins", count = 3 },
+					{ dungeonId = "dng_castle", count = 4 },
 				})
 			end
 		)
-		it(
-			"D-088 解錠技術はダンジョン単位。難度が上限を超えるダンジョンの宝箱は開けられない",
-			function()
-				local s = pile("dng_castle", { 5 })
-				s.expansions.unlockTier = 2
-				expect(exec(s, { type = "OpenChests", dungeonId = "dng_castle" }).error).toBe("CHEST_LOCKED")
-				s.gold = 10 ^ 9
-				s.guild.level = 100
-				expect(exec(s, { type = "BuyExpansion", expansionId = "exp_unlock" }).ok).toBeTruthy()
-				expect(exec(s, { type = "OpenChests", dungeonId = "dng_castle" }).ok).toBeTruthy()
-			end
-		)
+		it("D-091 解錠技術は廃止。どのダンジョンの宝箱もすぐ開けられる", function()
+			local s = newState()
+			s.expansions.warehouseSize = 100000
+			Chest.add(s, "dng_sky_throne", 6, 3)
+			expect(exec(s, { type = "OpenChests", dungeonId = "dng_sky_throne" }).ok).toBeTruthy()
+			expect(master.expansions.exp_unlock).toBe(nil)
+		end)
 		it("D-089 まとめ開きは既定で chestBatchOpen 個。残りが少なければその数", function()
 			local s = pile("dng_ruins", { 150, 50 })
 			local r = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins" }))
@@ -197,6 +191,19 @@ return function(t)
 				end
 			end
 		)
+		it("D-090 どのダンジョンも演出が入る割合は基準（10〜15%）に収まる", function()
+			for _, d in master.dungeonList do
+				local total, tail = 0, 0
+				for r, w in d.chestRarityWeights do
+					total += w
+					if r >= d.chestEffectMinRarity then
+						tail += w
+					end
+				end
+				expect(tail / total >= K.chestEffectRate.min - 1e-9).toBeTruthy()
+				expect(tail / total <= K.chestEffectRate.max + 1e-9).toBeTruthy()
+			end
+		end)
 		it("D-089 演出の発生ラインはダンジョンごとに決まっている", function()
 			for _, d in master.dungeonList do
 				expect(d.chestEffectMinRarity >= 1 and d.chestEffectMinRarity <= master.rarityCount).toBeTruthy()
@@ -206,7 +213,7 @@ return function(t)
 			).toBeTruthy()
 		end)
 		it(
-			"D-084 / D-088 古いセーブは移行される（宝箱の一覧→数、解錠のランク→難度）",
+			"D-084 / D-091 古いセーブは移行される（宝箱の一覧→数、解錠技術は削除）",
 			function()
 				local Migration = require("../src/core/Migration")
 				local old = {
@@ -222,7 +229,7 @@ return function(t)
 				expect(old.version).toBe(Migration.CURRENT)
 				expect(old.chests.dng_ruins).toEqual({ 0, 0, 2, 0, 0 })
 				expect(old.chests.dng_tower).toEqual({ 1, 0, 0, 0, 0 })
-				expect(old.expansions.unlockTier).toBe(6)
+				expect(old.expansions.unlockTier).toBe(nil) -- D-091 で廃止
 				expect(old.expansions.unlockRank).toBe(nil)
 			end
 		)

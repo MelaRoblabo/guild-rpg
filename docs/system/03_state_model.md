@@ -83,12 +83,11 @@ export type PlayerState = {
 	expansions: {
 		partySlots: number, candidateSlots: number, rosterSize: number, warehouseSize: number,
 		trainingLevel: number, -- トレーニング場のレベル（D-077、初期1）
-		unlockTier: number,    -- 解錠技術：開けられる宝箱のダンジョンの難度の上限（D-088、初期2）
 	},                         -- version 2 で trainingLevel・unlockRank を追加（Migration v1→v2）
 	adventurers: { [string]: Adventurer },
 	parties: { Party },
 	equipment: { [string]: EquipmentItem },
-	chests: ChestCounts,       -- version 3 で一覧から数に変更（Migration v2→v3）。version 4 で unlockRank → unlockTier（v3→v4）
+	chests: ChestCounts,       -- version 3 で一覧から数に変更（Migration v2→v3）。version 4 で unlockRank → unlockTier（v3→v4）、version 5 で解錠技術を削除（v4→v5、D-091）
 	items: { [string]: number },      -- アイテムID → 所持数（チケット・ポーション・売却用）
 	expeditions: { [string]: Expedition },
 	unlockedDungeons: { [string]: boolean },

@@ -78,6 +78,13 @@ return function(t)
 			table.insert(d.Constants.sellRarityMult, 20)
 			expect(#errorsOf(d)).toBe(0)
 		end)
+		it("D-090 演出が入る割合が基準（10〜15%）から外れると失敗", function()
+			local d = clone(Data)
+			d.Dungeons[1].chestEffectMinRarity = 1 -- 全部演出になる
+			expect(function()
+				MasterData.load(d)
+			end).toThrow("演出が入る割合")
+		end)
 		it("D-024 ギフト追加回数が上限を超えると失敗", function()
 			local d = clone(Data)
 			d.Constants.giftMax = 3

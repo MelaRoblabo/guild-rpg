@@ -99,7 +99,6 @@ local function snapshotHour(h: number)
 			end
 			return n
 		end)(),
-		unlockTier = state.expansions.unlockTier,
 		trainingLevel = state.expansions.trainingLevel,
 	})
 end
@@ -169,7 +168,7 @@ local lines = {
 	"## 1時間ごと",
 	"",
 	"| 時間 | ギルドLv | パーティ | 所属 | 帰還回数 | 帰還間隔(秒) | 所持金 | 売却益(累計) | チケット | 転生(累計) | 最も育った | 最も遅れた | 最深の踏破 |",
-	"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+	"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
 }
 local function short(n: number): string
 	if n >= 10 ^ 8 then
@@ -183,8 +182,8 @@ local spendLines = {
 	"",
 	"## ゴールドの出入り（1時間ごと。支出は累計）",
 	"",
-	"| 時間 | 収入(この1時間) | 所持金 | 拡張 | 転生費用 | トレーニング | 派遣費 | 未開封の宝箱 | 解錠 | トレーニング場 |",
-	"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+	"| 時間 | 収入(この1時間) | 所持金 | 拡張 | 転生費用 | トレーニング | 派遣費 | 未開封の宝箱 | トレーニング場 |",
+	"| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
 }
 local prevTotal = 500
 for _, h in hourly do
@@ -192,7 +191,7 @@ for _, h in hourly do
 	table.insert(
 		spendLines,
 		string.format(
-			"| %d | %s | %s | %s | %s | %s | %s | %d | %d | %d |",
+			"| %d | %s | %s | %s | %s | %s | %s | %d | %d |",
 			h.hour,
 			short(total - prevTotal),
 			short(h.gold),
@@ -201,7 +200,6 @@ for _, h in hourly do
 			short(h.spentTrain),
 			short(h.spentFees),
 			h.chests,
-			h.unlockTier,
 			h.trainingLevel
 		)
 	)

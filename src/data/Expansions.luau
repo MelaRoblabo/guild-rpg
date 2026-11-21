@@ -3,7 +3,6 @@
 -- steps は順に購入する。value＝購入後の値、guildLevel＝必要なギルドレベル、gold＝費用
 -- requiresClear＝そのダンジョンの踏破が必要（パーティ枠：所要時間÷パーティ数≒30秒になる時点で開く。D-075）
 -- trainingLevel＝トレーニング場（D-077。各レベルの効果は Constants.trainingFacility）
--- unlockTier＝解錠技術（D-088。開けられる宝箱のダンジョンの難度の上限）
 -- 金額は仮。tools/autoplay の実測で調整する（docs/reports/M5_economy.md）
 
 return {
@@ -48,7 +47,7 @@ return {
 		name = "倉庫",
 		kind = "warehouseSize",
 		steps = {
-			{ value = 400, guildLevel = 5, gold = 5000 },
+			{ value = 400, guildLevel = 5, gold = 10000 }, -- D-091：解錠技術の廃止分を上乗せ
 			{ value = 500, guildLevel = 15, gold = 30000 },
 			{ value = 600, guildLevel = 25, gold = 120000 },
 			{ value = 700, guildLevel = 35, gold = 400000 },
@@ -62,22 +61,11 @@ return {
 		name = "トレーニング場",
 		kind = "trainingLevel",
 		steps = {
-			{ value = 2, guildLevel = 10, gold = 20000 },
-			{ value = 3, guildLevel = 30, gold = 300000 },
-			{ value = 4, guildLevel = 50, gold = 3000000 },
-			{ value = 5, guildLevel = 70, gold = 20000000 },
-		},
-	},
-	{
-		id = "exp_unlock",
-		name = "解錠技術",
-		kind = "unlockTier",
-		steps = {
-			{ value = 4, guildLevel = 5, gold = 5000 }, -- 封印の塔・騎士の古城
-			{ value = 6, guildLevel = 15, gold = 50000 }, -- 水没神殿・霧の大森林
-			{ value = 8, guildLevel = 30, gold = 300000 }, -- 地下大迷宮・呪われた修道院
-			{ value = 10, guildLevel = 45, gold = 1500000 }, -- 鋼鉄の要塞・竜の巣
-			{ value = 12, guildLevel = 60, gold = 5000000 }, -- 魔界の門・天空の玉座
+			-- D-091：解錠技術（D-088、廃止）の費用を上乗せ
+			{ value = 2, guildLevel = 10, gold = 70000 },
+			{ value = 3, guildLevel = 30, gold = 600000 },
+			{ value = 4, guildLevel = 50, gold = 4500000 },
+			{ value = 5, guildLevel = 70, gold = 25000000 },
 		},
 	},
 }

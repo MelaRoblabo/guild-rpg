@@ -22,7 +22,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M2 | `Unequip` | adventurerUid, slot | 外す | WAREHOUSE_FULL | 06章 |
 | M2 | `Dispatch` | partyIndex, dungeonId | 派遣。派遣費があれば払い、探索ログを確定 | PARTY_BUSY, PARTY_EMPTY, DUNGEON_LOCKED, NOT_ENOUGH_GOLD | D-026, D-079, D-071 |
 | M2 | `SetAutoRepeat` | partyIndex, dungeonId? | 自動再派遣の設定・解除 | — | 01章 |
-| M2 | `OpenChests` | dungeonId, count?（省略時 chestBatchOpen＝100） | そのダンジョンの宝箱の山から、残り数で重み付けして1つずつ引いて開ける。結果は1つの `ChestsOpened` イベント：`normal`（演出なし、開けた順）と `special`（演出あり、レアリティの低い順）、`remaining` | DUNGEON_NOT_FOUND, NO_CHEST, CHEST_LOCKED（解錠技術が足りない）, WAREHOUSE_FULL, INVALID_COUNT | D-015, D-084, D-087〜D-089 |
+| M2 | `OpenChests` | dungeonId, count?（省略時 chestBatchOpen＝100） | そのダンジョンの宝箱の山から、残り数で重み付けして1つずつ引いて開ける。結果は1つの `ChestsOpened` イベント：`normal`（演出なし、開けた順）と `special`（演出あり、レアリティの低い順）、`remaining` | DUNGEON_NOT_FOUND, NO_CHEST, WAREHOUSE_FULL, INVALID_COUNT | D-015, D-084, D-087, D-089 |
 | M2 | `Sell` | equipmentUids / itemId+count | 売却 | ITEM_LOCKED, ITEM_EQUIPPED | 06章 |
 | M2 | `SetLock` | uid, locked | 保護の切り替え | — | 02章 |
 | M3 | `HireStart` | — | 雇用費を払い候補を抽選 | NOT_ENOUGH_GOLD, ROSTER_FULL, SESSION_EXISTS | 02章 |
@@ -38,7 +38,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M4 | `ChangeJob` | adventurerUid, jobId | 転職ポーションを使う | NO_POTION, UNIQUE_JOB_RESTRICTED | 03章 |
 | M4 | `ChangeAppearance` | adventurerUid | 見た目変更ポーションで抽選 | NO_POTION, UNIQUE_CANNOT_CHANGE | 07章 |
 | M4 | `ChangeAppearanceChoose` | "previous" / "current" | 見た目を選ぶ（どちらでも1個消費） | — | 07章 |
-| M5 | `BuyExpansion` | expansionId | 拡張を購入（パーティ枠・雇用候補枠・所属枠・倉庫・トレーニング場・解錠技術） | NOT_ENOUGH_GOLD, GUILD_LEVEL_TOO_LOW, DUNGEON_NOT_CLEARED | 08章, D-075, D-077, D-078 |
+| M5 | `BuyExpansion` | expansionId | 拡張を購入（パーティ枠・雇用候補枠・所属枠・倉庫・トレーニング場） | NOT_ENOUGH_GOLD, GUILD_LEVEL_TOO_LOW, DUNGEON_NOT_CLEARED | 08章, D-075, D-077 |
 | M5 | `SetAutoSell` | enabled, maxRarity | 自動売却の設定 | — | 06章 |
 | M5b | `Train` | adventurerUid, sessions | トレーニング。最大 sessions 回、1回ごとに費用を払って経験値を得る。上限レベルかゴールド切れで止まる（払った回数分だけ行う） | TRAINING_CAP, NOT_ENOUGH_GOLD, ADVENTURER_ON_EXPEDITION, ADVENTURER_IN_REBIRTH, INVALID_COUNT | D-076, D-077 |
 | M9 | `GrantPurchase` | productId | Robux購入の付与（サーバー専用） | — | 10章 |
