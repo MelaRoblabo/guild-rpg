@@ -42,7 +42,7 @@ src/（文字列 require のまま）──rojo serve / rojo build──▶ Robl
 
 - `src/server`・`src/client` のうち、Roblox API も `@game/...` も使わない純粋なモジュール（例：セッションロックの判定）は、`tests/` から相対パスで require して Lune でテストする。
 - Roblox API を使う部分（DataStore・Remote・Players など）は薄く保ち、Studio のプレイテストで確認する（Studio MCP を使ってよい）。
-- 静的解析：`src/server`・`src/client` は selene の `roblox` 標準で検査する（`tools/check` に追加）。`src/core`・`src/data`・`tools`・`tests` は従来どおり `luau` 標準。
+- 静的解析：`src/server`・`src/client` は selene の `roblox` 標準（`selene.roblox.toml`）で検査する（`tools/check` から実行。selene 0.32 以降）。`src/core`・`src/data`・`tools`・`tests` は従来どおり `luau` 標準。
 - 運用の値（自動保存の間隔など。ゲームの数値ではないもの）は `src/server/Config.luau` に置く。ゲームの数値・確率・コンテンツは従来どおり `src/data`。
 
 ## 2. サーバー権限
