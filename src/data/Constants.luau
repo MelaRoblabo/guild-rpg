@@ -52,7 +52,7 @@ return {
 	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
 	expBase = 100,
 	expExponent = 1.5,
-	expCycleMult = { 1.179, 0.8121, 1.333, 2.228, 3.312, 5.418, 6.867, 11.84, 15.6 },
+	expCycleMult = { 1.31, 1.015, 1.72, 2.829, 3.84, 5.487, 7.197, 11.84, 15.6 },
 	levelCapInitial = 20, -- D-071
 	levelCapPerRebirth = 10,
 	levelCapMax = 100,
