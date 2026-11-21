@@ -7,6 +7,7 @@ local HttpService = game:GetService("HttpService")
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Migration = require("@game/ReplicatedStorage/Core/Migration")
+local Config = require("./Config")
 local Persistence = require("./Persistence")
 
 local PlayerSessions = {}
@@ -39,6 +40,9 @@ function PlayerSessions.new(master: any)
 	self.persistence = Persistence.new(jobId, game.PlaceId)
 	self.sessions = {} :: { [number]: Session }
 	self.onLoaded = nil :: ((Session, { any }) -> ())?
+	-- 処理中の読み込み・保存の数。サーバー終了時は、退出時の保存や読み込み中のものも終わるまで待つ（M7-5 で発見）
+	self.inFlight = 0
+	self.closing = false
 	return self
 end
 
@@ -50,7 +54,7 @@ function PlayerSessions.get(self: any, player: Player): Session?
 	return self.sessions[player.UserId]
 end
 
-function PlayerSessions.onPlayerAdded(self: any, player: Player)
+local function loadPlayer(self: any, player: Player)
 	local userId = player.UserId
 	local status, record, err = self.persistence:load(userId)
 
@@ -63,8 +67,8 @@ function PlayerSessions.onPlayerAdded(self: any, player: Player)
 		return
 	end
 
-	-- 読み込み中に退出した：取ったロックを、中身を変えずに解放する
-	if player.Parent == nil then
+	-- 読み込み中に退出した、またはサーバーが終了中：取ったロックを、中身を変えずに解放する
+	if player.Parent == nil or self.closing then
 		self.persistence:save(userId, record.state, true)
 		return
 	end
@@ -112,8 +116,22 @@ function PlayerSessions.onPlayerAdded(self: any, player: Player)
 	end
 end
 
+function PlayerSessions.onPlayerAdded(self: any, player: Player)
+	self.inFlight += 1
+	local ok, err = pcall(loadPlayer, self, player)
+	self.inFlight -= 1
+	if not ok then
+		warn(`[PlayerSessions] 読み込みの処理でエラー（{player.UserId}）：{err}`)
+	end
+end
+
 local function saveSession(self: any, session: Session, release: boolean): string
-	local result = self.persistence:save(session.userId, session.state, release)
+	self.inFlight += 1
+	local ok, resultOrErr = pcall(function()
+		return self.persistence:save(session.userId, session.state, release)
+	end)
+	self.inFlight -= 1
+	local result = if ok then resultOrErr else "error"
 	if result == "ok" then
 		session.lastSavedAt = os.time()
 	end
@@ -145,19 +163,22 @@ function PlayerSessions.autosave(self: any)
 	end
 end
 
--- サーバー終了時（BindToClose）：全員を並行して保存・解放し、終わるまで待つ
+-- サーバー終了時（BindToClose）：全員を並行して保存・解放し、終わるまで待つ。
+-- 先に始まっている退出時の保存・読み込みも終わるまで待つ（待たないと、ロックが残ったまま終わる：M7-5 で発見）
 function PlayerSessions.saveAll(self: any)
-	local pending = 0
+	self.closing = true
 	for userId, session in self.sessions do
 		self.sessions[userId] = nil
-		pending += 1
-		task.spawn(function()
-			saveSession(self, session, true)
-			pending -= 1
-		end)
+		task.spawn(saveSession, self, session, true)
 	end
-	while pending > 0 do
+	local started = os.clock()
+	while self.inFlight > 0 and os.clock() - started < Config.closeWaitSeconds do
 		task.wait()
+	end
+	if self.inFlight > 0 then
+		warn(
+			`[PlayerSessions] 終了時の保存が {Config.closeWaitSeconds} 秒で終わらなかった（残り {self.inFlight}）`
+		)
 	end
 end
 

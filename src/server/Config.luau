@@ -12,6 +12,7 @@ return {
 	lockRetryCount = 6, -- 仮
 	saveRetryCount = 3, -- 仮。待ち時間は 1・2・4 秒と倍にする
 	saveSizeWarnBytes = 3000000, -- 仮。DataStore の上限は 4MB
+	closeWaitSeconds = 25, -- サーバー終了時に保存を待つ上限（Roblox の BindToClose は最大30秒）
 
 	-- サーバー権限・通信（M7-3 で使う）
 	advanceIntervalSeconds = 1, -- 仮
