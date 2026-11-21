@@ -76,7 +76,7 @@
 | `gradeWeights` | +0:0.74 / +1:0.20 / +2:0.05 / +3:0.01（仮） | 06章 |
 | `modifierChance` | 0.40（仮） | 06章 |
 | `potionChanceRarePlus` | 0.05、内訳 転職0.40 / 見た目変更0.30 / 見た目維持0.30（仮） | Q-011 |
-| `itemEventWeights` | チケット0.60 / 売却用0.40（仮） | Q-011 |
+| `itemEventWeights` | チケット0.02 / 売却用0.98 | Q-011, D-074, D-092 |
 | `sellRarityMult` | 1 / 1.5 / 2.5 / 4 / 7 / 12（仮。レアリティの数だけ） | 06章, D-085 |
 | `sellGradeCoef` | 0.5（仮） | 06章 |
 | `equipRarityMult` | 1.0 / 1.3 / 1.7 / 2.2 / 3.0 / 4.0（仮。レアリティの数だけ） | Q-020, D-085 |
@@ -115,6 +115,7 @@
 
 - **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、必要なら `chestEffectMinRarity` を見直す。検証が長さの食い違いをエラーにする。
 - 派遣費 `dispatchFee`（D-079）はテンプレートに書き、calibrate がそのまま写す。難度7以降のみ（仮：1千〜3万G）。
+- 経験値は「深いダンジョンほど1秒あたりの経験値が前の1.08倍以上」になるよう calibrate が引き上げる（D-092）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 
 ## 5. 職業（Jobs.luau）
