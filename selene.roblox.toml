@@ -1,0 +1,5 @@
+# src/server・src/client 用（Roblox API を使う）。tools/check から --config で指定する（11章 §1）。
+std = "roblox"
+
+[rules]
+global_usage = "deny"

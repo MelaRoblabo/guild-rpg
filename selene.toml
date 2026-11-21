@@ -1,5 +1,5 @@
-# core と tools は Roblox API を使わないため、標準の Luau のみを許可する（CLAUDE.md §2）。
-# M7 で src/server・src/client 用に roblox 標準を追加する。
+# core・data・tools・tests は Roblox API を使わないため、標準の Luau のみを許可する（CLAUDE.md §2）。
+# src/server・src/client は selene.roblox.toml（roblox 標準）で検査する（11章 §1）。
 std = "luau"
 
 [rules]

@@ -8,6 +8,9 @@ local MasterData = require("../src/core/MasterData")
 local Data = require("../src/data")
 
 local TARGETS = { "src", "tools", "tests" }
+-- selene は Roblox API を使うかどうかで標準ライブラリを分ける（11章 §1）
+local LUAU_TARGETS = { "src/core", "src/data", "tools", "tests" }
+local ROBLOX_TARGETS = { "src/server", "src/client" }
 
 local failed = false
 
@@ -25,7 +28,8 @@ local function step(name: string, cmd: string, args: { string })
 end
 
 step("StyLua", "stylua", { "--check", table.unpack(TARGETS) })
-step("selene", "selene", TARGETS)
+step("selene（luau）", "selene", LUAU_TARGETS)
+step("selene（roblox）", "selene", { "--config", "selene.roblox.toml", table.unpack(ROBLOX_TARGETS) })
 
 print("\n== マスターデータ検証 ==")
 local issues = MasterData.validate(Data)
