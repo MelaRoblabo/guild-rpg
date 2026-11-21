@@ -16,6 +16,8 @@
 | M5 ギルド・経済 | 05（M5行）, 06§10 | `src/core/{Guild,Game}`、`src/data/{GuildLevels,Expansions}`、`tools/cli`、`tools/autoplay`、`tests/` | 複数パーティ・自動再派遣・倉庫満杯時の停止・オフライン復帰 |
 | M6 検証・調整 | 09§3-4 | `src/data/`（数値のみ）、`tools/autoplay`、`out/` | 企画書§14の検証項目に回答。仮の数値を決定ログで確定 |
 | M7 Roblox統合 | 03, 05, 08, 11 | `src/server`、`src/client`、`src/core/{Protocol,CommandText}`（新規）、`tools/cli`（書式の解析を CommandText へ移す）、`tools/check`、`default.project.json`、`selene.toml`、`rokit.toml`、`tests/`、`docs/system/11`・`12` | Roblox 上で M2〜M5b の全コマンドがデバッグ画面から実行でき、再参加で状態が戻る（11章 §7）。`lune run tools/check` が通る |
+| M8 UI設計・実装 | ゲーム仕様書11章 | M8 の実装に入る前に決める | 11章の画面が Roblox 上で動く（詳細は M8 の開始時に決める） |
+| M8-FX 演出（M8 と並行。D-147） | ゲーム仕様書11章 §8、D-140〜D-146 | `src/core`（演出を選ぶ処理を新規）、`src/data`（演出の表を新規）、`src/client`（演出の再生役・確認ツール）、`tools/sim`、`tests/` | 演出の選択がテスト（信頼度どおり・確定演出が外れない・降格しない）を通る。確認ツールで全演出を再生できる。100個あたりの平均時間が上限以内。点滅が1秒3回以内 |
 
 ### M7 の進め方
 
