@@ -107,6 +107,7 @@ DataStore を直接使い、セッションロックを自前で実装する。
 | --- | --- | --- | --- |
 | `Command` | RemoteFunction | クライアント → サーバー → 結果を返す | 05章のコマンドを送る |
 | `StateChanged` | RemoteEvent | サーバー → クライアント | 起きたことと、状態の要約の差分を送る |
+| `WorldChanged` | RemoteEvent | サーバー → クライアント | 同じサーバーの他プレイヤーのパーティの位置（M8、§6。D-121） |
 
 ### 4.1 Command
 
@@ -190,9 +191,26 @@ patch = {
 - テキストの書式をコマンドに変える処理は、テキスト版と共通にする（`tools/cli` から `src/core/CommandText.luau` に切り出し、両方から使う。Lune でテストする）。
 - 探索の現在位置などの表示用の計算は `Game.query.*` を使う。表示用の時刻は `workspace:GetServerTimeNow()` の整数部分。
 
-## 6. マルチ表示（D-027）
+## 6. マルチ表示（D-027、D-108、D-121。M8 で実装）
 
-- 他プレイヤーの表示に必要なのは、各パーティの `dungeonId`・`departAt`・`travelSeconds`・`totalSeconds` だけ。M8で実装。
+他プレイヤーのパーティは、マップに馬車だけを出し、タップで詳細を見せる（ゲーム仕様 11章 S-14）。
+
+### 6.1 馬車の位置：`WorldChanged`
+
+- 自分の状態通知（`StateChanged`、連番つきの差分）とは混ぜない。届かなくても自分のゲームには影響しないので、連番は付けず、届いたものをそのまま上書きする。
+- 送る中身（プレイヤー1人分の公開情報）：`{ userId, guildLevel, parties = { { index, dungeonId, departAt, travelSeconds, totalSeconds } } }`。パーティは探索中のものだけ。位置はクライアントが出発時刻と時間から求める（D-026）。
+- 送るとき：
+  - 参加したプレイヤーへ、他の全員分をまとめて1回。
+  - 誰かが出発・帰還したとき（オフライン分の帰還を含む）、そのプレイヤー分を全員へ。
+  - 退出したとき、そのプレイヤーを消す知らせを全員へ。
+- 自分自身の分は送らない（自分の馬車は自分の状態から描く）。
+
+### 6.2 タップしたときの詳細：`Inspect` コマンド
+
+- `Command` で `{ type = "Inspect", userId, partyIndex }` を送ると、そのパーティのメンバーの `name`・`jobId`・`level`・`appearanceId` とギルドLvを返す。状態は変えない（`Game.execute` を通さない読み取り専用）。回数制限（§4.4）の対象にする。
+- 相手が同じサーバーにいない、パーティが探索中でない場合は `NOT_FOUND`。
+- プレイヤー名とアバターアイコンは、クライアントが Roblox の API（`Players:GetNameFromUserIdAsync`・`Players:GetUserThumbnailAsync`）で取る。サーバーからは送らない。
+- 返す中身を作る処理は `src/core` に置き、Lune でテストする（隠す情報を含めない）。
 
 ## 7. 確認方法（M7 の完了条件）
 
