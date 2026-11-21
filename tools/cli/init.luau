@@ -181,6 +181,9 @@ local function handle(tokens: { string }): (boolean, any)
 			partyIndex = tonumber(tokens[2]),
 			dungeonId = if tokens[3] == "off" then nil else tokens[3],
 		})
+		if result.ok and tokens[3] ~= "off" then
+			say("※自動再派遣は次の帰還から働きます。待機中なら go で出発してください")
+		end
 	elseif c == "watch" then
 		say(Text.watch(save, tonumber(tokens[2]) or 1, master))
 	elseif c == "wait" then

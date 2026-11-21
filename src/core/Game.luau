@@ -363,10 +363,11 @@ handlers.Equip = function(state, cmd, ctx)
 	if not item then
 		return fail("ITEM_NOT_FOUND")
 	end
-	if
-		Party.isAdventurerBusy(state, adv.uid) or (item.equippedBy and Party.isAdventurerBusy(state, item.equippedBy))
-	then
+	if Party.isAdventurerBusy(state, adv.uid) then
 		return fail("ADVENTURER_ON_EXPEDITION")
+	end
+	if item.equippedBy and Party.isAdventurerBusy(state, item.equippedBy) then
+		return fail("ITEM_HOLDER_ON_EXPEDITION") -- 品を装備している別の冒険者が探索中
 	end
 	local err = Inventory.equip(state, adv, item, ctx.master)
 	if err then
@@ -469,8 +470,10 @@ handlers.OpenChests = function(state, cmd, ctx)
 	local pickRng = takeRng(state)
 	local normal, special = {}, {}
 	local opened = 0
+	local stoppedBy = nil
 	for _ = 1, n do
 		if Inventory.warehouseFree(state) < perChest then
+			stoppedBy = "WAREHOUSE_FULL" -- 途中で倉庫がいっぱいになった
 			break
 		end
 		local rank = Chest.draw(state, d.id, pickRng)
@@ -528,6 +531,7 @@ handlers.OpenChests = function(state, cmd, ctx)
 				normal = normal,
 				special = special,
 				remaining = Chest.dungeonTotal(state, d.id),
+				stoppedBy = stoppedBy,
 			},
 		},
 	}

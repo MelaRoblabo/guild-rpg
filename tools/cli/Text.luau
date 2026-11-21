@@ -24,6 +24,7 @@ local ERRORS = {
 	ADVENTURER_ON_EXPEDITION = "探索中は変更できません",
 	JOB_CANNOT_EQUIP = "この職業では装備できません",
 	ITEM_EQUIPPED = "装備中の品です",
+	ITEM_HOLDER_ON_EXPEDITION = "その品を装備している冒険者が探索中です",
 	SLOT_EMPTY = "その枠には何も装備していません",
 	WAREHOUSE_FULL = "倉庫がいっぱいです",
 	DUNGEON_NOT_FOUND = "そのダンジョンはありません",
@@ -35,10 +36,10 @@ local ERRORS = {
 	NOT_ENOUGH_ITEMS = "数が足りません",
 	NOT_FOUND = "見つかりません",
 	UNKNOWN_COMMAND = "不明なコマンドです",
-	SESSION_EXISTS = "雇用の途中です（candidates で確認、cancel でやめる）",
+	SESSION_EXISTS = "雇用・転生・見た目変更のどれかが途中です（candidates／rebirth の結果を確定するか cancel）",
 	ROSTER_FULL = "所属枠がいっぱいです",
 	NOT_ENOUGH_GOLD = "お金が足りません",
-	NO_SESSION = "雇用を始めていません（hire）",
+	NO_SESSION = "進行中の雇用・転生・見た目変更がありません",
 	ALREADY_PICKED = "面接する候補はもう選んでいます",
 	CANDIDATE_NOT_FOUND = "その番号の候補はいません",
 	NOT_PICKED = "まず面接する候補を選んでください（pick）",
@@ -416,7 +417,13 @@ function Text.events(events: { any }, save: any, master: any): string
 			end
 			table.insert(
 				lines,
-				t .. `{master.dungeons[e.dungeonId].name}の宝箱を{e.opened}個開けた（残り{e.remaining}個）`
+				t
+					.. `{master.dungeons[e.dungeonId].name}の宝箱を{e.opened}個開けた（残り{e.remaining}個）`
+					.. (
+						if e.stoppedBy == "WAREHOUSE_FULL"
+							then " ※倉庫がいっぱいで途中で止めました"
+							else ""
+					)
 			)
 			if #e.normal > 0 then
 				table.insert(lines, `  ── 通常 {#e.normal}個 ──`)

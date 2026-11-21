@@ -87,6 +87,22 @@ return function(t)
 			local r3 = Game.execute(s, { type = "Equip", adventurerUid = uid, equipmentUid = eq.uid }, ctx(T0 + 1))
 			expect(r3.error).toBe("ADVENTURER_ON_EXPEDITION")
 		end)
+		it(
+			"探索中の冒険者が装備している品は、待機中の冒険者にも付け替えられない（専用のエラー）",
+			function()
+				local s = newState()
+				local holder = s.parties[1].slots[1]
+				local wpn = s.adventurers[holder].equipment.weapon
+				-- 待機中の冒険者を1人作る（パーティ外）
+				local spare = "adv_spare"
+				s.adventurers[spare] = table.clone(s.adventurers[holder])
+				s.adventurers[spare].uid = spare
+				s.adventurers[spare].equipment = {}
+				Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
+				local r = Game.execute(s, { type = "Equip", adventurerUid = spare, equipmentUid = wpn }, ctx(T0 + 1))
+				expect(r.error).toBe("ITEM_HOLDER_ON_EXPEDITION")
+			end
+		)
 		it("未解放のダンジョンには派遣できない", function()
 			local s = newState()
 			local r = Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_ruins" }, ctx(T0))
