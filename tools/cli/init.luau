@@ -10,11 +10,11 @@ local process = require("@lune/process")
 local serde = require("@lune/serde")
 local stdio = require("@lune/stdio")
 
-local Data = require("../../src/data")
-local Game = require("../../src/core/Game")
-local MasterData = require("../../src/core/MasterData")
-local Migration = require("../../src/core/Migration")
-local Text = require("./Text")
+local Data = require("../src/data")
+local Game = require("../src/core/Game")
+local MasterData = require("../src/core/MasterData")
+local Migration = require("../src/core/Migration")
+local Text = require("@self/Text")
 
 local master = MasterData.load(Data)
 

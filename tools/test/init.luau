@@ -8,7 +8,7 @@
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 
-local Expect = require("./Expect")
+local Expect = require("@self/Expect")
 
 local TESTS_DIR = "tests"
 
@@ -52,7 +52,7 @@ end
 table.sort(files)
 
 for _, f in files do
-	local mod = (require :: any)("../../" .. TESTS_DIR .. "/" .. string.gsub(f, "%.luau$", ""))
+	local mod = (require :: any)("../" .. TESTS_DIR .. "/" .. string.gsub(f, "%.luau$", ""))
 	if type(mod) ~= "function" then
 		error(`{f}: テストファイルは function(t) を返すこと`)
 	end

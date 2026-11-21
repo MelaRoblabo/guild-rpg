@@ -1,7 +1,6 @@
-# ツールのバージョン固定（M0 で各バージョンの配布物が存在することを確認済み）。
+# ツールのバージョン固定（M0 で各バージョンの配布物が存在することを確認済み。M7-0 で Rojo・Lune を更新し、darklua を外した：D-102）。
 [tools]
-rojo = "rojo-rbx/rojo@7.4.4"
-lune = "lune-org/lune@0.8.9"
-darklua = "seaofvoices/darklua@0.13.1"
+rojo = "rojo-rbx/rojo@7.7.1"
+lune = "lune-org/lune@0.11.1"
 selene = "Kampfkarren/selene@0.27.1"
 stylua = "JohnnyMorganz/StyLua@0.20.0"

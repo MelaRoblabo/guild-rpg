@@ -4,8 +4,8 @@
 
 local process = require("@lune/process")
 
-local MasterData = require("../../src/core/MasterData")
-local Data = require("../../src/data")
+local MasterData = require("../src/core/MasterData")
+local Data = require("../src/data")
 
 local TARGETS = { "src", "tools", "tests" }
 
@@ -13,7 +13,7 @@ local failed = false
 
 local function step(name: string, cmd: string, args: { string })
 	print(`\n== {name} ==`)
-	local ok, result = pcall(process.spawn, cmd, args, { stdio = "inherit" })
+	local ok, result = pcall(process.exec, cmd, args, { stdio = "inherit" })
 	if not ok then
 		print(`起動できません: {cmd}（rokit install を実行してください）`)
 		failed = true

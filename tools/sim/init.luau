@@ -11,12 +11,12 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 
-local Data = require("../../src/data")
-local Expedition = require("../../src/core/Expedition")
-local Formulas = require("../../src/core/Formulas")
-local MasterData = require("../../src/core/MasterData")
-local Rng = require("../../src/core/Rng")
-local Stages = require("./Stages")
+local Data = require("../src/data")
+local Expedition = require("../src/core/Expedition")
+local Formulas = require("../src/core/Formulas")
+local MasterData = require("../src/core/MasterData")
+local Rng = require("../src/core/Rng")
+local Stages = require("@self/Stages")
 
 -- 引数 -----------------------------------------------------------------
 local positional, opts = {}, {}

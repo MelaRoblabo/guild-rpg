@@ -3,15 +3,15 @@
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
-      "Core": { "$path": "build/core" },
-      "Data": { "$path": "build/data" }
+      "Core": { "$path": "src/core" },
+      "Data": { "$path": "src/data" }
     },
     "ServerScriptService": {
-      "Server": { "$path": "build/server" }
+      "Server": { "$path": "src/server" }
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "Client": { "$path": "build/client" }
+        "Client": { "$path": "src/client" }
       }
     }
   }

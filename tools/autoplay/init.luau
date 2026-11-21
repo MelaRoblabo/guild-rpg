@@ -7,11 +7,11 @@
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 
-local Data = require("../../src/data")
-local Game = require("../../src/core/Game")
-local MasterData = require("../../src/core/MasterData")
-local Rng = require("../../src/core/Rng")
-local Policy = require("./Policy")
+local Data = require("../src/data")
+local Game = require("../src/core/Game")
+local MasterData = require("../src/core/MasterData")
+local Rng = require("../src/core/Rng")
+local Policy = require("@self/Policy")
 
 local opts = { hours = 10, seed = 1, policy = "greedy" }
 do
