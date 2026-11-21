@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local Data = require("@game/ReplicatedStorage/Data")
 local MasterData = require("@game/ReplicatedStorage/Core/MasterData")
 local Config = require("./Config")
+local Network = require("./Network")
 local PlayerSessions = require("./PlayerSessions")
 
 -- マスターデータは起動時に1回だけ読み込む。検証に失敗したらプレイヤーを受け付けない（11章 §2）
@@ -25,6 +26,8 @@ if not ok then
 end
 
 local sessions = PlayerSessions.new(masterOrErr)
+-- 通信は参加の受け付けより先に用意する（読み込み完了時に全体を通知するため）
+Network.start(sessions)
 
 Players.PlayerAdded:Connect(function(player)
 	sessions:onPlayerAdded(player)

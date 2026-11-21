@@ -36,6 +36,7 @@ src/（文字列 require のまま）──rojo serve / rojo build──▶ Robl
 1. リポジトリで `rojo serve` を起動する。
 2. Studio（プレイス「冒険者ギルド」、D-100）の Rojo プラグインで Connect する。
 3. 上の表の場所がリポジトリの内容で作られ、保存のたびに更新される。Rojo が管理しない場所には触れない。
+4. プレイテストの前に、Studio 側のスクリプトがリポジトリと同じか確かめる（M7-3 で、OneDrive 内のフォルダでファイルの変更を1回取りこぼしたことがある）。違っていたら、そのファイルを保存し直す（中身を一度変えて戻す）。
 
 
 ### サーバー・クライアントのコードの置き方
@@ -175,9 +176,9 @@ patch = {
 
 `Protocol.view(state, master, now)` で作る（純粋な関数。Lune でテストする）。
 
-- 送らないもの：`seed`・`rngCounter`・各探索の `seed`（乱数の予測を防ぐ）、`stats`（集計用）。
+- 送らないもの：`seed`・`rngCounter`・各探索の `seed`（乱数の予測を防ぐ）、`nextUid`、`stats`（集計用）、`lastAdvancedAt`（時間経過のたびに変わるだけで表示に使わない。送ると差分が毎秒出る）。
 - 宝箱（D-087）：`chests`（ランク別の数）の代わりに `Game.query.chestsByDungeon` の結果（ダンジョンごとの数）を送る。
-- 探索ログ：宝箱イベントのランク（`detail.ranks`、`rewards.chests[].rank`）を取り除き、個数だけ残す。
+- 探索ログ：宝箱のランクを取り除き、個数だけ残す（`Protocol.redactLog`）。`floors[].detail.ranks` → `detail.chestCount`、`rewards.chests` → `rewards.chestCount`、`clearChestRanks` → `clearChestCount`。
 - events：`ExpeditionReturned` など、宝箱のランクを含むものは同じ規則で取り除く。開封結果（`ChestsOpened`）は開けた後なのでランクを含めてよい（演出の `effect` と派手さの `rank` に使う）。
 - それ以外の状態（冒険者・パーティ・装備・アイテム・面接や転生の途中の結果など）はそのまま送る。
 

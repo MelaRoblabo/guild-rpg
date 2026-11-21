@@ -4,7 +4,12 @@
     "$className": "DataModel",
     "ReplicatedStorage": {
       "Core": { "$path": "src/core" },
-      "Data": { "$path": "src/data" }
+      "Data": { "$path": "src/data" },
+      "Remotes": {
+        "$className": "Folder",
+        "Command": { "$className": "RemoteFunction" },
+        "StateChanged": { "$className": "RemoteEvent" }
+      }
     },
     "ServerScriptService": {
       "Server": { "$path": "src/server" }

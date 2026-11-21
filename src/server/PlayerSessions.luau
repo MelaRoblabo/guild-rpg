@@ -18,6 +18,11 @@ export type Session = {
 	state: any,
 	loadedAt: number,
 	lastSavedAt: number,
+	-- 通信（11章 §4、M7-3）
+	seq: number, -- 最後に送った通知の連番
+	lastView: any, -- 最後に送った要約（差分の元：D-103）
+	commandTimes: { number }, -- 直近1秒に受けたコマンドの時刻（送りすぎの制限）
+	busy: boolean, -- コマンド・時間経過の処理中
 }
 
 local MSG_LOCKED =
@@ -33,7 +38,7 @@ function PlayerSessions.new(master: any)
 	self.master = master
 	self.persistence = Persistence.new(jobId, game.PlaceId)
 	self.sessions = {} :: { [number]: Session }
-	self.onLoaded = nil :: ((Session) -> ())?
+	self.onLoaded = nil :: ((Session, { any }) -> ())?
 	return self
 end
 
@@ -83,17 +88,27 @@ function PlayerSessions.onPlayerAdded(self: any, player: Player)
 	local state = stateOrErr
 
 	-- オフライン中に帰還した探索だけを処理する（05章 §3、企画書§16.8 案A）
-	Game.advance(state, self:ctx(false))
+	local offlineEvents = Game.advance(state, self:ctx(false))
 
 	local now = os.time()
-	local session: Session = { player = player, userId = userId, state = state, loadedAt = now, lastSavedAt = 0 }
+	local session: Session = {
+		player = player,
+		userId = userId,
+		state = state,
+		loadedAt = now,
+		lastSavedAt = 0,
+		seq = 0,
+		lastView = nil,
+		commandTimes = {},
+		busy = false,
+	}
 	self.sessions[userId] = session
 	print(
 		`[PlayerSessions] {player.Name} を読み込み（{if isNew then "新規" else "既存"}、所持金 {state.gold}）`
 	)
 
 	if self.onLoaded then
-		self.onLoaded(session)
+		self.onLoaded(session, offlineEvents)
 	end
 end
 
