@@ -1,0 +1,4 @@
+# 改行は LF に統一する（StyLua の確認が Windows の CRLF で失敗するため。M7-0）
+* text=auto eol=lf
+*.rbxm binary
+*.rbxl binary
