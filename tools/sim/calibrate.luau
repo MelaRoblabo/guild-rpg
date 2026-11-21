@@ -62,6 +62,7 @@ for i, t in Templates do
 		trapDamageRate = t.trapDamageRate,
 		dispatchFee = t.dispatchFee,
 		chestRarityWeights = t.chestRarityWeights,
+		chestEffectMinRarity = t.chestEffectMinRarity,
 		battleReward = { exp = 100, gold = math.floor(GOLD_BASE * GOLD_GROWTH ^ (i - 1) + 0.5) },
 		sellableItems = t.sellableItems,
 		jobPotionTargets = t.jobPotionTargets,
@@ -244,6 +245,7 @@ for _, r in lines do
 		table.insert(out, `\t\ttrapDamageRate = {r.trapDamageRate},`)
 	end
 	table.insert(out, `\t\tchestRarityWeights = {numList(r.chestRarityWeights)},`)
+	table.insert(out, `\t\tchestEffectMinRarity = {r.chestEffectMinRarity},`)
 	if r.dispatchFee then
 		table.insert(out, `\t\tdispatchFee = {r.dispatchFee},`)
 	end

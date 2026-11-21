@@ -91,7 +91,7 @@ return function(t)
 	describe("自動売却（06章 §6）", function()
 		local function withChests(n: number, rank: number)
 			local s = Game.newState(master, 1, T0)
-			s.expansions.unlockRank = 5 -- 解錠技術は別のテスト（D-078）
+			s.expansions.unlockTier = 12 -- 解錠技術は別のテスト（D-088）
 			for _ = 1, n do
 				Chest.add(s, "dng_ruins", rank, 1)
 			end
@@ -101,7 +101,7 @@ return function(t)
 			local s = withChests(50, 1)
 			exec(s, { type = "SetAutoSell", enabled = true, maxRarity = 1, keepModified = true })
 			local gold0 = s.gold
-			exec(s, { type = "OpenChests" })
+			exec(s, { type = "OpenChests", dungeonId = "dng_ruins" })
 			for _, e in s.equipment do
 				if e.equippedBy == nil then
 					expect(e.modifierId ~= nil).toBeTruthy()
@@ -112,12 +112,12 @@ return function(t)
 		it("指定より高いレアリティは売らない", function()
 			local s = withChests(10, 3)
 			exec(s, { type = "SetAutoSell", enabled = true, maxRarity = 2, keepModified = false })
-			exec(s, { type = "OpenChests" })
+			exec(s, { type = "OpenChests", dungeonId = "dng_ruins" })
 			expect(Inventory.warehouseUsage(s) > 0).toBeTruthy()
 		end)
 		it("無効なら売らない", function()
 			local s = withChests(10, 1)
-			exec(s, { type = "OpenChests" })
+			exec(s, { type = "OpenChests", dungeonId = "dng_ruins" })
 			expect(Inventory.warehouseUsage(s) >= 10).toBeTruthy()
 		end)
 	end)

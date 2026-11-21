@@ -84,6 +84,7 @@
 | `guildExpPerFloor` / `guildExpClearBonus` / `guildExpFirstClear` | 1 / 5 / 50（仮） | Q-017 |
 | `guildLevelMax` | 20（仮） | Q-017 |
 | （宝箱の保管上限） | なし（旧 `chestStorageMax` 500 は廃止） | D-084 |
+| `chestBatchOpen` | 100（まとめて開く個数） | D-089 |
 
 ## 4. ダンジョン（D-068, D-069）
 
@@ -108,7 +109,9 @@
 | 魔界の門 | 0 | 9 | 27 | 36 | 22 | 6 |
 | 天空の玉座 | 0 | 5 | 22 | 37 | 27 | 9 |
 
-- **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、`exp_unlock` に段階を足す。検証が長さの食い違いをエラーにする。
+- 開けるときの演出の発生ライン `chestEffectMinRarity`（D-089、仮）：古い墓地・罠の遺跡 アンコモン以上／封印の塔・騎士の古城 レア以上／水没神殿〜地下大迷宮 エピック以上／呪われた修道院〜魔界の門 レジェンド以上／天空の玉座 ミシック。
+- 解錠技術 `exp_unlock`（D-088、仮）：初期は難度2（古い墓地・罠の遺跡）まで。難度4（5千G・ギルドLv5）／6（5万G・Lv15）／8（30万G・Lv30）／10（150万G・Lv45）／12（500万G・Lv60）。
+- **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、必要なら `chestEffectMinRarity` を見直す。検証が長さの食い違いをエラーにする。
 - 派遣費 `dispatchFee`（D-079）はテンプレートに書き、calibrate がそのまま写す。難度7以降のみ（仮：1千〜3万G）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 

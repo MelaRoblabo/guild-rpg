@@ -3,7 +3,7 @@
 -- steps は順に購入する。value＝購入後の値、guildLevel＝必要なギルドレベル、gold＝費用
 -- requiresClear＝そのダンジョンの踏破が必要（パーティ枠：所要時間÷パーティ数≒30秒になる時点で開く。D-075）
 -- trainingLevel＝トレーニング場（D-077。各レベルの効果は Constants.trainingFacility）
--- unlockRank＝解錠技術（D-078。開けられる宝箱のランクの上限）
+-- unlockTier＝解錠技術（D-088。開けられる宝箱のダンジョンの難度の上限）
 -- 金額は仮。tools/autoplay の実測で調整する（docs/reports/M5_economy.md）
 
 return {
@@ -71,12 +71,13 @@ return {
 	{
 		id = "exp_unlock",
 		name = "解錠技術",
-		kind = "unlockRank",
+		kind = "unlockTier",
 		steps = {
-			{ value = 3, guildLevel = 1, gold = 5000 },
-			{ value = 4, guildLevel = 20, gold = 200000 },
-			{ value = 5, guildLevel = 40, gold = 1000000 },
-			{ value = 6, guildLevel = 60, gold = 5000000 }, -- ミシック（D-085）
+			{ value = 4, guildLevel = 5, gold = 5000 }, -- 封印の塔・騎士の古城
+			{ value = 6, guildLevel = 15, gold = 50000 }, -- 水没神殿・霧の大森林
+			{ value = 8, guildLevel = 30, gold = 300000 }, -- 地下大迷宮・呪われた修道院
+			{ value = 10, guildLevel = 45, gold = 1500000 }, -- 鋼鉄の要塞・竜の巣
+			{ value = 12, guildLevel = 60, gold = 5000000 }, -- 魔界の門・天空の玉座
 		},
 	},
 }

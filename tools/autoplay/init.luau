@@ -99,7 +99,7 @@ local function snapshotHour(h: number)
 			end
 			return n
 		end)(),
-		unlockRank = state.expansions.unlockRank,
+		unlockTier = state.expansions.unlockTier,
 		trainingLevel = state.expansions.trainingLevel,
 	})
 end
@@ -201,7 +201,7 @@ for _, h in hourly do
 			short(h.spentTrain),
 			short(h.spentFees),
 			h.chests,
-			h.unlockRank,
+			h.unlockTier,
 			h.trainingLevel
 		)
 	)

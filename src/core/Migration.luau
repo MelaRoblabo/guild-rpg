@@ -4,7 +4,7 @@
 
 local Migration = {}
 
-Migration.CURRENT = 3
+Migration.CURRENT = 4
 
 local STEPS: { [number]: (any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -23,6 +23,15 @@ local STEPS: { [number]: (any) -> () } = {
 		end
 		state.chests = counts
 		state.version = 3
+	end,
+	-- v3 → v4：解錠技術をダンジョン単位に（D-088）。旧ランクの上限を近い難度に置き換える
+	[3] = function(state)
+		local ex = state.expansions
+		if ex then
+			ex.unlockTier = math.max(2, 2 * ((ex.unlockRank or 2) - 1))
+			ex.unlockRank = nil
+		end
+		state.version = 4
 	end,
 }
 

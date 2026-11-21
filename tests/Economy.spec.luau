@@ -97,27 +97,21 @@ return function(t)
 		end)
 	end)
 
-	describe("解錠技術（D-078）", function()
-		local function withChests(ranks: { number })
+	describe("宝箱の保管・解錠技術・まとめ開き（D-084, D-087〜D-089）", function()
+		local function pile(dungeonId: string, counts: { number })
 			local s = newState()
 			s.expansions.warehouseSize = 100000
-			for _, rank in ranks do
-				Chest.add(s, "dng_ruins", rank, 1)
+			s.expansions.unlockTier = 12
+			for r, n in counts do
+				if n > 0 then
+					Chest.add(s, dungeonId, r, n)
+				end
 			end
 			return s
 		end
-		it("D-078 上限より高いランクの宝箱は開けられず、ギルドに残る", function()
-			local s = withChests({ 1, 2, 3, 5 })
-			expect(exec(s, { type = "OpenChests" }).ok).toBeTruthy()
-			expect(Chest.total(s)).toBe(2)
-			expect(Chest.count(s, "dng_ruins", 3)).toBe(1)
-			expect(Chest.count(s, "dng_ruins", 5)).toBe(1)
-		end)
-		it("D-078 開けられる宝箱がなければ CHEST_RANK_TOO_HIGH", function()
-			local s = withChests({ 4 })
-			expect(exec(s, { type = "OpenChests" }).error).toBe("CHEST_RANK_TOO_HIGH")
-			expect(exec(s, { type = "OpenChests", rank = 4 }).error).toBe("CHEST_RANK_TOO_HIGH")
-		end)
+		local function ev(r: any)
+			return r.events[1]
+		end
 		it(
 			"D-084 宝箱は倉庫とは別に、ダンジョン×ランクの数だけを保存する（上限なし）",
 			function()
@@ -135,43 +129,103 @@ return function(t)
 			end
 		)
 		it(
-			"D-084 ランク・個数を指定して開けられる。ダンジョンの並び順→ランクの低い順に開ける",
+			"D-087 プレイヤーに見せる一覧はダンジョンごとの数だけ（レアリティを含まない）",
 			function()
 				local s = newState()
-				s.expansions.warehouseSize = 100000
-				Chest.add(s, "dng_castle", 2, 2)
-				Chest.add(s, "dng_graveyard", 2, 2)
-				Chest.add(s, "dng_graveyard", 1, 2)
-				local r = exec(s, { type = "OpenChests", rank = 2, count = 3 })
-				expect(#r.events).toBe(3)
-				expect(r.events[1].result.dungeonId).toBe("dng_graveyard")
-				expect(r.events[3].result.dungeonId).toBe("dng_castle")
-				expect(Chest.count(s, "dng_graveyard", 1)).toBe(2)
-				expect(Chest.count(s, "dng_castle", 2)).toBe(1)
+				Chest.add(s, "dng_ruins", 1, 2)
+				Chest.add(s, "dng_ruins", 3, 1)
+				Chest.add(s, "dng_castle", 2, 4)
+				local list = Game.query.chestsByDungeon(s, master)
+				expect(list).toEqual({
+					{ dungeonId = "dng_ruins", count = 3, unlocked = true },
+					{ dungeonId = "dng_castle", count = 4, unlocked = false },
+				})
 			end
 		)
-		it("D-084 セーブ v2 の宝箱一覧は数に変換される", function()
-			local Migration = require("../src/core/Migration")
-			local old = {
-				version = 2,
-				chests = {
-					{ uid = "ch_1", rank = 3, dungeonId = "dng_ruins", obtainedAt = T0 },
-					{ uid = "ch_2", rank = 3, dungeonId = "dng_ruins", obtainedAt = T0 },
-					{ uid = "ch_3", rank = 1, dungeonId = "dng_tower", obtainedAt = T0 },
-				},
-			}
-			Migration.migrate(old)
-			expect(old.version).toBe(Migration.CURRENT)
-			expect(old.chests.dng_ruins).toEqual({ 0, 0, 2, 0, 0 })
-			expect(old.chests.dng_tower).toEqual({ 1, 0, 0, 0, 0 })
-		end)
-		it("D-078 解錠技術を上げると開けられる", function()
-			local s = withChests({ 3 })
-			s.gold = 10 ^ 9
-			expect(exec(s, { type = "BuyExpansion", expansionId = "exp_unlock" }).ok).toBeTruthy()
-			expect(exec(s, { type = "OpenChests" }).ok).toBeTruthy()
+		it(
+			"D-088 解錠技術はダンジョン単位。難度が上限を超えるダンジョンの宝箱は開けられない",
+			function()
+				local s = pile("dng_castle", { 5 })
+				s.expansions.unlockTier = 2
+				expect(exec(s, { type = "OpenChests", dungeonId = "dng_castle" }).error).toBe("CHEST_LOCKED")
+				s.gold = 10 ^ 9
+				s.guild.level = 100
+				expect(exec(s, { type = "BuyExpansion", expansionId = "exp_unlock" }).ok).toBeTruthy()
+				expect(exec(s, { type = "OpenChests", dungeonId = "dng_castle" }).ok).toBeTruthy()
+			end
+		)
+		it("D-089 まとめ開きは既定で chestBatchOpen 個。残りが少なければその数", function()
+			local s = pile("dng_ruins", { 150, 50 })
+			local r = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins" }))
+			expect(r.opened).toBe(K.chestBatchOpen)
+			expect(r.remaining).toBe(200 - K.chestBatchOpen)
+			local r2 = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins" }))
+			expect(r2.opened).toBe(200 - K.chestBatchOpen)
 			expect(Chest.total(s)).toBe(0)
 		end)
+		it(
+			"D-089 山からはランクの残り数で重み付けして引く（数の比率どおりに出る）",
+			function()
+				local s = pile("dng_ruins", { 3000, 1000 })
+				local r = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins", count = 2000 }))
+				local high = 0
+				for _, x in r.normal do
+					high += if x.rank == 2 then 1 else 0
+				end
+				for _, x in r.special do
+					high += if x.rank == 2 then 1 else 0
+				end
+				expect(high / 2000).toBeCloseTo(0.25, 0.03)
+			end
+		)
+		it(
+			"D-089 発生ライン以上は演出あり。演出なしの一覧 → 演出ありはレアリティの低い順",
+			function()
+				local d = master.dungeons.dng_castle
+				local s = pile(d.id, { 20, 20, 20, 20, 20, 20 })
+				local r = ev(exec(s, { type = "OpenChests", dungeonId = d.id }))
+				expect(#r.normal + #r.special).toBe(100)
+				for _, x in r.normal do
+					expect(x.rank < d.chestEffectMinRarity).toBeTruthy()
+					expect(x.effect).toBe(false)
+				end
+				local prev = 0
+				for _, x in r.special do
+					expect(x.rank >= d.chestEffectMinRarity).toBeTruthy()
+					expect(x.rank >= prev).toBeTruthy()
+					prev = x.rank
+				end
+			end
+		)
+		it("D-089 演出の発生ラインはダンジョンごとに決まっている", function()
+			for _, d in master.dungeonList do
+				expect(d.chestEffectMinRarity >= 1 and d.chestEffectMinRarity <= master.rarityCount).toBeTruthy()
+			end
+			expect(
+				master.dungeons.dng_sky_throne.chestEffectMinRarity > master.dungeons.dng_graveyard.chestEffectMinRarity
+			).toBeTruthy()
+		end)
+		it(
+			"D-084 / D-088 古いセーブは移行される（宝箱の一覧→数、解錠のランク→難度）",
+			function()
+				local Migration = require("../src/core/Migration")
+				local old = {
+					version = 2,
+					expansions = { unlockRank = 4 },
+					chests = {
+						{ uid = "ch_1", rank = 3, dungeonId = "dng_ruins", obtainedAt = T0 },
+						{ uid = "ch_2", rank = 3, dungeonId = "dng_ruins", obtainedAt = T0 },
+						{ uid = "ch_3", rank = 1, dungeonId = "dng_tower", obtainedAt = T0 },
+					},
+				}
+				Migration.migrate(old)
+				expect(old.version).toBe(Migration.CURRENT)
+				expect(old.chests.dng_ruins).toEqual({ 0, 0, 2, 0, 0 })
+				expect(old.chests.dng_tower).toEqual({ 1, 0, 0, 0, 0 })
+				expect(old.expansions.unlockTier).toBe(6)
+				expect(old.expansions.unlockRank).toBe(nil)
+			end
+		)
 	end)
 
 	describe("派遣費（D-079）", function()

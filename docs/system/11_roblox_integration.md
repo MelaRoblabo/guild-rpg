@@ -25,3 +25,9 @@ src/（文字列 require）──darklua process──▶ build/（Roblox の re
 ## 4. マルチ表示（D-027）
 
 - 他プレイヤーの表示に必要なのは、各パーティの `dungeonId`・`departAt`・`travelSeconds`・`totalSeconds` だけ。M8で実装。
+
+## 宝箱のレアリティを隠す（D-087）
+
+- 宝箱のランクはサーバーの状態にだけ持つ。クライアントには `Game.query.chestsByDungeon`（ダンジョンごとの数）だけを送る。
+- 探索ログ（再生用）をクライアントに送るときは、宝箱イベントのランク（`detail.ranks`、`rewards.chests[].rank`）を取り除く。個数だけ残す。
+- 開封結果（`ChestsOpened`）は開けた後なので、ランクを含めて送ってよい。演出の有無（`effect`）と派手さ（`rank`）はここから決める。

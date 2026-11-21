@@ -178,6 +178,7 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	-- イベント
 	c:weights(p .. ".eventWeights", k.eventWeights, "weight", true)
 	c:probability(p .. ".fountainHealRate", k.fountainHealRate)
+	c:integer(p .. ".chestBatchOpen", k.chestBatchOpen, 1) -- D-089
 	c:number(p .. ".trapK", k.trapK, 0)
 	c:probability(p .. ".trapDamageRate", k.trapDamageRate)
 
@@ -500,6 +501,7 @@ local function validateContent(c: Checker, d: any)
 			end
 			c:number(p .. ".refAgi", g.refAgi, 1)
 			c:integer(p .. ".tier", g.tier, 1)
+			c:integer(p .. ".chestEffectMinRarity", g.chestEffectMinRarity, 1, rarityCount(d)) -- D-089
 			-- 宝箱のレアリティの出現率（D-085）。長さはレアリティの数以下（足りない上位は0）、合計は正
 			if c:array(p .. ".chestRarityWeights", g.chestRarityWeights) then
 				if #g.chestRarityWeights > rarityCount(d) then
@@ -563,7 +565,7 @@ local function validateLootAndStarter(c: Checker, d: any)
 		return
 	end
 	c:integer("StarterSet.gold", S.gold, 0)
-	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize", "trainingLevel", "unlockRank" } do
+	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize", "trainingLevel", "unlockTier" } do
 		c:integer(`StarterSet.expansions.{key}`, if type(S.expansions) == "table" then S.expansions[key] else nil, 1)
 	end
 	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
@@ -702,7 +704,7 @@ local function validateExpansions(c: Checker, d: any)
 			rosterSize = true,
 			warehouseSize = true,
 			trainingLevel = true,
-			unlockRank = true,
+			unlockTier = true,
 		})
 		local maxValue = if e.kind == "unlockRank"
 			then (if type(d.Rarities) == "table" then rarityCount(d) else 0)

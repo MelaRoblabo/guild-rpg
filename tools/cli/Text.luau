@@ -65,7 +65,7 @@ local ERRORS = {
 	INVALID_RARITY = "レアリティは1〜5です",
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
-	CHEST_RANK_TOO_HIGH = "解錠技術が足りず開けられない宝箱です（expand exp_unlock）",
+	CHEST_LOCKED = "解錠技術が足りず、このダンジョンの宝箱は開けられません（expand exp_unlock）",
 }
 
 function Text.errorText(code: string?): string
@@ -129,24 +129,33 @@ function Text.status(save: any, master: any): string
 		local rep = if p.autoRepeat then ` ／ 自動再派遣：{master.dungeons[p.autoRepeat.dungeonId].name}` else ""
 		table.insert(lines, `パーティ{i} [{table.concat(names, " ")}] {partyStatus(save, i, master)}{rep}`)
 	end
-	local byRank = Game.query.chestsByRank(s, master)
+	-- D-087：見せるのはダンジョンごとの数だけ（レアリティは開けるまで分からない）
+	local piles = Game.query.chestsByDungeon(s, master)
 	local totalChests = 0
-	for _, n in byRank do
-		totalChests += n
-	end
 	local chestText = {}
-	for r = 1, #byRank do
-		if byRank[r] > 0 then
-			table.insert(chestText, `{RANK_NAME[r]}×{byRank[r]}`)
-		end
+	for _, c in piles do
+		totalChests += c.count
+		table.insert(
+			chestText,
+			`{master.dungeons[c.dungeonId].name}×{c.count}{if c.unlocked
+				then ""
+				else "（解錠技術が足りない）"}`
+		)
 	end
 	local wh = Game.query.warehouse(s)
 	table.insert(
 		lines,
 		`未開封の宝箱 {totalChests}個{if #chestText > 0
 			then "（" .. table.concat(chestText, "、") .. "）"
-			else ""} ／ 開けられるのは{RANK_NAME[s.expansions.unlockRank]}まで ／ 倉庫 {wh.used}/{wh.size}`
+			else ""} ／ 倉庫 {wh.used}/{wh.size}`
 	)
+	local maxName = "-"
+	for _, d in master.dungeonList do
+		if d.tier <= s.expansions.unlockTier then
+			maxName = d.name
+		end
+	end
+	table.insert(lines, `解錠技術：{maxName}の宝箱まで開けられる`)
 	local fac = master.K.trainingFacility[s.expansions.trainingLevel]
 	table.insert(
 		lines,
@@ -347,11 +356,7 @@ function Text.watch(save: any, partyIndex: number, master: any): string
 			if done and f.event == "trap" then
 				text ..= if f.detail.evaded then "→ 回避" else "→ ダメージ"
 			elseif done and f.event == "chest" then
-				local r = {}
-				for _, x in f.detail.ranks do
-					table.insert(r, RANK_NAME[x])
-				end
-				text ..= `→ {table.concat(r, "・")}の宝箱を確保`
+				text ..= `→ 宝箱を{#f.detail.ranks}個確保` -- D-087：レアリティは開けるまで見せない
 			end
 		end
 		for _, g in f.giftTriggers do
@@ -404,19 +409,38 @@ function Text.events(events: { any }, save: any, master: any): string
 						e.returnAt - START_CLOCK
 					)}）`
 			)
-		elseif e.type == "ChestOpened" then
-			local r = e.result
-			local got = {}
-			for _, uid in r.equipmentUids do
-				table.insert(got, uid .. " " .. equipName(save.state.equipment[uid], master))
+		elseif e.type == "ChestsOpened" then
+			-- D-089：演出なしをまとめて一覧 → 演出ありを1つずつ（レアリティの低い順、最後が一番派手）
+			local function contents(r: any): string
+				local got = {}
+				for _, uid in r.equipmentUids do
+					table.insert(got, uid .. " " .. equipName(save.state.equipment[uid], master))
+				end
+				for id, n in r.items do
+					table.insert(got, `{master.items[id].name}×{n}`)
+				end
+				if r.gold > 0 then
+					table.insert(got, `{r.gold}G`)
+				end
+				if r.autoSoldGold and r.autoSoldGold > 0 then
+					table.insert(got, `（自動売却 {#r.autoSold}個 {r.autoSoldGold}G）`)
+				end
+				return table.concat(got, "、")
 			end
-			for id, n in r.items do
-				table.insert(got, `{master.items[id].name}×{n}`)
+			table.insert(
+				lines,
+				t .. `{master.dungeons[e.dungeonId].name}の宝箱を{e.opened}個開けた（残り{e.remaining}個）`
+			)
+			if #e.normal > 0 then
+				table.insert(lines, `  ── 通常 {#e.normal}個 ──`)
+				for _, r in e.normal do
+					table.insert(lines, `  {RANK_NAME[r.rank]}：{contents(r)}`)
+				end
 			end
-			if r.gold > 0 then
-				table.insert(got, `{r.gold}G`)
+			for _, r in e.special do
+				local stars = string.rep("★", r.rank)
+				table.insert(lines, `  {stars} 演出！ {RANK_NAME[r.rank]}の宝箱：{contents(r)}`)
 			end
-			table.insert(lines, t .. `{RANK_NAME[r.rank]}の宝箱を開けた：{table.concat(got, "、")}`)
 		elseif e.type == "HireStarted" then
 			table.insert(lines, t .. `雇用を始めた（雇用費 {e.cost}G）`)
 		elseif e.type == "Hired" then
@@ -625,7 +649,7 @@ function Text.view(save: any, master: any): any
 		gold = s.gold,
 		guildExp = s.guild.exp,
 		parties = parties,
-		unopenedChests = Game.query.chestsByRank(s, master),
+		unopenedChests = Game.query.chestsByDungeon(s, master),
 		warehouse = wh,
 		unlockedDungeons = unlocked,
 	}

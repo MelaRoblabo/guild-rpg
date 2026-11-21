@@ -11,7 +11,7 @@ return {
 		rosterSize = 8,
 		warehouseSize = 300,
 		trainingLevel = 1, -- D-077
-		unlockRank = 2, -- D-078：開けられる宝箱のランクの上限
+		unlockTier = 2, -- D-088：開けられる宝箱のダンジョンの難度の上限（古い墓地・罠の遺跡）
 	},
 	adventurers = {
 		{

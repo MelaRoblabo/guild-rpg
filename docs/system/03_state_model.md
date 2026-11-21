@@ -35,6 +35,7 @@ export type EquipmentItem = {
 }
 
 -- 宝箱（D-084）：倉庫とは別の「宝箱置き場」。1個ずつの記録は持たず、ダンジョン×ランクの数だけ。上限なし
+-- ランクはサーバーだけが知る。クライアント・画面に渡すのはダンジョンごとの合計だけ（D-087）
 -- 例：chests = { dng_ruins = { 12, 4, 1, 0, 0 } }  … 罠の遺跡の宝箱がコモン12・アンコモン4・レア1
 export type ChestCounts = { [string]: { number } }  -- dungeonId → ランク1からの数（配列。出た最上位ランクまでの長さ。D-085）
 
@@ -82,12 +83,12 @@ export type PlayerState = {
 	expansions: {
 		partySlots: number, candidateSlots: number, rosterSize: number, warehouseSize: number,
 		trainingLevel: number, -- トレーニング場のレベル（D-077、初期1）
-		unlockRank: number,    -- 解錠技術：開けられる宝箱のランクの上限（D-078、初期2）
+		unlockTier: number,    -- 解錠技術：開けられる宝箱のダンジョンの難度の上限（D-088、初期2）
 	},                         -- version 2 で trainingLevel・unlockRank を追加（Migration v1→v2）
 	adventurers: { [string]: Adventurer },
 	parties: { Party },
 	equipment: { [string]: EquipmentItem },
-	chests: ChestCounts,       -- version 3 で一覧から数に変更（Migration v2→v3）
+	chests: ChestCounts,       -- version 3 で一覧から数に変更（Migration v2→v3）。version 4 で unlockRank → unlockTier（v3→v4）
 	items: { [string]: number },      -- アイテムID → 所持数（チケット・ポーション・売却用）
 	expeditions: { [string]: Expedition },
 	unlockedDungeons: { [string]: boolean },

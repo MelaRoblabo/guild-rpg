@@ -192,7 +192,7 @@ return function(t)
 	describe("宝箱（D-015）", function()
 		local function withChests(rank: number, n: number)
 			local s = newState()
-			s.expansions.unlockRank = 5 -- 解錠技術は別のテスト（D-078）
+			s.expansions.unlockTier = 12 -- 解錠技術は別のテスト（D-088）
 			for _ = 1, n do
 				Chest.add(s, "dng_castle", rank, 1)
 			end
@@ -202,13 +202,16 @@ return function(t)
 			"D-015 開封で中身を抽選。装備のレアリティ＝ランク、アイテムレベル＝ダンジョンの tier",
 			function()
 				local s = withChests(3, 5)
-				local r = Game.execute(s, { type = "OpenChests" }, ctx(T0))
+				local r = Game.execute(s, { type = "OpenChests", dungeonId = "dng_castle", count = 100000 }, ctx(T0))
 				expect(r.ok).toBeTruthy()
 				expect(Chest.total(s)).toBe(0)
-				for _, ev in r.events :: any do
-					for _, uid in ev.result.equipmentUids do
-						expect(s.equipment[uid].rarity).toBe(3)
-						expect(s.equipment[uid].itemLevel).toBe(master.dungeons.dng_castle.tier)
+				local ev = (r.events :: any)[1]
+				for _, list in { ev.normal, ev.special } do
+					for _, res in list do
+						for _, uid in res.equipmentUids do
+							expect(s.equipment[uid].rarity).toBe(3)
+							expect(s.equipment[uid].itemLevel).toBe(master.dungeons.dng_castle.tier)
+						end
 					end
 				end
 			end
@@ -216,12 +219,14 @@ return function(t)
 		it("Q-020 倉庫の空きが足りなければ開けられない", function()
 			local s = withChests(1, 1)
 			s.expansions.warehouseSize = 1
-			expect(Game.execute(s, { type = "OpenChests" }, ctx(T0)).error).toBe("WAREHOUSE_FULL")
+			expect(Game.execute(s, { type = "OpenChests", dungeonId = "dng_castle", count = 100000 }, ctx(T0)).error).toBe(
+				"WAREHOUSE_FULL"
+			)
 		end)
 		it("D-058 統計: レア以上の箱からポーションがおよそ5%で出る", function()
 			local s = withChests(3, 2000)
 			s.expansions.warehouseSize = 100000
-			Game.execute(s, { type = "OpenChests" }, ctx(T0))
+			Game.execute(s, { type = "OpenChests", dungeonId = "dng_castle", count = 100000 }, ctx(T0))
 			local potions = 0
 			for id, n in s.items do
 				if string.find(id, "potion") then
@@ -316,7 +321,7 @@ return function(t)
 				Game.execute(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
 				Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
 				Game.advance(s, ctx(T0 + 1200))
-				Game.execute(s, { type = "OpenChests" }, ctx(T0 + 1200))
+				Game.execute(s, { type = "OpenChests", dungeonId = "dng_graveyard" }, ctx(T0 + 1200))
 				return s
 			end
 			expect(play()).toEqual(play())

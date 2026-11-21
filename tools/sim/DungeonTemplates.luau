@@ -11,6 +11,7 @@
 -- trapEvade    : 想定パーティの罠回避率の目標
 -- chestRarityWeights : 宝箱のレアリティの出現率（%）。[1]=コモン …（D-085）。深いほど少しずつ上位が増える。
 --                     書いていない上位のレアリティは0。レアリティを増やしたら必要なダンジョンに足す
+-- chestEffectMinRarity : このレアリティ以上の宝箱は開けるとき演出が入る（D-089）。演出の派手さはレアリティで決まる
 -- dispatchFee  : 派遣費（D-079）。上級ダンジョンだけ。出発のたびにゴールドが減る（仮）
 
 local BAL = { hp = 8, atk = 0.9, pdef = 0.4, mdef = 0.4 }
@@ -38,6 +39,7 @@ return {
 		},
 		bosses = { { id = "mon_bone_lord", weight = 1 } },
 		chestRarityWeights = { 80, 20 },
+		chestEffectMinRarity = 2,
 		sellableItems = { { id = "itm_bone_fragment", weight = 1 } },
 		jobPotionTargets = { "job_priest", "job_bishop" },
 		modifierPool = { "mod_exorcism", "mod_healing" },
@@ -59,6 +61,7 @@ return {
 		},
 		bosses = { { id = "mon_stone_guardian", weight = 1 } },
 		chestRarityWeights = { 70, 25, 5 },
+		chestEffectMinRarity = 2,
 		sellableItems = { { id = "itm_old_gear", weight = 1 } },
 		jobPotionTargets = { "job_thief", "job_ninja" },
 		modifierPool = { "mod_trapward", "mod_swift" },
@@ -78,6 +81,7 @@ return {
 		},
 		bosses = { { id = "mon_sealed_archmage", weight = 1 } },
 		chestRarityWeights = { 55, 32, 11, 2 },
+		chestEffectMinRarity = 3,
 		sellableItems = { { id = "itm_magic_shard", weight = 1 } },
 		jobPotionTargets = { "job_mage", "job_sage" },
 		modifierPool = { "mod_healing", "mod_swift" },
@@ -97,6 +101,7 @@ return {
 		},
 		bosses = { { id = "mon_fallen_lord", weight = 1 } },
 		chestRarityWeights = { 42, 36, 17, 5 },
+		chestEffectMinRarity = 3,
 		sellableItems = { { id = "itm_knight_crest", weight = 1 } },
 		jobPotionTargets = { "job_warrior", "job_knight" },
 		modifierPool = { "mod_exorcism", "mod_trapward" },
@@ -116,6 +121,7 @@ return {
 		},
 		bosses = { { id = "mon_tide_priestess", weight = 1 } },
 		chestRarityWeights = { 31, 37, 23, 8, 1 },
+		chestEffectMinRarity = 4,
 		sellableItems = { { id = "itm_tide_pearl", weight = 1 } },
 		jobPotionTargets = { "job_mage", "job_sage" },
 		modifierPool = { "mod_healing", "mod_exorcism" },
@@ -135,6 +141,7 @@ return {
 		},
 		bosses = { { id = "mon_ancient_bear", weight = 1 } },
 		chestRarityWeights = { 21, 36, 29, 12, 2 },
+		chestEffectMinRarity = 4,
 		sellableItems = { { id = "itm_amber_sap", weight = 1 } },
 		jobPotionTargets = { "job_thief", "job_ninja" },
 		modifierPool = { "mod_swift", "mod_trapward" },
@@ -157,6 +164,7 @@ return {
 		},
 		bosses = { { id = "mon_labyrinth_warden", weight = 1 } },
 		chestRarityWeights = { 13, 32, 33, 17, 5 },
+		chestEffectMinRarity = 4,
 		sellableItems = { { id = "itm_labyrinth_coin", weight = 1 } },
 		jobPotionTargets = { "job_warrior", "job_knight" },
 		modifierPool = { "mod_trapward", "mod_swift" },
@@ -177,6 +185,7 @@ return {
 		},
 		bosses = { { id = "mon_abbot_lich", weight = 1 } },
 		chestRarityWeights = { 7, 26, 35, 23, 8, 1 },
+		chestEffectMinRarity = 5,
 		sellableItems = { { id = "itm_holy_relic", weight = 1 } },
 		jobPotionTargets = { "job_priest", "job_bishop" },
 		modifierPool = { "mod_exorcism", "mod_healing" },
@@ -197,6 +206,7 @@ return {
 		},
 		bosses = { { id = "mon_fortress_colossus", weight = 1 } },
 		chestRarityWeights = { 3, 20, 34, 29, 12, 2 },
+		chestEffectMinRarity = 5,
 		sellableItems = { { id = "itm_steel_cog", weight = 1 } },
 		jobPotionTargets = { "job_warrior", "job_knight" },
 		modifierPool = { "mod_trapward", "mod_swift" },
@@ -217,6 +227,7 @@ return {
 		},
 		bosses = { { id = "mon_elder_dragon", weight = 1 } },
 		chestRarityWeights = { 1, 14, 31, 33, 17, 4 },
+		chestEffectMinRarity = 5,
 		sellableItems = { { id = "itm_dragon_scale", weight = 1 } },
 		jobPotionTargets = { "job_mage", "job_sage" },
 		modifierPool = { "mod_swift", "mod_healing" },
@@ -237,6 +248,7 @@ return {
 		},
 		bosses = { { id = "mon_gate_keeper", weight = 1 } },
 		chestRarityWeights = { 0, 9, 27, 36, 22, 6 },
+		chestEffectMinRarity = 5,
 		sellableItems = { { id = "itm_demon_horn", weight = 1 } },
 		jobPotionTargets = { "job_thief", "job_ninja" },
 		modifierPool = { "mod_healing", "mod_trapward" },
@@ -257,6 +269,7 @@ return {
 		},
 		bosses = { { id = "mon_sky_tyrant", weight = 1 } },
 		chestRarityWeights = { 0, 5, 22, 37, 27, 9 },
+		chestEffectMinRarity = 6,
 		sellableItems = { { id = "itm_sky_feather", weight = 1 } },
 		jobPotionTargets = { "job_priest", "job_bishop" },
 		modifierPool = { "mod_exorcism", "mod_swift" },

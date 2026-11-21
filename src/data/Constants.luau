@@ -135,6 +135,7 @@ return {
 	equipGradeCoef = 0.10, -- 仮（Q-020）
 	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
 	-- 宝箱の保管は上限なし（D-084。旧 chestStorageMax は廃止）
+	chestBatchOpen = 100, -- D-089：「まとめて開く」の個数（残りが少なければその数）
 
 	-- ギルド（Q-017）
 	guildExpPerFloor = 1,

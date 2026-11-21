@@ -450,82 +450,91 @@ handlers.SetAutoRepeat = function(state, cmd, ctx)
 end
 
 handlers.OpenChests = function(state, cmd, ctx)
-	-- 解錠技術（D-078）：開けられるのは unlockRank 以下の宝箱だけ。開けられない宝箱はギルドに残る
-	-- 宝箱は「ダンジョン×ランクの数」で持つ（D-084）。rank・dungeonId で絞り込み、count 個まで開ける（省略時はすべて）
-	-- 開ける順：ダンジョンの並び順 → ランクの低い順
+	-- D-087：プレイヤーに見えるのは「どのダンジョンの宝箱が何個」だけ。レアリティは開けるまで分からない
+	-- D-088：解錠技術はダンジョン単位。tier が unlockTier 以下のダンジョンの宝箱だけ開けられる
+	-- D-089：まとめ開き。指定ダンジョンの山から最大 count 個（省略時 chestBatchOpen）を、残り数で重み付けして1つずつ引く
 	local master = ctx.master
-	local unlockRank = state.expansions.unlockRank
-	if cmd.rank ~= nil and (type(cmd.rank) ~= "number" or cmd.rank < 1 or cmd.rank > master.rarityCount) then
-		return fail("INVALID_RARITY")
+	local d = master.dungeons[cmd.dungeonId]
+	if not d then
+		return fail("DUNGEON_NOT_FOUND")
 	end
 	if cmd.count ~= nil and (type(cmd.count) ~= "number" or cmd.count < 1 or cmd.count ~= math.floor(cmd.count)) then
 		return fail("INVALID_COUNT")
 	end
-	if cmd.rank and cmd.rank > unlockRank then
-		return fail("CHEST_RANK_TOO_HIGH")
+	local available = Chest.dungeonTotal(state, d.id)
+	if available == 0 then
+		return fail("NO_CHEST")
 	end
-	local limit = cmd.count or math.huge
-	local targets = {}
-	local lockedExists = false
-	for _, d in master.dungeonList do
-		if cmd.dungeonId == nil or cmd.dungeonId == d.id then
-			for r = 1, master.rarityCount do
-				if cmd.rank == nil or cmd.rank == r then
-					local n = Chest.count(state, d.id, r)
-					if n > 0 and r > unlockRank then
-						lockedExists = true
-					elseif n > 0 then
-						for _ = 1, math.min(n, limit - #targets) do
-							table.insert(targets, { dungeonId = d.id, rank = r })
-						end
-					end
-				end
-			end
-		end
+	if d.tier > state.expansions.unlockTier then
+		return fail("CHEST_LOCKED")
 	end
-	if #targets == 0 then
-		return fail(if lockedExists then "CHEST_RANK_TOO_HIGH" else "NO_CHEST")
-	end
-	local perChest = Chest.maxEquipmentPerChest(ctx.master)
-	local events = {}
-	for _, c in targets do
+	local n = math.min(cmd.count or master.K.chestBatchOpen, available)
+	local perChest = Chest.maxEquipmentPerChest(master)
+	local pickRng = takeRng(state)
+	local normal, special = {}, {}
+	local opened = 0
+	for _ = 1, n do
 		if Inventory.warehouseFree(state) < perChest then
 			break
 		end
-		local rng = takeRng(state)
-		local opened = Chest.open(state, c, rng, ctx.master)
+		local rank = Chest.draw(state, d.id, pickRng)
+		Chest.add(state, d.id, rank, -1)
+		local res = Chest.open(state, { dungeonId = d.id, rank = rank }, takeRng(state), master)
 		-- 自動売却（06章 §6）：保護中の品は対象外（開けたばかりの品は保護されていない）
 		local auto = state.settings.autoSell
 		if auto.enabled then
 			local kept = {}
-			opened.autoSold = {}
-			opened.autoSoldGold = 0
-			for _, uid in opened.equipmentUids do
+			res.autoSold = {}
+			res.autoSoldGold = 0
+			for _, uid in res.equipmentUids do
 				local item = state.equipment[uid]
 				if item.rarity <= auto.maxRarity and not (auto.keepModified and item.modifierId) then
-					local price = Inventory.equipmentSellPrice(item, ctx.master)
+					local price = Inventory.equipmentSellPrice(item, master)
 					state.gold += price
-					opened.autoSoldGold += price
-					table.insert(opened.autoSold, { baseId = item.baseId, rarity = item.rarity, grade = item.grade })
+					res.autoSoldGold += price
+					table.insert(res.autoSold, { baseId = item.baseId, rarity = item.rarity, grade = item.grade })
 					state.equipment[uid] = nil
 					bump(state, "goldFromSales", price)
 				else
 					table.insert(kept, uid)
 				end
 			end
-			opened.equipmentUids = kept
+			res.equipmentUids = kept
 		end
-		Chest.add(state, c.dungeonId, c.rank, -1)
+		-- D-089：ダンジョンごとの発生ライン以上のレアリティなら演出あり（派手さはレアリティで決まる）
+		res.effect = rank >= d.chestEffectMinRarity
+		opened += 1
+		res.order = opened
+		table.insert(if res.effect then special else normal, res)
 		bump(state, "chestsOpened")
-		if state.stats.firstChestOpenedAt == nil then
-			state.stats.firstChestOpenedAt = ctx.now
-		end
-		table.insert(events, { type = "ChestOpened", at = ctx.now, result = opened })
 	end
-	if #events == 0 then
+	if opened == 0 then
 		return fail("WAREHOUSE_FULL")
 	end
-	return { ok = true, events = events }
+	if state.stats.firstChestOpenedAt == nil then
+		state.stats.firstChestOpenedAt = ctx.now
+	end
+	-- 表示の順（D-089）：演出なしをまとめて一覧 → 演出ありをレアリティの低い順に1つずつ（最後が一番派手）
+	table.sort(special, function(x, y)
+		if x.rank ~= y.rank then
+			return x.rank < y.rank
+		end
+		return x.order < y.order
+	end)
+	return {
+		ok = true,
+		events = {
+			{
+				type = "ChestsOpened",
+				at = ctx.now,
+				dungeonId = d.id,
+				opened = opened,
+				normal = normal,
+				special = special,
+				remaining = Chest.dungeonTotal(state, d.id),
+			},
+		},
+	}
 end
 
 handlers.Sell = function(state, cmd, ctx)
@@ -1113,6 +1122,19 @@ function Game.query.sellPrice(item: any, master: any): number
 end
 
 -- 未開封の宝箱のランクごとの数（D-084）
+-- 未開封の宝箱：ダンジョンごとの数（プレイヤーに見せてよいのはこれだけ：D-087）
+function Game.query.chestsByDungeon(state: any, master: any): { any }
+	local out = {}
+	for _, d in master.dungeonList do
+		local n = Chest.dungeonTotal(state, d.id)
+		if n > 0 then
+			table.insert(out, { dungeonId = d.id, count = n, unlocked = d.tier <= state.expansions.unlockTier })
+		end
+	end
+	return out
+end
+
+-- 未開封の宝箱のランクごとの数。開発・自動プレイ用（プレイヤーに見せない：D-087）
 function Game.query.chestsByRank(state: any, master: any): { number }
 	return Chest.countByRank(state, master)
 end

@@ -26,7 +26,7 @@ lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   
 | `go <n> <dng>` / `repeat <n> <dng\|off>` | Dispatch / SetAutoRepeat |
 | `watch <n>` | 探索の再生（現在位置まで、ログを文章で表示） |
 | `wait <秒>` | 仮想時計を進めて advance |
-| `open [all\|<uid>...]` | OpenChests |
+| `open <dng> [個数]` | OpenChests（まとめ開き：D-089） |
 | `sell <eq_uid>...` / `lock <uid>` | Sell / SetLock |
 | `hire` / `candidates` / `pick <n>` / `reroll` / `choose prev\|cur` / `cancel` | Hire 系（M3） |
 | `rename <uid> <名前>` / `dismiss <uid>` | Rename / Dismiss（M3） |

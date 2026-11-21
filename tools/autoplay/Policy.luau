@@ -42,8 +42,17 @@ local function itemScore(item: any, master: any): number
 end
 Policy.itemScore = itemScore
 
+-- 開けられるダンジョンの宝箱を、まとめ開き（D-089）で開けられるだけ開ける
 local function openAll(state: any, ctx: Ctx)
-	exec(state, { type = "OpenChests" }, ctx)
+	for _, c in Game.query.chestsByDungeon(state, ctx.master) do
+		if c.unlocked then
+			for _ = 1, 1000 do
+				if not exec(state, { type = "OpenChests", dungeonId = c.dungeonId }, ctx).ok then
+					break
+				end
+			end
+		end
+	end
 end
 
 -- 遅れている冒険者（最も進んだ人より転生回数が2以上少ない）
@@ -429,9 +438,9 @@ local function savingForUnlock(state: any, master: any): boolean
 		return false
 	end
 	local locked = 0
-	for r, n in Game.query.chestsByRank(state, master) do
-		if r > state.expansions.unlockRank then
-			locked += n
+	for _, c in Game.query.chestsByDungeon(state, master) do
+		if not c.unlocked then
+			locked += c.count
 		end
 	end
 	return locked >= 300 -- 開けられない宝箱がかなり溜まったときだけ

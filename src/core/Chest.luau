@@ -123,6 +123,28 @@ function Chest.total(state: any): number
 	return n
 end
 
+-- そのダンジョンの未開封の数
+function Chest.dungeonTotal(state: any, dungeonId: string): number
+	local n = 0
+	for _, v in state.chests[dungeonId] or {} do
+		n += v
+	end
+	return n
+end
+
+-- 山から1つ引く（ランクごとの残り数で重み付け。D-089）。数は減らさない
+function Chest.draw(state: any, dungeonId: string, rng: Rng.Rng): number
+	local entries = {}
+	for r, v in state.chests[dungeonId] do
+		if v > 0 then
+			table.insert(entries, { rank = r, weight = v })
+		end
+	end
+	return rng:pickWeighted(entries, function(e)
+		return e.weight
+	end).rank
+end
+
 -- 宝箱を1つ開封して状態に反映する（数を減らすのと倉庫の空き確認は呼び出し側）
 function Chest.open(state: any, chest: any, rng: Rng.Rng, master: any): any
 	local dungeon = master.dungeons[chest.dungeonId]
