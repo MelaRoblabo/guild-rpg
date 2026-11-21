@@ -1,5 +1,5 @@
 --!strict
--- 初期状態（Q-020 仮）
+-- 初期状態（Q-020 仮。D-092：初期の4人は4項目合計約80＝雇用の平均並み）
 -- 4職業1人ずつ、Lv1、コモン+0（アイテムレベル1）の装備。古い墓地を確実に踏破できること（01章：最初の宝箱1分以内）
 -- 見た目ID・名前は仮（見た目データは M3 で用意する）
 
@@ -18,7 +18,7 @@ return {
 			gender = "m",
 			appearanceId = "chr_m_nor_phy_01",
 			jobId = "job_warrior",
-			baseStats = { str = 14, mag = 6, agi = 12, dex = 10, hp = 52 },
+			baseStats = { str = 28, mag = 8, agi = 22, dex = 22, hp = 60 },
 			giftIds = { "gift_sturdy" },
 			equipment = { weapon = "eq_wpn_sword", armor = "eq_arm_chainmail", sub = "eq_sub_buckler" },
 		},
@@ -27,7 +27,7 @@ return {
 			gender = "f",
 			appearanceId = "chr_f_nor_phy_01",
 			jobId = "job_thief",
-			baseStats = { str = 12, mag = 6, agi = 15, dex = 15, hp = 44 },
+			baseStats = { str = 20, mag = 8, agi = 26, dex = 26, hp = 50 },
 			giftIds = { "gift_trapsense" },
 			equipment = { weapon = "eq_wpn_dagger", armor = "eq_arm_leather", sub = "eq_sub_ring_wind" },
 		},
@@ -36,7 +36,7 @@ return {
 			gender = "m",
 			appearanceId = "chr_m_nor_mag_01",
 			jobId = "job_mage",
-			baseStats = { str = 6, mag = 15, agi = 12, dex = 11, hp = 40 },
+			baseStats = { str = 8, mag = 30, agi = 22, dex = 20, hp = 46 },
 			giftIds = { "gift_swift" },
 			equipment = { weapon = "eq_wpn_staff", armor = "eq_arm_robe", sub = "eq_sub_ring_wisdom" },
 		},
@@ -45,7 +45,7 @@ return {
 			gender = "f",
 			appearanceId = "chr_f_nor_mag_01",
 			jobId = "job_priest",
-			baseStats = { str = 8, mag = 14, agi = 11, dex = 10, hp = 46 },
+			baseStats = { str = 10, mag = 28, agi = 20, dex = 22, hp = 52 },
 			giftIds = { "gift_lucky" },
 			equipment = { weapon = "eq_wpn_mace", armor = "eq_arm_vestment", sub = "eq_sub_ring_wisdom" },
 		},

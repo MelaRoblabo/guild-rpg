@@ -333,6 +333,8 @@ report(secs, clears)
 -- 「1回の転生で4人が必要とするチケット × PLAY_SHARE」から、アイテムイベント由来の分を引いた残りを
 -- その周回のレベルアップ報酬に均等に割り振る。10の倍数のレベルではポーションも配る。
 local PLAY_SHARE = 0.5 -- 遊んで手に入る割合
+-- M6：AIテストプレイでチケットが大きく余ったため、配布量を約1/3にする（D-092）
+local TICKET_SUPPLY_SCALE = 1 / 3
 local ROLLS_FIRST, ROLLS_LAST = 100, 300 -- 1キャラが「良い結果」に届く期待回数（転生1回目・8回目）
 local LEVELS_PER_CYCLE = 10
 
@@ -360,7 +362,7 @@ if opts.writeGuild then
 		prevPerLevel = perLevel
 		local n = math.min(k, 8)
 		local need = ticketsNeededForRebirth(n) - (lastTickets[k] or 0)
-		local perLevelTickets = math.max(1, math.ceil(need / ups))
+		local perLevelTickets = math.max(1, math.ceil(need / ups * TICKET_SUPPLY_SCALE))
 		for lv = startLv, endLv - 1 do
 			levels[lv].expToNext = perLevel
 			levels[lv + 1].rewards = { itm_slot_ticket = perLevelTickets }

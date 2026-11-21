@@ -52,7 +52,7 @@ return {
 	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
 	expBase = 100,
 	expExponent = 1.5,
-	expCycleMult = { 1.31, 1.015, 1.72, 2.829, 3.84, 5.487, 7.197, 11.84, 15.6 },
+	expCycleMult = { 1.482, 1.033, 1.486, 2.455, 3.636, 5.853, 9.87, 11.84, 15.6 },
 	levelCapInitial = 20, -- D-071
 	levelCapPerRebirth = 10,
 	levelCapMax = 100,
@@ -126,8 +126,8 @@ return {
 		{ id = "appearance_keep", weight = 0.30 },
 	},
 	itemEventWeights = {
-		{ id = "ticket", weight = 0.06 }, -- D-074：遊んで出る量を約1/10に。主な入手はギルドレベル報酬
-		{ id = "sellable", weight = 0.94 },
+		{ id = "ticket", weight = 0.02 }, -- D-074 で約1/10、D-092 でさらに1/3（M6 テストプレイで余ったため）
+		{ id = "sellable", weight = 0.98 },
 	},
 	sellRarityMult = { 1, 1.5, 2.5, 4, 7, 12 }, -- 仮。レアリティの数だけ並べる（D-085）
 	sellGradeCoef = 0.5, -- 仮
