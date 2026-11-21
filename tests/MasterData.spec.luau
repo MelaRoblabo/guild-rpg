@@ -87,7 +87,7 @@ return function(t)
 		end)
 		it("Q-006 雇用の範囲で min > max なら失敗", function()
 			local d = clone(Data)
-			d.Constants.hireStatRange.str.min = 30
+			d.Constants.hireStatRange.str.min = d.Constants.hireStatRange.str.max + 1
 			expect(function()
 				MasterData.load(d)
 			end).toThrow("hireStatRange.str")

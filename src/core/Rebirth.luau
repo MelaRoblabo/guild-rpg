@@ -13,20 +13,6 @@ function Rebirth.total(stats: Types.StatBlock): number
 	return stats.str + stats.mag + stats.agi + stats.dex
 end
 
--- Q-021：引き直すとき、比較の基準として残す結果を決める
---   keep = "previous" / "current" / nil（nil なら合計値の高い方。同じなら current）
-function Rebirth.pickKept(previous: Types.StatBlock?, current: Types.StatBlock, keep: string?): Types.StatBlock
-	if previous == nil then
-		return current
-	end
-	if keep == "previous" then
-		return previous
-	elseif keep == "current" then
-		return current
-	end
-	return if Rebirth.total(previous) > Rebirth.total(current) then previous else current
-end
-
 -- 引き継ぎ分：転生前の素の値の1/2（端数切り捨て：Q-009）
 function Rebirth.inherited(base: Types.StatBlock): Types.StatBlock
 	local out: any = {}

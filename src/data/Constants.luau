@@ -90,11 +90,11 @@ return {
 	-- 雇用（Q-006）。ステータスの範囲はギルドの成長に関係なく一定（D-081）
 	hireCost = 300,
 	hireStatRange = {
-		str = { min = 5, max = 20 },
-		mag = { min = 5, max = 20 },
-		agi = { min = 5, max = 20 },
-		dex = { min = 5, max = 20 },
-		hp = { min = 30, max = 60 },
+		str = { min = 1, max = 40 }, -- D-086：引き直しに一喜一憂が出るよう幅を広げる
+		mag = { min = 1, max = 40 },
+		agi = { min = 1, max = 40 },
+		dex = { min = 1, max = 40 },
+		hp = { min = 20, max = 80 },
 	},
 	hireFreeRerolls = 3,
 	specialVisitorChance = 0.005, -- 仮

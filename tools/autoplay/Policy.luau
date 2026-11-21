@@ -136,6 +136,19 @@ local function buyExpansions(state: any, ctx: Ctx)
 	end
 end
 
+-- 加算分の上限比（4項目の平均。D-074 の「良い結果」の定義）
+local REBIRTH_GOOD = 0.7
+local function bonusRatio(bonus: any, maxs: any): number
+	local sum, n = 0, 0
+	for _, k in { "str", "mag", "agi", "dex" } do
+		if maxs[k] > 0 then
+			sum += bonus[k] / maxs[k]
+			n += 1
+		end
+	end
+	return if n > 0 then sum / n else 1
+end
+
 -- 転生：無料3回＋チケットを「残りの枚数 ÷ 上限に達した人数」まで使い、合計の高い方を採用
 local function rebirthCapped(state: any, ctx: Ctx, stats: any)
 	local capped = {}
@@ -153,18 +166,27 @@ local function rebirthCapped(state: any, ctx: Ctx, stats: any)
 		if not exec(state, { type = "RebirthStart", adventurerUid = uid }, ctx).ok then
 			continue -- 転生費用が足りなければ待つ（D-080）
 		end
+		-- D-086：上限比の平均が REBIRTH_GOOD 以上の結果が出たらその場で採用。予算を使い切ったら前回・今回の良い方
 		local budget = ctx.master.K.rebirthFreeRerolls
 			+ math.floor((state.items.itm_slot_ticket or 0) / (#capped - i + 1))
-		for _ = 1, budget do
+		local which = nil
+		for _ = 0, budget do
+			local r = state.rebirthSession
+			if bonusRatio(r.currentBonus, r.bonusMax) >= REBIRTH_GOOD then
+				which = "current"
+				break
+			end
 			if not exec(state, { type = "RebirthReroll" }, ctx).ok then
 				break
 			end
 			stats.rebirthRerolls += 1
 		end
 		local r = state.rebirthSession
-		local which = "current"
-		if r.previousBonus and Rebirth.total(r.previousBonus) > Rebirth.total(r.currentBonus) then
-			which = "previous"
+		if which == nil then
+			which = "current"
+			if r.previousBonus and Rebirth.total(r.previousBonus) > Rebirth.total(r.currentBonus) then
+				which = "previous"
+			end
 		end
 		exec(state, { type = "RebirthChoose", which = which }, ctx)
 		stats.rebirths += 1
@@ -252,6 +274,9 @@ local function trainBehind(state: any, ctx: Ctx, stats: any)
 	end
 end
 
+-- 雇用の面接で即採用する合計値（4項目 1〜40 の合計の上位1割ほど）
+local HIRE_GOOD = 110
+
 -- パーティに入っていない冒険者の系統ごとの数と、空き枠が求める系統
 local function hireIfNeeded(state: any, ctx: Ctx, stats: any)
 	local master = ctx.master
@@ -283,13 +308,24 @@ local function hireIfNeeded(state: any, ctx: Ctx, stats: any)
 			end
 		end
 		exec(state, { type = "HirePick", candidateIndex = pick }, ctx)
-		for _ = 1, master.K.hireFreeRerolls do
-			exec(state, { type = "HireReroll" }, ctx)
+		-- D-086：合計が HIRE_GOOD 以上ならその場で採用。無料の引き直しを使い切ったら前回・今回の良い方
+		local which = nil
+		for _ = 0, master.K.hireFreeRerolls do
+			local h = state.hireSession
+			if h.currentRoll and Rebirth.total(h.currentRoll) >= HIRE_GOOD then
+				which = "current"
+				break
+			end
+			if not exec(state, { type = "HireReroll" }, ctx).ok then
+				break
+			end
 		end
 		local h = state.hireSession
-		local which = "current"
-		if h.previousRoll and Rebirth.total(h.previousRoll) > Rebirth.total(h.currentRoll) then
-			which = "previous"
+		if which == nil then
+			which = "current"
+			if h.previousRoll and Rebirth.total(h.previousRoll) > Rebirth.total(h.currentRoll) then
+				which = "previous"
+			end
 		end
 		exec(state, { type = "HireChoose", which = which }, ctx)
 		stats.hired += 1

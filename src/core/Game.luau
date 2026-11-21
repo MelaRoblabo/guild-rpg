@@ -631,7 +631,7 @@ handlers.HirePick = function(state, cmd, ctx)
 	return { ok = true, events = { { type = "StatsRolled", at = ctx.now, stats = h.currentRoll } } }
 end
 
-handlers.HireReroll = function(state, cmd, ctx)
+handlers.HireReroll = function(state, _cmd, ctx)
 	local h = state.hireSession
 	if not h then
 		return fail("NO_SESSION")
@@ -653,8 +653,8 @@ handlers.HireReroll = function(state, cmd, ctx)
 		state.items.itm_slot_ticket -= 1
 		usedTicket = true
 	end
-	-- Q-021：残す方（keep）と新しい結果を並べる。指定がなければ合計値の高い方を残す
-	h.previousRoll = Rebirth.pickKept(h.previousRoll, h.currentRoll, cmd.keep)
+	-- D-086：直前の結果だけを比較用に残す（それより前の結果は消える。良い結果を残すには採用するしかない）
+	h.previousRoll = h.currentRoll
 	h.currentRoll = Hiring.rollStats(takeRng(state), ctx.master)
 	bump(state, "hireRerolls")
 	return {
@@ -802,7 +802,7 @@ handlers.RebirthStart = function(state, cmd, ctx)
 	return { ok = true, events = { { type = "RebirthStarted", at = ctx.now, uid = adv.uid, cost = cost } } }
 end
 
-handlers.RebirthReroll = function(state, cmd, ctx)
+handlers.RebirthReroll = function(state, _cmd, ctx)
 	local r = state.rebirthSession
 	if not r then
 		return fail("NO_SESSION")
@@ -818,7 +818,7 @@ handlers.RebirthReroll = function(state, cmd, ctx)
 		usedTicket = true
 	end
 	local adv = state.adventurers[r.adventurerUid]
-	r.previousBonus = Rebirth.pickKept(r.previousBonus, r.currentBonus, cmd.keep) -- Q-021
+	r.previousBonus = r.currentBonus -- D-086：直前の結果だけを残す
 	r.currentBonus = Rebirth.rollBonus(adv.baseStats, adv.rebirthCount + 1, takeRng(state), ctx.master)
 	bump(state, "rebirthRerolls")
 	return { ok = true, events = { { type = "RebirthRerolled", at = ctx.now, usedTicket = usedTicket } } }

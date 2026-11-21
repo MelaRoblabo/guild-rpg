@@ -87,7 +87,7 @@ return function(t)
 		end)
 	end)
 
-	describe("転生スロット（D-072、Q-009、Q-021）", function()
+	describe("転生スロット（D-072、Q-009、D-086）", function()
 		it("Q-009 引き継ぎは素の値の1/2（切り捨て）", function()
 			local s, uid = atCap()
 			exec(s, { type = "RebirthStart", adventurerUid = uid })
@@ -125,30 +125,28 @@ return function(t)
 			expect(exec(s, { type = "RebirthReroll" }).ok).toBeTruthy()
 			expect(s.items.itm_slot_ticket).toBe(0)
 		end)
-		it("Q-021 指定がなければ合計値の高い方を残す", function()
-			local a = { str = 10, mag = 0, agi = 0, dex = 0, hp = 0 }
-			local b = { str = 5, mag = 0, agi = 0, dex = 0, hp = 99 }
-			expect(Rebirth.pickKept(a, b, nil)).toBe(a)
-			expect(Rebirth.pickKept(b, a, nil)).toBe(a)
-			expect(Rebirth.pickKept(nil, b, nil)).toBe(b)
-		end)
-		it("Q-021 残す方を指定できる", function()
-			local a = { str = 10, mag = 0, agi = 0, dex = 0, hp = 0 }
-			local b = { str = 5, mag = 0, agi = 0, dex = 0, hp = 0 }
-			expect(Rebirth.pickKept(a, b, "current")).toBe(b)
-			expect(Rebirth.pickKept(b, a, "previous")).toBe(b)
-		end)
-		it("Q-021 何度引き直しても、一番良い結果が残り続ける（既定）", function()
-			local s, uid = atCap()
-			s.items.itm_slot_ticket = 30
-			exec(s, { type = "RebirthStart", adventurerUid = uid })
-			local best = Rebirth.total(s.rebirthSession.currentBonus)
-			for _ = 1, 30 do
-				exec(s, { type = "RebirthReroll" })
-				local r = s.rebirthSession
-				best = math.max(best, Rebirth.total(r.previousBonus))
-				expect(math.max(Rebirth.total(r.previousBonus), Rebirth.total(r.currentBonus)) >= best).toBeTruthy()
+		it(
+			"D-086 引き直すと直前の結果だけが比較用に残る（良い方は自動で残らない）",
+			function()
+				local s, uid = atCap()
+				s.items.itm_slot_ticket = 30
+				exec(s, { type = "RebirthStart", adventurerUid = uid })
+				for _ = 1, 30 do
+					local before = s.rebirthSession.currentBonus
+					exec(s, { type = "RebirthReroll" })
+					expect(s.rebirthSession.previousBonus).toEqual(before)
+				end
 			end
+		)
+		it("D-086 良い結果を残すには、その場で採用するしかない", function()
+			local s, uid = atCap()
+			s.items.itm_slot_ticket = 10
+			exec(s, { type = "RebirthStart", adventurerUid = uid })
+			local first = s.rebirthSession.currentBonus
+			exec(s, { type = "RebirthReroll" })
+			exec(s, { type = "RebirthReroll" })
+			local r = s.rebirthSession
+			expect(r.previousBonus == first or r.currentBonus == first).toBe(false)
 		end)
 	end)
 

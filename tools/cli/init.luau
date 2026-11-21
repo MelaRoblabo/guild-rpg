@@ -110,13 +110,13 @@ local HELP = [[
   hire                       雇用を始める（雇用費を支払い候補を表示）
   candidates                 候補と面接の状況を表示
   pick <番号>                面接する候補を選ぶ（ステータスを抽選）
-  reroll [prev|cur]          ステータスを引き直す（無料回数→チケット）。残す方を指定（省略時は合計の高い方）
+  reroll                     ステータスを引き直す（無料回数→チケット）。今回の結果が「前回」になり、それより前は消える
   choose <prev|cur>          採用する結果を選んで雇用する
   cancel                     雇用をやめる（雇用費は戻らない）
   rename <adv_uid> <名前>    名前を変える
   dismiss <adv_uid>          解雇する
   rebirth <adv_uid> [keep]   転生を始める（keep：見た目維持ポーションを使う）
-  rb-reroll [prev|cur]       転生スロットを引き直す（残す方を指定、省略時は合計の高い方）
+  rb-reroll                  転生スロットを引き直す（今回が「前回」になり、それより前は消える）
   rb-choose <prev|cur>       転生スロットの結果を確定する
   jobchange <adv_uid> <job_id>   転職ポーションで転職する
   looks <adv_uid>            見た目変更ポーションを使う
@@ -210,8 +210,7 @@ local function handle(tokens: { string }): (boolean, any)
 			say(Text.hiring(save, master))
 		end
 	elseif c == "reroll" then
-		local keep = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else nil
-		result = run({ type = "HireReroll", keep = keep })
+		result = run({ type = "HireReroll" })
 		if result.ok then
 			say(Text.hiring(save, master))
 		end
@@ -228,8 +227,7 @@ local function handle(tokens: { string }): (boolean, any)
 			say(Text.rebirth(save, master))
 		end
 	elseif c == "rb-reroll" then
-		local keep = if tokens[2] == "prev" then "previous" elseif tokens[2] == "cur" then "current" else nil
-		result = run({ type = "RebirthReroll", keep = keep })
+		result = run({ type = "RebirthReroll" })
 		if result.ok then
 			say(Text.rebirth(save, master))
 		end

@@ -37,14 +37,17 @@ local JOB_GEAR = {
 
 -- 転生モデルに沿った基礎ステータス
 -- 転生時の加算分は「無料の引き直し＋1回」の最良値の期待値：上限 × n/(n+p)（D-072）
+--   D-086 で「良い方を自動で残す」は廃止したが、チケットで上限比7割を狙うプレイ（D-074）ならこの水準に届くので、
+--   想定はこのままにする
+-- 初期値は雇用の範囲から取らず、初期の4人に近い固定値にする（D-086 で雇用の範囲を広げても序盤の想定を変えない）
+local STAGE_BASE = { str = 12, mag = 12, agi = 12, dex = 12, hp = 45 }
 function Stages.baseStats(master: any, jobId: string, k: number, level: number)
 	local K = master.K
 	local job = master.jobs[jobId]
 	local n = K.rebirthFreeRerolls + 1
 	local out = {}
 	for _, s in STATS do
-		local r = K.hireStatRange[s]
-		local stat = math.floor((r.min + r.max) / 2)
+		local stat = STAGE_BASE[s]
 		for j = 0, k - 1 do
 			local cap = math.min(K.levelCapInitial + K.levelCapPerRebirth * j, K.levelCapMax)
 			local atCap = stat + job.growth[s] * (cap - 1)

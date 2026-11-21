@@ -68,7 +68,7 @@
 | `trainGoldCoef` / `trainGoldExponent` | 10 / 2（1回 = 10 × Lv²、仮） | D-076 |
 | `trainingFacility` | Lv1〜5：上限 Lv10/20/30/40/50、1回の経験値 430/820/1200/1630/2060（仮） | D-077 |
 | `hireCost` | 300G（仮） | Q-006 |
-| `hireStatRange` | 4項目 5〜20、HP 30〜60。ギルドの成長に関係なく一定（仮） | Q-006, D-081 |
+| `hireStatRange` | 4項目 1〜40、HP 20〜80。ギルドの成長に関係なく一定（仮） | Q-006, D-081, D-086 |
 | `hireFreeRerolls` | 3（初回を含まない、仮） | Q-006 |
 | `specialVisitorChance` | 0.005（仮） | 02章 |
 | `appearanceGenderWeights` | m 0.5 / f 0.5 | D-050 |
