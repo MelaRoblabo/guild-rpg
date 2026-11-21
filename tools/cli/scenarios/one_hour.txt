@@ -3,14 +3,15 @@ new 1
 repeat 1 dng_graveyard
 go 1 dng_graveyard
 wait 600
-open all
+open dng_graveyard
 status
 wait 600
-open all
+open dng_graveyard
 wait 600
-open all
+open dng_graveyard
 repeat 1 dng_ruins
 wait 1800
-open all
+open dng_graveyard
+open dng_ruins
 status
 roster
