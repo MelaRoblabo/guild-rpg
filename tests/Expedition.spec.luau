@@ -173,8 +173,10 @@ return function(t)
 				end
 			end
 		)
-		it("D-085 古い墓地はコモン・アンコモンだけ、罠の遺跡はレアまで", function()
-			expect(#master.dungeons.dng_graveyard.chestRarityWeights).toBe(2)
+		it("D-085 D-188 古い墓地・罠の遺跡はレアまで（エピック以上は出ない）", function()
+			-- D-188：普通の演出ライン（10〜15%）とレアダンジョン用（20〜30%）の2本を引くため、古い墓地にもレアを足した
+			-- （コモン・アンコモンの2つだけでは2本目の線が引けない）
+			expect(#master.dungeons.dng_graveyard.chestRarityWeights).toBe(3)
 			expect(#master.dungeons.dng_ruins.chestRarityWeights).toBe(3)
 		end)
 		it("D-085 深いダンジョンほどコモンが減り、上位が増える（緩やかに）", function()

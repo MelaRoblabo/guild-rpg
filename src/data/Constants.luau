@@ -105,21 +105,7 @@ return {
 	--   ゴールド = floor(rewardGoldBase[基準のダンジョン] × 報酬ごとの係数)
 	--   基準のダンジョン＝踏破した一番深いダンジョン（まだどこも踏破していなければ古い墓地：D-187）
 	--   報酬ごとの係数は rewards の goldMult（Quests・PlaytimeRewards・LoginBonus）と friendRewardGoldMult
-	--   値はすべて仮（M7b-6）。仮の値は各ダンジョンの battleReward.gold に比例させ、古い墓地を 100 にした
-	rewardGoldBase = {
-		dng_graveyard = 100, -- 仮（M7b-6）
-		dng_ruins = 150, -- 仮（M7b-6）
-		dng_tower = 210, -- 仮（M7b-6）
-		dng_castle = 310, -- 仮（M7b-6）
-		dng_sunken_temple = 440, -- 仮（M7b-6）
-		dng_mist_forest = 640, -- 仮（M7b-6）
-		dng_labyrinth = 930, -- 仮（M7b-6）
-		dng_abbey = 1350, -- 仮（M7b-6）
-		dng_iron_fortress = 1950, -- 仮（M7b-6）
-		dng_dragon_nest = 2830, -- 仮（M7b-6）
-		dng_demon_gate = 4110, -- 仮（M7b-6）
-		dng_sky_throne = 5960, -- 仮（M7b-6）
-	},
+	--   基準額 rewardGoldBase はダンジョンごとに持つ（Dungeons。tools/sim/DungeonTemplates に書き calibrate が写す：D-198）
 
 	-- フレンドボタン（D-157, D-190。06章 §20）。量は仮（M7b-6）
 	--   ゴールド = floor(rewardGoldBase[基準のダンジョン] × friendRewardGoldMult

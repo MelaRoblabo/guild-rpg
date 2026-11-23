@@ -8,6 +8,8 @@
 --   3. 距離      ：所要秒（中央値）が timeTarget になる値
 --   4. 経験値    ：次の段階に進む手前のレベルで、5回の探索で1レベル上がる値（転生の経験値ボーナス込み）
 --   5. ゴールド  ：tier に応じた等比（経済は M5 で調整）
+-- 宝箱の表・演出ライン（chestEffectMinRarity・rareChestEffectMinRarity）と報酬のゴールドの基準額（rewardGoldBase、D-198）は
+-- テンプレートの値をそのまま写す。
 -- を決める。
 
 local fs = require("@lune/fs")
@@ -62,6 +64,8 @@ for i, t in Templates do
 		trapDamageRate = t.trapDamageRate,
 		chestRarityWeights = t.chestRarityWeights,
 		chestEffectMinRarity = t.chestEffectMinRarity,
+		rareChestEffectMinRarity = t.rareChestEffectMinRarity, -- D-171, D-185
+		rewardGoldBase = t.rewardGoldBase, -- D-198
 		battleReward = { exp = 100, gold = math.floor(GOLD_BASE * GOLD_GROWTH ^ (i - 1) + 0.5) },
 		sellableItems = t.sellableItems,
 		jobPotionTargets = t.jobPotionTargets,
@@ -259,7 +263,11 @@ for _, r in lines do
 	end
 	table.insert(out, `\t\tchestRarityWeights = {numList(r.chestRarityWeights)},`)
 	table.insert(out, `\t\tchestEffectMinRarity = {r.chestEffectMinRarity},`)
+	if r.rareChestEffectMinRarity then
+		table.insert(out, `\t\trareChestEffectMinRarity = {r.rareChestEffectMinRarity},`)
+	end
 	table.insert(out, `\t\tbattleReward = \{ exp = {r.battleReward.exp}, gold = {r.battleReward.gold} \},`)
+	table.insert(out, `\t\trewardGoldBase = {r.rewardGoldBase},`)
 	table.insert(out, `\t\tsellableItems = {weighted(r.sellableItems)},`)
 	table.insert(out, `\t\tjobPotionTargets = {list(r.jobPotionTargets)},`)
 	table.insert(out, `\t\tmodifierPool = {list(r.modifierPool)},`)

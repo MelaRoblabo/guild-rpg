@@ -367,9 +367,12 @@ return function(t)
 		it(
 			"D-171 rareChestEffectMinRarity のないダンジョンのレアダンジョンの山は開けられない（今の作り）",
 			function()
-				local s = newState()
+				-- D-188 で本番データは全ダンジョンが演出ラインを持つ。読み込んだ後に遺跡の演出ラインを外して確かめる
+				local m = Fixtures.master()
+				m.dungeons.dng_ruins.rareChestEffectMinRarity = nil
+				local s = newState(1, m)
 				Chest.add(s, "special:rare:dng_ruins", 1, 3)
-				expect(exec(s, { type = "OpenChests", pileKey = "special:rare:dng_ruins" }, T0).error).toBe(
+				expect(exec(s, { type = "OpenChests", pileKey = "special:rare:dng_ruins" }, T0, m).error).toBe(
 					"PILE_NOT_FOUND"
 				)
 			end
@@ -928,8 +931,11 @@ return function(t)
 				{ rank = 3, weight = 10 },
 				{ rank = 4, weight = 2 },
 			})
-			-- 古い墓地（コモン・アンコモンだけ）はアンコモンだけになる
-			expect(Merchant.rarityTable(master.dungeons.dng_graveyard)).toEqual({ { rank = 2, weight = 12 } })
+			-- 古い墓地もコモンを除いた行（D-188 の表：78/12/10）
+			expect(Merchant.rarityTable(master.dungeons.dng_graveyard)).toEqual({
+				{ rank = 2, weight = 12 },
+				{ rank = 3, weight = 10 },
+			})
 		end)
 		it("D-189 コモンしかない表のときはコモンを使う", function()
 			local only = { chestRarityTable = { { rank = 1, weight = 100 } } }

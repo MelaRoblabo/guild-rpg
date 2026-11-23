@@ -105,7 +105,7 @@ return function(t)
 			function()
 				local s = newState()
 				-- ゴールドは係数（D-190）：まだどこも踏破していないので古い墓地の基準 × 1
-				expect(K.rewardGoldBase.dng_graveyard).toBe(100)
+				expect(master.dungeons.dng_graveyard.rewardGoldBase).toBe(100)
 				Inbox.push(s, "quest", T0, {
 					goldMult = 1,
 					items = { itm_slot_ticket = 2 },
@@ -307,7 +307,8 @@ return function(t)
 				expect(ev.special[1].rank).toBe(2)
 				local uid = ev.special[1].equipmentUids[1]
 				expect(s.equipment[uid].itemLevel).toBe(m.dungeons.dng_tower.tier)
-				-- 演出ラインを持たないダンジョンの山は開けられない
+				-- 演出ラインを持たないダンジョンの山は開けられない（D-188 で本番データは全ダンジョンが持つので、読み込んだ後に外す）
+				m.dungeons.dng_castle.rareChestEffectMinRarity = nil
 				Chest.add(s, "special:rare:dng_castle", 1, 1)
 				expect(exec(s, { type = "OpenChests", pileKey = "special:rare:dng_castle" }, T0, m).error).toBe(
 					"PILE_NOT_FOUND"
@@ -334,7 +335,7 @@ return function(t)
 				local e2 = errorsOf(function(d)
 					for _, g in d.Dungeons do
 						if g.id == "dng_castle" then
-							g.rareChestEffectMinRarity = 3 -- レア以上 15%
+							g.rareChestEffectMinRarity = 4 -- エピック以上 10%（D-188 の表 62/16/12/10）
 						end
 					end
 				end)
@@ -550,7 +551,9 @@ return function(t)
 			expect(s.inbox[1].source).toBe("quest")
 			-- ゴールドは基準のダンジョン（未踏破なので古い墓地）× goldMult（D-190）
 			expect(s.inbox[1].rewards.gold).toBe(
-				math.floor(K.rewardGoldBase.dng_graveyard * master.quests.qst_daily_expeditions.rewards.goldMult)
+				math.floor(
+					master.dungeons.dng_graveyard.rewardGoldBase * master.quests.qst_daily_expeditions.rewards.goldMult
+				)
 			)
 			expect(s.quests.daily.bonusDone).toBe(false)
 			-- 達成済みは数えない（量を超えない）
@@ -589,7 +592,7 @@ return function(t)
 				expect(#s.inbox).toBe(1)
 				expect(s.inbox[1].source).toBe("login")
 				expect(s.inbox[1].rewards.gold).toBe(
-					math.floor(K.rewardGoldBase.dng_graveyard * master.loginBonus.days[1].goldMult) -- D-190
+					math.floor(master.dungeons.dng_graveyard.rewardGoldBase * master.loginBonus.days[1].goldMult) -- D-190
 				)
 				expect(s.login.day).toBe(2)
 				expect(s.login.lastDayIndex).toBe(Calendar.dayIndex(T0))

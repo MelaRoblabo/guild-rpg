@@ -5,7 +5,7 @@
 --       trainings（トレーニングの回数）/ clears（踏破）/ rebirths（転生。weekly のみ）
 -- 量 = amountPerParty × 解放済みのパーティ数（06章 §15）
 -- rewards：{ goldMult?, items? = { [itemId] = 数 }, chests? = { { pileKey, count, rank? } } }（rank を省くと SpecialChests の表で抽選）
---   goldMult：ゴールドの係数。ゴールド = floor(Constants.rewardGoldBase[踏破した一番深いダンジョン] × goldMult)（D-190、06章 §22）。
+--   goldMult：ゴールドの係数。ゴールド = floor(踏破した一番深いダンジョンの rewardGoldBase × goldMult)（D-190、06章 §22）。
 --             受け取り箱へ入れたときの踏破で決める。固定額のゴールドは置かない
 -- 報酬は達成したときに受け取り箱へ入る（D-164）。全部達成のボーナスは Constants.questDailyBonus / questWeeklyBonus
 -- お題の候補・量・報酬の量はすべて仮（M7b-6）

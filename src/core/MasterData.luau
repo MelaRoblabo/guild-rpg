@@ -714,8 +714,9 @@ local function validateContent(c: Checker, d: any)
 					end
 				end
 			end
-			-- レアダンジョンの山の演出ライン（D-171, D-185）。あれば、その割合を rareDungeonEffectRate に収める
-			if g.rareChestEffectMinRarity ~= nil then
+			-- レアダンジョンの山の演出ライン（D-171, D-185）。全ダンジョン必須（D-188 で表を作り直し、
+			-- 普通の演出率 10〜15% とレアダンジョン用の 20〜30% の両方の線が引けるようにした）。その割合を rareDungeonEffectRate に収める
+			do
 				local q = p .. ".rareChestEffectMinRarity"
 				if
 					c:integer(q, g.rareChestEffectMinRarity, 1, rarityCount(d))
@@ -733,6 +734,8 @@ local function validateContent(c: Checker, d: any)
 					)
 				end
 			end
+			-- 報酬のゴールドの基準額（D-190, D-198）：ダンジョンごとに1つ（ひな形から calibrate が写す）
+			c:integer(p .. ".rewardGoldBase", g.rewardGoldBase, 0)
 			if g.dispatchFee ~= nil then
 				c:error(p .. ".dispatchFee", "派遣費は廃止（D-163）")
 			end
@@ -1127,7 +1130,7 @@ end
 
 -- 報酬の形（クエスト・ログインボーナス・プレイ時間で共通。受け取り箱に入る：D-164）
 --   { goldMult?, items? = { [itemId] = 数 }, chests? = { { pileKey, count, rank? } } }
--- ゴールドは固定額を置かず、係数 goldMult を Constants.rewardGoldBase に掛ける（D-190、06章 §22）
+-- ゴールドは固定額を置かず、係数 goldMult を基準のダンジョンの rewardGoldBase に掛ける（D-190, D-198、06章 §22）
 -- 宝箱の山は表を持つ特別な宝箱（D-171）。rank を省けばその表で抽選する
 local function validateRewards(c: Checker, path: string, r: any, d: any)
 	if type(r) ~= "table" then
@@ -1197,18 +1200,9 @@ local QUEST_KINDS = {
 -- クエスト・ログインボーナス・プレイ時間（D-153, D-154, D-155）
 local function validateRewardSources(c: Checker, d: any)
 	local K = if type(d.Constants) == "table" then d.Constants else {}
-	-- 報酬のゴールドの基準（D-190）：すべてのダンジョンに1つずつ、知らないダンジョンは置かない
-	local base = K.rewardGoldBase
-	if type(base) ~= "table" then
-		c:error("Constants.rewardGoldBase", "テーブルが必要")
-	else
-		local known = idSet(d.Dungeons)
-		for id in known do
-			c:integer(`Constants.rewardGoldBase.{id}`, base[id], 0)
-		end
-		for id in base do
-			c:ref("Constants.rewardGoldBase", id, known)
-		end
+	-- 報酬のゴールドの基準（D-190）はダンジョンごとの rewardGoldBase に移した（D-198。検査はダンジョンの検証で行う）
+	if K.rewardGoldBase ~= nil then
+		c:error("Constants.rewardGoldBase", "Dungeons の rewardGoldBase に移した（D-198）")
 	end
 	local rows = d.Quests
 	if c:array("Quests", rows) then

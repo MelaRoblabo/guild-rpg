@@ -9,6 +9,7 @@ local MasterData = require("../src/core/MasterData")
 local Quest = require("../src/core/Quest")
 local Rng = require("../src/core/Rng")
 local Data = require("../src/data")
+local Templates = require("../tools/sim/DungeonTemplates")
 local Fixtures = require("./helpers/Fixtures")
 
 local T0 = 1767225600 -- 2026-01-01 00:00 UTC
@@ -31,7 +32,7 @@ return function(t)
 		end
 	end
 	local function goldOf(s: any, mult: number): number
-		return math.floor(K.rewardGoldBase[Chest.baseDungeon(s, master).id] * mult)
+		return math.floor(Chest.baseDungeon(s, master).rewardGoldBase * mult)
 	end
 	local function errorsOf(m: (any) -> ()): string
 		local d = Fixtures.clone(Data)
@@ -52,18 +53,18 @@ return function(t)
 	end
 
 	describe("報酬のゴールドの式（D-190、06章 §22）", function()
-		it("D-190 ゴールド = floor(rewardGoldBase[基準のダンジョン] × 係数)", function()
+		it("D-190 D-198 ゴールド = floor(基準のダンジョンの rewardGoldBase × 係数)", function()
 			for _, d in master.dungeonList do
-				expect(Formulas.rewardGold(d, 1, K)).toBe(K.rewardGoldBase[d.id])
-				expect(Formulas.rewardGold(d, 2.5, K)).toBe(math.floor(K.rewardGoldBase[d.id] * 2.5))
+				expect(Formulas.rewardGold(d, 1, K)).toBe(d.rewardGoldBase)
+				expect(Formulas.rewardGold(d, 2.5, K)).toBe(math.floor(d.rewardGoldBase * 2.5))
 			end
 			expect(Formulas.rewardGold(master.dungeons.dng_graveyard, 0, K)).toBe(0)
 		end)
 		it("D-190 深いダンジョンほど基準のゴールドが大きい（仮の値）", function()
 			local prev = 0
 			for _, d in master.dungeonList do
-				expect(K.rewardGoldBase[d.id] > prev).toBeTruthy()
-				prev = K.rewardGoldBase[d.id]
+				expect(d.rewardGoldBase > prev).toBeTruthy()
+				prev = d.rewardGoldBase
 			end
 		end)
 		it("D-187 D-190 基準は踏破した一番深いダンジョン。未踏破なら古い墓地", function()
@@ -82,11 +83,11 @@ return function(t)
 				expect(mult ~= nil).toBeTruthy()
 				local a = newState()
 				Game.advance(a, ctx(T0))
-				expect(a.inbox[1].rewards.gold).toBe(math.floor(K.rewardGoldBase.dng_graveyard * mult))
+				expect(a.inbox[1].rewards.gold).toBe(math.floor(master.dungeons.dng_graveyard.rewardGoldBase * mult))
 				local b = newState()
 				clearUpTo(b, 6)
 				Game.advance(b, ctx(T0))
-				expect(b.inbox[1].rewards.gold).toBe(math.floor(K.rewardGoldBase[master.dungeonList[6].id] * mult))
+				expect(b.inbox[1].rewards.gold).toBe(math.floor(master.dungeonList[6].rewardGoldBase * mult))
 				expect(b.inbox[1].rewards.gold > a.inbox[1].rewards.gold).toBeTruthy()
 				-- 額は入れたときに決まり、後で深く踏破しても変わらない
 				local before = b.inbox[1].rewards.gold
@@ -130,7 +131,9 @@ return function(t)
 					expect(s.inbox[1].rewards.gold).toBe(goldOf(s, row.rewards.goldMult))
 					return s.inbox[1].rewards.gold
 				end
-				expect(questGold(0)).toBe(math.floor(K.rewardGoldBase.dng_graveyard * row.rewards.goldMult))
+				expect(questGold(0)).toBe(
+					math.floor(master.dungeons.dng_graveyard.rewardGoldBase * row.rewards.goldMult)
+				)
 				expect(questGold(8) > questGold(0)).toBeTruthy()
 			end
 		)
@@ -181,26 +184,48 @@ return function(t)
 			)).toBeTruthy()
 		end)
 		it(
-			"D-190 rewardGoldBase はすべてのダンジョンに1つずつ（知らないダンジョンは置かない）",
+			"D-190 D-198 rewardGoldBase はすべてのダンジョンに1つずつ（ダンジョンの行に持ち、Constants には置かない）",
 			function()
 				expect(has(
 					errorsOf(function(d)
-						d.Constants.rewardGoldBase.dng_sky_throne = nil
+						d.Dungeons[#d.Dungeons].rewardGoldBase = nil
 					end),
-					"Constants.rewardGoldBase.dng_sky_throne"
+					`Dungeons[{#Data.Dungeons}].rewardGoldBase`
 				)).toBeTruthy()
 				expect(has(
 					errorsOf(function(d)
-						d.Constants.rewardGoldBase.dng_nope = 10
+						d.Dungeons[1].rewardGoldBase = -1
 					end),
-					"Constants.rewardGoldBase"
+					"Dungeons[1].rewardGoldBase"
 				)).toBeTruthy()
 				expect(has(
 					errorsOf(function(d)
-						d.Constants.rewardGoldBase = nil
+						d.Dungeons[1].rewardGoldBase = 1.5
+					end),
+					"Dungeons[1].rewardGoldBase"
+				)).toBeTruthy()
+				-- 古い置き場所（Constants.rewardGoldBase）に残っていたら止める（D-198）
+				expect(has(
+					errorsOf(function(d)
+						d.Constants.rewardGoldBase = { dng_graveyard = 100 }
 					end),
 					"Constants.rewardGoldBase"
 				)).toBeTruthy()
+			end
+		)
+		it(
+			"D-198 D-188 Dungeons の rewardGoldBase・宝箱の表はダンジョンのひな形（DungeonTemplates）の値を写したもの",
+			function()
+				expect(#Templates).toBe(#Data.Dungeons)
+				for i, tpl in Templates do
+					local d = Data.Dungeons[i]
+					expect(d.id).toBe(tpl.id)
+					expect(d.rewardGoldBase).toBe(tpl.rewardGoldBase)
+					-- 宝箱の表と2本の演出ラインも写す（D-085, D-188）
+					expect(d.chestRarityWeights).toEqual(tpl.chestRarityWeights)
+					expect(d.chestEffectMinRarity).toBe(tpl.chestEffectMinRarity)
+					expect(d.rareChestEffectMinRarity).toBe(tpl.rareChestEffectMinRarity)
+				end
 			end
 		)
 	end)

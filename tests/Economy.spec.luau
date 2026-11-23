@@ -204,6 +204,68 @@ return function(t)
 				expect(tail / total <= K.chestEffectRate.max + 1e-9).toBeTruthy()
 			end
 		end)
+		it(
+			"D-188 D-171 D-185 どのダンジョンも普通の演出率（10〜15%）とレアダンジョンの演出率（20〜30%）の両方に収まる",
+			function()
+				expect(#master.dungeonList).toBe(12)
+				for _, d in master.dungeonList do
+					local total, tail, rareTail = 0, 0, 0
+					expect(type(d.rareChestEffectMinRarity)).toBe("number")
+					for r, w in d.chestRarityWeights do
+						total += w
+						if r >= d.chestEffectMinRarity then
+							tail += w
+						end
+						if r >= d.rareChestEffectMinRarity then
+							rareTail += w
+						end
+					end
+					expect(tail / total >= K.chestEffectRate.min - 1e-9).toBeTruthy()
+					expect(tail / total <= K.chestEffectRate.max + 1e-9).toBeTruthy()
+					expect(rareTail / total >= K.rareDungeonEffectRate.min - 1e-9).toBeTruthy()
+					expect(rareTail / total <= K.rareDungeonEffectRate.max + 1e-9).toBeTruthy()
+				end
+			end
+		)
+		it(
+			"D-188 D-085 表の性格：深いほどコモンが減り、各レアリティ以上が出る割合は深いほど増える（または同じ）",
+			function()
+				local prev: { number }? = nil
+				for _, d in master.dungeonList do
+					local total = 0
+					for _, w in d.chestRarityWeights do
+						total += w
+					end
+					local atLeast = table.create(master.rarityCount, 0)
+					for k = 1, master.rarityCount do
+						for r, w in d.chestRarityWeights do
+							if r >= k then
+								atLeast[k] += w / total
+							end
+						end
+					end
+					if prev then
+						-- コモンの割合 = 1 − アンコモン以上の割合
+						expect(atLeast[2] > prev[2]).toBeTruthy()
+						for k = 2, master.rarityCount do
+							expect(atLeast[k] >= prev[k] - 1e-9).toBeTruthy()
+						end
+					end
+					prev = atLeast
+				end
+			end
+		)
+		it("D-188 rareChestEffectMinRarity はすべてのダンジョンに必須（検証で止める）", function()
+			local e = {}
+			local d = Fixtures.clone(require("../src/data"))
+			d.Dungeons[5].rareChestEffectMinRarity = nil
+			for _, i in require("../src/core/MasterData").validate(d) do
+				if i.level == "error" then
+					table.insert(e, i.path)
+				end
+			end
+			expect(table.find(e, "Dungeons[5].rareChestEffectMinRarity") ~= nil).toBeTruthy()
+		end)
 		it("D-089 演出の発生ラインはダンジョンごとに決まっている", function()
 			for _, d in master.dungeonList do
 				expect(d.chestEffectMinRarity >= 1 and d.chestEffectMinRarity <= master.rarityCount).toBeTruthy()
@@ -278,26 +340,32 @@ return function(t)
 			function()
 				-- M7b-4 で SpecialChests の表を持つ山（special:raid など）は開けられるようになった（Rewards.spec）。
 				-- 表のない種類と、演出ライン（rareChestEffectMinRarity）のないダンジョンのレアダンジョンの山は開けられない
+				-- （D-188 で本番データは全ダンジョンが演出ラインを持つので、読み込んだ後に古城の演出ラインを外して確かめる）
+				local m = Fixtures.master()
+				m.dungeons.dng_castle.rareChestEffectMinRarity = nil
+				local function execM(s: any, cmd: any, now: number?)
+					return Game.execute(s, cmd, { now = now or T0, master = m, online = true })
+				end
 				local s = newState()
 				Chest.add(s, "special:unknown", 3, 2)
 				Chest.add(s, "special:raid", 3, 2)
 				Chest.add(s, "special:rare:dng_castle", 1, 1)
 				Chest.add(s, "dng_graveyard", 1, 1)
 				local before = Game._deepClone(s)
-				expect(exec(s, { type = "OpenChests", pileKey = "special:unknown" }).error).toBe("PILE_NOT_FOUND")
-				expect(exec(s, { type = "OpenChests", pileKey = "special:rare:dng_castle" }).error).toBe(
+				expect(execM(s, { type = "OpenChests", pileKey = "special:unknown" }).error).toBe("PILE_NOT_FOUND")
+				expect(execM(s, { type = "OpenChests", pileKey = "special:rare:dng_castle" }).error).toBe(
 					"PILE_NOT_FOUND"
 				)
 				expect(s).toEqual(before)
 				-- 普通の山は開けられ、特別な山の数はそのまま
-				local r = exec(s, { type = "OpenChests", pileKey = "dng_graveyard" })
+				local r = execM(s, { type = "OpenChests", pileKey = "dng_graveyard" })
 				expect(r.ok).toBeTruthy()
 				expect(r.events[1].pileKey).toBe("dng_graveyard")
 				expect(s.chests["special:raid"]).toEqual({ 0, 0, 2 })
 				-- 時間経過・保存の形も壊れない
-				exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
+				execM(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
 				local e = Game.query.expeditionOf(s, 1)
-				Game.advance(s, ctx(e.returnAt))
+				Game.advance(s, { now = e.returnAt, master = m, online = true })
 				local serde = require("@lune/serde")
 				local decoded = serde.decode("json", serde.encode("json", s))
 				expect(decoded.chests["special:rare:dng_castle"]).toEqual({ 1 })

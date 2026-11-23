@@ -125,6 +125,7 @@
 （派遣費の式は D-163 で削除。D-079 は廃止）
 演出あり = 宝箱のレアリティ ≥ 宝箱の山の chestEffectMinRarity（特別な宝箱は SpecialChests の effectMinRarity）   -- D-089, D-166
   普通のダンジョンの演出率（chestEffectMinRarity 以上が出る割合）は chestEffectRate（10〜15%）の範囲   -- D-090（検査は普通のダンジョンだけ）
+  同じ表の rareChestEffectMinRarity 以上が出る割合は rareDungeonEffectRate（20〜30%）の範囲。全ダンジョンで両方を満たす   -- D-171, D-185, D-188（§19）
   特別な宝箱の演出率は行ごとの effectRateMin〜effectRateMax の範囲                              -- §19、D-166
 まとめ開き：指定した宝箱の山から min(count, chestBatchOpen, 残り) 個を、ランクごとの残り数で重み付けして1つずつ引く   -- D-089, D-166
 宝箱は倉庫とは別に「宝箱の山×ランクの数」で保管する。上限なし   -- D-084, D-166
@@ -311,7 +312,7 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 プレイ時間の足し方：オンラインの advance ごとに 経過秒 = ctx.now − 前回の advance の時刻（ログイン時の留守の計算で前回の時刻は ctx.now になるので、ログイン直後の最初の advance は 0）
               日が変わっていたら seconds・claimedSteps を 0 に戻し、足すのは今日の区切り（Calendar.dayStart）より後の分だけ
 フレンド    ：ctx.now ≥ friend.nextAt のとき押せる。報酬は人数 min(friendCount, friendRewardMaxFriends) で少し増える。押したら nextAt = ctx.now + friendRewardIntervalSeconds（押さないとたまらない）
-              ゴールド = floor(rewardGoldBase[基準のダンジョン] × friendRewardGoldMult × (1 + friendRewardBonusPerFriend × (min(friendCount, friendRewardMaxFriends) − 1)))   -- §22、D-190
+              ゴールド = floor(基準のダンジョンの rewardGoldBase × friendRewardGoldMult × (1 + friendRewardBonusPerFriend × (min(friendCount, friendRewardMaxFriends) − 1)))   -- §22、D-190
               friendCount はサーバーが数えて ctx.friendCount で渡す（M7b-5）。1 未満なら押せない（NO_FRIEND）
               1日に friendRewardDailyCap 回まで（friend.dayIndex が今日と違えば todayCount を 0 として数える）
 紹介        ：報酬はステータススロットチケット（referralRewards）。招待した側・された側とも、招待された人が進み具合の条件に届いたときに渡す（D-192）
@@ -337,18 +338,18 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 
 ゲーム仕様書04章の「補正の発生源は個体のみ」の例外。効果の種類と量は、専用ギフトの中身が決まってから足す（D-165）。
 
-## 22. 報酬のゴールド（D-190, D-187）
+## 22. 報酬のゴールド（D-190, D-187, D-198）
 
 ```
 基準のダンジョン = 踏破した一番深いダンジョン（tier が最大。同じ tier は並びの先）
                    まだどこも踏破していなければ一番浅いダンジョン（古い墓地：D-187）      -- Chest.baseDungeon
-ゴールド         = floor(rewardGoldBase[基準のダンジョン] × 報酬ごとの係数)               -- Formulas.rewardGold
+ゴールド         = floor(基準のダンジョンの rewardGoldBase × 報酬ごとの係数)               -- Formulas.rewardGold
 報酬ごとの係数   = プレイ時間・クエスト・ログインボーナス：rewards の goldMult（Quests・PlaytimeRewards・LoginBonus、全部達成のボーナスも同じ形）
                    フレンドボタン：friendRewardGoldMult × (1 + friendRewardBonusPerFriend × (min(friendCount, friendRewardMaxFriends) − 1))（§20）
 額を決める時     = 受け取り箱に入れたとき（InboxEntry.rewards.gold に額を保存。後で深く踏破しても変わらない）。フレンドボタンは押したとき
 ```
 
-- 報酬のゴールドに固定額は置かない（rewards に `gold` を書くと検証で止める）。`rewardGoldBase` はダンジョンごとに1つ（全ダンジョン必須）。
+- 報酬のゴールドに固定額は置かない（rewards に `gold` を書くと検証で止める）。`rewardGoldBase` はダンジョンごとに1つ（全ダンジョン必須）。ダンジョンのひな形（`tools/sim/DungeonTemplates`）に書き、calibrate が `Dungeons` に写す（D-198。`Constants` には置かない）。
 - 値（`rewardGoldBase`・各 `goldMult`・`friendRewardGoldMult`）は仮（M7b-6 の自動プレイで決める。D-154 の「1時間の収入の数%」に合わせる）。仮の `rewardGoldBase` は各ダンジョンの `battleReward.gold` に比例させ、古い墓地を 100 にした。
 
 ## 23. ゲーム外の通知：いつも遊ぶ時刻・許可の画面（D-159, D-196）

@@ -472,7 +472,7 @@ return function(t)
 				local function expected(n: number): number
 					local c = math.min(n, K.friendRewardMaxFriends)
 					return math.floor(
-						K.rewardGoldBase.dng_graveyard
+						master.dungeons.dng_graveyard.rewardGoldBase
 							* K.friendRewardGoldMult
 							* (1 + K.friendRewardBonusPerFriend * (c - 1))
 					)
