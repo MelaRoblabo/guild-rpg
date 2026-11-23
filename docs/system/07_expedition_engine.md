@@ -81,6 +81,7 @@ ExpeditionLog = {
 	totalSeconds: number,
 	dailyTraitId: string?,          -- 当てた日替わりの特性（D-156）
 	traitChests: number?,           -- chestMult で増えた宝箱の数（rewards.chests に含む。D-173）
+	traitChestSources: { number }?, -- 増えた宝箱それぞれの元の宝箱が rewards.chests の何番目か（D-186）
 	timeMult: number?,              -- 留守番の時間の倍率（1 のときは nil。D-161）
 }
 FloorLog = {
@@ -91,6 +92,7 @@ FloorLog = {
 	event: "chest" | "item" | "trap" | "fountain" | "none"?, detail: any?,
 	hpAfter: { number },            -- フロア終了時の各メンバーのHP
 	giftTriggers: { { uid: string, giftId: string } },   -- 発動したギフト（演出用）
+	gained: { exp, gold, items, chestFrom, chestTo },     -- このフロアで得た報酬（途中ログイン用：D-186）。宝箱は番号の範囲だけ
 }
 ```
 
@@ -101,7 +103,7 @@ FloorLog = {
 ## 4b. 留守番・日替わり・マップイベント（D-152, D-156, D-161）
 
 - **留守番の探索**：`input.timeMult = offlineTimeMult` で同じ `simulate` を使う。戦闘・イベント・報酬は普通の探索と同じで、`travelSeconds`・各フロアの `startOffset`/`duration`・`totalSeconds` だけを倍率で伸ばす。`Expedition.offline = true` の印を付け、クエストに数えない（D-153, D-161）。
-- **途中でログインしたとき**：6時間より前にログインしたら、まだ帰っていない留守番の探索はログインの時点で帰還させる。結果（ログの報酬）は出発時に決まっているので、そのまま受け取る。再生位置（§5）は使わず、全員ギルドで待機にそろえる（D-172）。
+- **途中でログインしたとき**：6時間より前にログインしたら、まだ帰っていない留守番の探索はログインの時点で帰還させ、全員ギルドで待機にそろえる（D-172）。持ち帰るのは、ログの時間の流れ（各フロアの `startOffset + duration`）でその時点までに終わったフロアの分だけ（`Expedition.rewardsAt`。その時点で撤退したのと同じ。踏破していなければ踏破の報酬は出さない：D-186、06章 §13）。このため各フロアのログに、そのフロアで得た報酬 `gained`（経験値・ゴールド・アイテム、宝箱は `rewards.chests` の番号の範囲だけ。ランクは持たない：D-087）を記録し、日替わりで増えた宝箱は元の宝箱の番号 `traitChestSources` を記録する。乱数の消費順は変わらない。
 - **日替わりの特性**：`dailyTraitId` の効果を出発時の計算に入れる（攻撃力・移動時間は MemberSnapshot・片道秒の計算で、宝箱の数は報酬の計算で。06章 §16）。攻撃力は個体補正の上限の外で掛ける（D-173）。経験値の倍率は休息ボーナスと同じく帰還時に掛ける。留守番も出発した日の特性を当てる。
 - **専用ギフトのパーティ効果**：移動・宝箱の数に効く。同じ効果はパーティ内で重ねない（06章 §21、D-174）。
 - **レアダンジョン**：踏破済みの一番深いダンジョンのデータで計算し、宝箱の数に `rareDungeonChestMult` を掛け、宝箱の山は `special:rare:<相当するダンジョン>`（1段上のダンジョン。D-152, D-166, D-171）。

@@ -34,6 +34,15 @@ export type FloorLog = {
 	detail: any?,
 	hpAfter: { number }, -- メンバー順（input.members の順）のフロア終了時のHP
 	giftTriggers: { { uid: string, giftId: string } },
+	-- このフロアで得た報酬（途中ログインで、進んだフロアの分だけ持ち帰るため：D-186）
+	-- 宝箱はランクを持たず、rewards.chests の何番目からかの範囲だけ（ランクを隠すため：D-087）
+	gained: {
+		exp: { [string]: number },
+		gold: number,
+		items: { [string]: number },
+		chestFrom: number,
+		chestTo: number,
+	}?,
 }
 
 export type Log = {
@@ -52,6 +61,7 @@ export type Log = {
 	travelGiftId: string?,
 	dailyTraitId: string?,
 	traitChests: number?, -- 日替わりの特性 chestMult で増えた宝箱の数（rewards.chests に含む）
+	traitChestSources: { number }?, -- 増えた宝箱それぞれの元の宝箱の番号（rewards.chests の何番目か）
 	timeMult: number?,
 	rewards: Events.Rewards,
 }
@@ -102,6 +112,13 @@ function Expedition.simulate(input: Input, master: any): Log
 	for floor = 1, dungeon.floors do
 		reached = floor
 		local triggers = {}
+		-- このフロアの報酬の差分を取るための、フロア前の値（D-186）
+		local before = {
+			exp = table.clone(rewards.exp),
+			gold = rewards.gold,
+			items = table.clone(rewards.items),
+			chests = #rewards.chests,
+		}
 		local entry: FloorLog
 
 		if floor % 2 == 1 then
@@ -173,6 +190,27 @@ function Expedition.simulate(input: Input, master: any): Log
 			end
 		end
 
+		local gainedExp = {}
+		for uid, v in rewards.exp do
+			local d = v - (before.exp[uid] or 0)
+			if d > 0 then
+				gainedExp[uid] = d
+			end
+		end
+		local gainedItems = {}
+		for id, v in rewards.items do
+			local d = v - (before.items[id] or 0)
+			if d > 0 then
+				gainedItems[id] = d
+			end
+		end
+		entry.gained = {
+			exp = gainedExp,
+			gold = rewards.gold - before.gold,
+			items = gainedItems,
+			chestFrom = before.chests + 1,
+			chestTo = #rewards.chests,
+		}
 		table.insert(floors, entry)
 		offset += entry.duration
 		if result == "retreat" then
@@ -197,18 +235,21 @@ function Expedition.simulate(input: Input, master: any): Log
 	end
 	-- 日替わりの特性 chestMult（D-173、07章 §3 の 4）：宝箱1個ごとに、整数部ぶん増やし、端数は確率で +1
 	local traitChests = nil
+	local traitChestSources = nil -- 増えた宝箱それぞれの元の宝箱が rewards.chests の何番目か（D-186）
 	if trait and trait.effect == "chestMult" then
 		traitChests = 0
+		traitChestSources = {}
 		local whole = math.floor(trait.value - 1)
 		local frac = (trait.value - 1) - whole
 		local base = table.clone(rewards.chests)
-		for _, c in base do
+		for i, c in base do
 			local extra = whole
 			if frac > 0 and rng:chance(frac) then
 				extra += 1
 			end
 			for _ = 1, extra do
 				table.insert(rewards.chests, { rank = c.rank })
+				table.insert(traitChestSources, i)
 			end
 			traitChests += extra
 		end
@@ -244,8 +285,73 @@ function Expedition.simulate(input: Input, master: any): Log
 		travelGiftId = travelGiftId,
 		dailyTraitId = input.dailyTraitId,
 		traitChests = traitChests,
+		traitChestSources = traitChestSources,
 		timeMult = if timeMult ~= 1 then timeMult else nil,
 		rewards = rewards,
+	}
+end
+
+-- D-186：途中ログイン。出発から elapsed 秒の時点までに終わったフロアの報酬だけを持ち帰る（その時点で撤退したのと同じ）
+-- 全フロアが終わっていれば（帰りの移動中・帰還済み）ログのとおり全部。踏破していなければ踏破の報酬（確定宝箱など）は出さない
+-- 戻り値：{ result, retreatReason, reachedFloor, floorsCleared, rewards, interrupted }
+function Expedition.rewardsAt(log: Log, elapsed: number, K: any): any
+	local done = 0
+	for _, f in log.floors do
+		if f.startOffset + f.duration <= elapsed then
+			done += 1
+		else
+			break
+		end
+	end
+	local full = log.rewards
+	if done >= #log.floors then
+		return {
+			result = log.result,
+			retreatReason = log.retreatReason,
+			reachedFloor = log.reachedFloor,
+			rewards = full,
+			interrupted = false,
+		}
+	end
+	local exp, items, gold = {}, {}, 0
+	local included: { [number]: boolean } = {}
+	local chests = {}
+	for k = 1, done do
+		local g = log.floors[k].gained
+		if g then
+			for uid, v in g.exp do
+				exp[uid] = (exp[uid] or 0) + v
+			end
+			for id, v in g.items do
+				items[id] = (items[id] or 0) + v
+			end
+			gold += g.gold
+			for i = g.chestFrom, g.chestTo do
+				included[i] = true
+				table.insert(chests, full.chests[i])
+			end
+		end
+	end
+	-- 日替わりの特性で増えた宝箱は、元の宝箱を持ち帰るときだけ
+	local baseCount = #full.chests - #(log.traitChestSources or {})
+	for j, src in log.traitChestSources or {} do
+		if included[src] then
+			table.insert(chests, full.chests[baseCount + j])
+		end
+	end
+	return {
+		result = "retreat",
+		retreatReason = "login",
+		reachedFloor = done,
+		rewards = {
+			exp = exp,
+			gold = gold,
+			chests = chests,
+			items = items,
+			floorsCleared = done,
+			guildExp = done * K.guildExpPerFloor, -- 撤退と同じ（踏破のボーナスなし）
+		},
+		interrupted = true,
 	}
 end
 

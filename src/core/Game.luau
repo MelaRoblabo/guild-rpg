@@ -259,6 +259,7 @@ local function collect(state: any, e: any, master: any, events: { any }, restAct
 		itemsSoldGold = itemsSoldGold,
 		guildExp = guildExp,
 		offline = e.offline,
+		interrupted = e.interrupted, -- 途中ログインで戻った（D-186）
 		dailyTraitId = e.dailyTraitId,
 		restBonus = if useRest then true else nil,
 	})
@@ -404,6 +405,7 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 	end
 
 	-- 6時間より前にログインしたら、帰っていない留守番の探索はログインの時点で帰還させる（D-172）。全員ギルドで待機
+	-- 持ち帰るのはその時点までに進んだフロアの分だけ（その時点で撤退したのと同じ：D-186）
 	local pending = {}
 	for _, e in state.expeditions do
 		if e.offline then
@@ -414,7 +416,15 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 		return tonumber(string.sub(x.uid, 4)) < tonumber(string.sub(y.uid, 4))
 	end)
 	for _, e in pending do
+		local part = Expedition.rewardsAt(e.log, ctx.now - e.departAt, K)
+		local log = table.clone(e.log)
+		log.result = part.result
+		log.retreatReason = part.retreatReason
+		log.reachedFloor = part.reachedFloor
+		log.rewards = part.rewards
+		e.log = log
 		e.returnAt = ctx.now
+		e.interrupted = if part.interrupted then true else nil
 		collect(state, e, master, events, false)
 	end
 	state.stats.offlineSecondsTotal = (state.stats.offlineSecondsTotal or 0) + away

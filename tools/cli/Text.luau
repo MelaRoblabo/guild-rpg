@@ -434,6 +434,7 @@ function Text.events(events: { any }, save: any, master: any): string
 						then `（素材を売却 {e.itemsSoldGold}G）`
 						else ""}`
 					.. (if e.offline then " ［留守番］" else "")
+					.. (if e.interrupted then " ［途中で帰還］" else "")
 					.. (if e.dailyTraitId then ` ［日替わり：{traitText(e.dailyTraitId, master)}］` else "")
 					.. (if e.restBonus then " ［休息ボーナス］" else "")
 			)

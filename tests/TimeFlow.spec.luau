@@ -413,6 +413,140 @@ return function(t)
 		)
 	end)
 
+	describe("途中ログインの持ち帰り（D-186）", function()
+		-- ログアウト中に出ている留守番の探索（古い墓地）を1つ作る
+		local function withOfflineExpedition()
+			local s = newState()
+			exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
+			local e = onlyExpedition(s)
+			e.offline = true
+			s.lastSavedAt = T0
+			return s, e
+		end
+		local function returned(events: { any }): any
+			for _, ev in events do
+				if ev.type == "ExpeditionReturned" then
+					return ev
+				end
+			end
+			error("帰還がない")
+		end
+		local function materialGold(items: { [string]: number }): number
+			local g = 0
+			for id, n in items do
+				if master.items[id].kind == "sellable" then
+					g += master.items[id].sellPrice * n
+				end
+			end
+			return g
+		end
+
+		it("D-186 ログアウト直後にログインすると、ほとんど何も持ち帰らない", function()
+			local s, e = withOfflineExpedition()
+			local adv = s.adventurers[e.memberUids[1]]
+			local exp0, level0, gold0 = adv.exp, adv.level, s.gold
+			local ev = returned(Game.advance(s, ctx(T0 + 1, false)))
+			expect(ev.interrupted).toBe(true)
+			expect(ev.result).toBe("retreat")
+			expect(ev.chests).toBe(0)
+			expect(ev.gold).toBe(0)
+			expect(ev.guildExp).toBe(0)
+			expect(s.gold).toBe(gold0)
+			expect(s.adventurers[adv.uid].exp).toBe(exp0)
+			expect(s.adventurers[adv.uid].level).toBe(level0)
+			expect(s.clearedDungeons.dng_graveyard).toBe(nil) -- 踏破の扱いにしない
+			expect(onlyExpedition(s)).toBe(nil) -- ギルドで待機
+		end)
+		it(
+			"D-186 半分ほど進んだところでログインすると、そこまでのフロアの分だけ持ち帰る",
+			function()
+				local s, e = withOfflineExpedition()
+				local log = e.log
+				local k = #log.floors // 2
+				local f = log.floors[k]
+				local now = e.departAt + f.startOffset + f.duration
+				expect(now < e.returnAt).toBeTruthy()
+				local gold, chests, items = 0, 0, {}
+				for i = 1, k do
+					local g = log.floors[i].gained
+					gold += g.gold
+					chests += g.chestTo - g.chestFrom + 1
+					for id, n in g.items do
+						items[id] = (items[id] or 0) + n
+					end
+				end
+				expect(chests < #log.rewards.chests).toBeTruthy() -- 確定宝箱などは入らない
+				local gold0 = s.gold
+				local events = Game.advance(s, ctx(now, false))
+				local ev = returned(events)
+				expect(ev.interrupted).toBe(true)
+				expect(ev.result).toBe("retreat")
+				expect(ev.reachedFloor).toBe(k)
+				expect(ev.gold).toBe(gold)
+				expect(ev.chests).toBe(chests)
+				expect(ev.guildExp).toBe(k * K.guildExpPerFloor)
+				expect(s.chests.dng_graveyard ~= nil or chests == 0).toBeTruthy()
+				local total = 0
+				for _, n in s.chests.dng_graveyard or {} do
+					total += n
+				end
+				expect(total).toBe(chests)
+				expect(s.gold).toBe(gold0 + gold + materialGold(items))
+				for _, x in events do
+					expect(x.type ~= "FirstClear").toBeTruthy()
+				end
+			end
+		)
+		it("D-186 帰還の時刻を過ぎていれば、全部持ち帰る（踏破の報酬も）", function()
+			local s, e = withOfflineExpedition()
+			local log = e.log
+			expect(log.result).toBe("clear")
+			local events = Game.advance(s, ctx(e.returnAt + 10, false))
+			local ev = returned(events)
+			expect(ev.interrupted).toBe(nil)
+			expect(ev.result).toBe("clear")
+			expect(ev.chests).toBe(#log.rewards.chests)
+			expect(ev.gold).toBe(log.rewards.gold)
+			expect(s.clearedDungeons.dng_graveyard).toBe(true)
+		end)
+		it("D-186 全フロアを終えて帰りの移動中なら、ログのとおり全部", function()
+			local s, e = withOfflineExpedition()
+			local log = e.log
+			local part = Expedition.rewardsAt(log, log.travelSeconds + log.replaySeconds, K)
+			expect(part.interrupted).toBe(false)
+			expect(part.result).toBe(log.result)
+			expect(part.rewards).toEqual(log.rewards)
+			local _ = s
+		end)
+		it("D-186 日替わりで増えた宝箱は、元の宝箱を持ち帰るときだけ", function()
+			local s = newState()
+			local snaps = snapsOf(s)
+			for seed = 1, 40 do
+				local log = Expedition.simulate({
+					seed = seed,
+					departAt = T0,
+					dungeonId = "dng_graveyard",
+					members = snaps,
+					dailyTraitId = "dt_chest",
+				}, master)
+				local k = #log.floors // 2
+				local f = log.floors[k]
+				local part = Expedition.rewardsAt(log, f.startOffset + f.duration, K)
+				local base = 0
+				for i = 1, k do
+					base += log.floors[i].gained.chestTo - log.floors[i].gained.chestFrom + 1
+				end
+				local extra = 0
+				for _, src in log.traitChestSources do
+					if src <= base then
+						extra += 1
+					end
+				end
+				expect(#part.rewards.chests).toBe(base + extra)
+			end
+		end)
+	end)
+
 	describe("休息ボーナス（D-161, D-173、06章 §14）", function()
 		it("D-161 留守にした時間の半分を貯める（上限4時間）", function()
 			local s = newState()
