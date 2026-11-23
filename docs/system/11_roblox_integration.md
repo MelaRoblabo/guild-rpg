@@ -248,7 +248,8 @@ patch = {
 `Protocol.view(state, master, now)` で作る（純粋な関数。Lune でテストする）。
 
 - 送らないもの：`seed`・`rngCounter`・各探索の `seed`（乱数の予測を防ぐ）、`nextUid`、`stats`（集計用）、`lastAdvancedAt`（時間経過のたびに変わるだけで表示に使わない。送ると差分が毎秒出る）。
-- 宝箱（D-087・D-166）：`chests`（ランク別の数）の代わりに、宝箱の山ごとの数 `{ { pileKey, count } }`（特別な宝箱の山を含む。ランクなし）を送る。前の形は `{ { dungeonId, count } }`（`chestsByDungeon`）で、デバッグ画面は両方を読む。
+- 宝箱（D-087・D-166）：`chests`（ランク別の数）の代わりに、宝箱の山ごとの数 `{ { pileKey, count } }`（特別な宝箱の山を含む。ランクなし）を送る。
+- 他のプレイヤーの UserId（D-192）：`referral` から `referredBy`・`rewardedInvitees`・`claimedDeliveries` を除く。event の `ReferralGranted` の `userId` も除く（`Protocol.redactEvents`）。
 - 探索ログ：宝箱のランクを取り除き、個数だけ残す（`Protocol.redactLog`）。`floors[].detail.ranks` → `detail.chestCount`、`rewards.chests` → `rewards.chestCount`、`clearChestRanks` → `clearChestCount`。
 - events：`ExpeditionReturned` など、宝箱のランクを含むものは同じ規則で取り除く。開封結果（`ChestsOpened`）は開けた後なのでランクを含めてよい（演出の `effect` と派手さの `rank` に使う）。
 - それ以外の状態（冒険者・パーティ・装備・アイテム・面接や転生の途中の結果など）はそのまま送る。

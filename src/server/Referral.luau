@@ -29,11 +29,8 @@ export type Hooks = {
 }
 
 -- 招待された人が、招待した側へ届ける進み具合に届いたか（D-157・D-192。条件はマスターデータの referralProgressCondition）
--- 今は core に判定がないので、いつも false（届け物を書かない）
-local function progressReached(_state: any, _master: any): boolean
-	-- TODO(merge): Friend.referralProgressReached を呼ぶ
-	--   return Friend.referralProgressReached(_state, _master)
-	return false
+local function progressReached(state: any, master: any): boolean
+	return Friend.referralProgressReached(state, master)
 end
 
 -- 参加したときの招待した人（ReferredByPlayerId）。なければ nil。Roblox API の呼び出しはここだけ。

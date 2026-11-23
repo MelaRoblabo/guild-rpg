@@ -71,10 +71,10 @@ function DebugView.render(view: any, master: any, now: number): string
 	end
 
 	-- 宝箱（山ごとの数だけ。特別な宝箱の山も含む：D-087・D-166）と倉庫
-	-- view.chests は { pileKey, count }（ランクなし）。前の形 { dungeonId, count } も読む（まとめるまでの互換）
+	-- view.chests は { pileKey, count }（ランクなし。11章 §4.5）
 	local chestText = {}
 	for _, c in view.chests or {} do
-		table.insert(chestText, `{c.pileKey or c.dungeonId}×{c.count}`)
+		table.insert(chestText, `{c.pileKey}×{c.count}`)
 	end
 	local wh = Game.query.warehouse(view)
 	add(`宝箱 {if #chestText > 0 then table.concat(chestText, " ") else "なし"} ／ 倉庫 {wh.used}/{wh.size}`)
