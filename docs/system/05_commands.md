@@ -43,8 +43,8 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M5b | `Train` | adventurerUid, sessions | トレーニング。最大 sessions 回、1回ごとに費用を払って経験値を得る。上限レベルかゴールド切れで止まる（払った回数分だけ行う） | TRAINING_CAP, NOT_ENOUGH_GOLD, ADVENTURER_ON_EXPEDITION, ADVENTURER_IN_REBIRTH, INVALID_COUNT | D-076, D-077 |
 | M7b | `BulkSell` | equipmentUids（開封結果に出た装備） | 開封結果のうち「今の装備より弱い」もの（06章 §17）を全部売る。修飾語つき・保護中・装備中・商人で買ったもの・補助は対象外 | NOTHING_TO_SELL | D-120, D-167 |
 | M7b | `ClaimInbox` | — | 受け取り箱の中身をまとめて受け取る（ゴールド・アイテム・宝箱の山・ユニーク）。受け取れないもの（所属枠・倉庫がいっぱいなど）は受け取り箱に残す（期限なし）。結果は `InboxClaimed`（gold・items・宝箱の山ごとの数・残った件数・blocked）と、加入したユニークごとの `UniqueJoined`。受け取れるものが無くても失敗にはしない | INBOX_EMPTY | D-164, D-176 |
-| M7b | `ClaimFriendReward` | friendCount（サーバーが判定した同じサーバーの友達の数） | フレンドボタンの報酬（ゴールド、人数で少し増える・上限 friendRewardMaxFriends）。受け取り箱には入れない | FRIEND_NOT_READY, NO_FRIEND, DAILY_LIMIT | D-157 |
-| M7b | `GrantReferral` | role（"invitee" / "inviter"）, userId | 紹介の報酬（サーバー専用）。招待された側は1回だけ。招待した側の報酬は、相手が referralProgressCondition に届いたときに「届け物」として別の保存場所に置かれ、招待した側の次のログインでこのコマンドで受け取り箱へ入れる（週の上限まで。他人のセーブを直接書き換えない）。届け物の保存の詳細は M7b-5 | ALREADY_REWARDED, WEEKLY_LIMIT | D-157, D-180 |
+| M7b | `ClaimFriendReward` | —（同じサーバーの友達の数はサーバーが数えて `ctx.friendCount` で渡す。クライアントからは受け取らない：M7b-5） | フレンドボタンの報酬（ゴールド、人数で少し増える・上限 friendRewardMaxFriends。式は06章 §20）。受け取り箱には入れず、その場で渡す。結果は `FriendReward`（gold・friendCount・nextAt・todayCount） | NO_FRIEND, DAILY_LIMIT, FRIEND_NOT_READY | D-157 |
+| M7b | `GrantReferral` | role（"invitee" / "inviter"）, userId（招待した側なら招待された人）, deliveryId?（届け物の id） | 紹介の報酬（サーバー専用）を受け取り箱へ（source = "referral"、中身は referralRewards）。招待された側は1回だけ。招待した側の報酬は、相手が referralProgressCondition に届いたときに「届け物」として別の保存場所に置かれ、招待した側の次のログインで受け取り箱へ入れる（相手1人ごと・週の上限まで。他人のセーブを直接書き換えない）。受け取った届け物の id は `referral.claimedDeliveries` に記録し、同じ id は二度受け取らない。結果は `ReferralGranted`（role・userId・inboxUid） | ALREADY_CLAIMED, ALREADY_REWARDED, WEEKLY_LIMIT, INVALID_ROLE, INVALID_USER | D-157, D-180 |
 | M7b | `DispatchEvent` | partyIndex, eventSlot | マップイベント（レアダンジョン・レイドボス）へ派遣。出発できるのは出てから mapEventWindowSeconds の間。レアダンジョンは1パーティ1回まで。レイドはダメージを出発時に計算する | EVENT_NOT_ACTIVE, EVENT_WINDOW_CLOSED, EVENT_ALREADY_JOINED, PARTY_BUSY, PARTY_EMPTY | D-152, D-179 |
 | M7b | `BuyFromMerchant` | eventSlot, itemIndex | 旅の商人で買う。買えるのはイベントの出発と同じ3分間（mapEventWindowSeconds）。買った装備は `fromMerchant = true` で倉庫へ入り、自動売却・一括売却で売らない | EVENT_NOT_ACTIVE, EVENT_WINDOW_CLOSED, ALREADY_BOUGHT, NOT_ENOUGH_GOLD, WAREHOUSE_FULL | D-152, D-175, D-179 |
 | M9 | `GrantPurchase` | productId | Robux購入の付与（サーバー専用） | — | 10章 |
@@ -67,10 +67,19 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
    - 同じ留守を二重に計算しない。基準の `lastSavedAt` の書き込みとセッションロックはサーバー側（11章、M7b-5）。
 4. `ctx.online == true` のときは、1〜2 のあとで、日・週の切り替え（06章 §11）を見て、クエストの入れ替え・ログインボーナスの前進（その日の最初のオンラインの advance で1日分）・プレイ時間のリセットを行う（D-153〜D-155, D-168）。プレイ時間は前回のオンラインの advance からの経過秒を足し（ログイン直後の最初の advance は足さない）、段階に届いたら報酬を受け取り箱へ（D-154）。休息ボーナスの残りはオンラインの経過秒だけ減らす（探索しているかは問わない。06章 §14、D-173）。
 
+## 3a. 届け物（サーバーの呼び口：D-180）
+
+`Game.grantDelivery(state, delivery, ctx) -> (boolean, events)`。delivery = `{ id, kind, fromUserId, at, data? }`。
+別の保存場所（サーバーが M7b-5 で持つ）から届いた物を受け取り箱へ入れる。`kind = "referral"` は紹介で招待した側への報酬で、`GrantReferral`（role = "inviter", userId = fromUserId, deliveryId = id）を実行する。
+
+- 同じ id の届け物は二度受け取らない（`referral.claimedDeliveries`）。サーバーが「保存してから届け物を消す」間に落ちて同じ届け物がもう一度来ても、何も変えずに false を返す。
+- 戻り値の boolean は「状態を変えたか」。false（受け取り済み・同じ相手でもう受け取った・週の上限・知らない種類・形の違うもの）のときも、サーバーは届け物を消してよい。
+- 招待された側の「招待した人へ届け物を書いた」印は `Friend.inviterDelivered(state)` / `Friend.markInviterDelivered(state)` で読み書きする（書くきっかけの判定はサーバー：M7b-5）。
+
 ## 3b. ツール用の時間の操作
 
 - 時刻を日単位で進めるのはツール（CLI・自動プレイヤー）の仮想時計の操作で、core のコマンドではない（09章）。core は渡された `ctx.now` を使うだけ（08章, D-168）。
 
 ## 4. 読み取り用関数（状態を変えない）
 
-`Game.query.*` として、表示に必要な計算済みの値を返す。例：未開封の宝箱の山ごとの数（`chestsByPile`。レアリティは返さない：D-087, D-166）、今日・明日の日替わりの特性（`dailyTraits`：D-156）、今のマップイベントと予告（`mapEvent`：D-152）、今週の訪問者と出現率（`weeklyVisitor`：D-158）、留守番の見込み（`offlineForecast`：D-161, D-162）、休息ボーナスの残り、冒険者の実効ステータス、トレーニングの見積もり（`trainingQuote`・`trainingSessionCost`）、転生費用（`rebirthCost`）、パーティの合計攻撃力・技巧合計・移動時間、探索の現在位置（ログ再生）、攻略ヒント。受け取り箱の中身（`inbox`。宝箱は山ごとの数）、今日・今週のクエスト（`quests`）、ログインボーナスのカレンダー（`loginCalendar`）、今日のプレイ時間（`playtime`）。UIとCLIは計算をここに任せ、自前で式を持たない。
+`Game.query.*` として、表示に必要な計算済みの値を返す。例：未開封の宝箱の山ごとの数（`chestsByPile`。レアリティは返さない：D-087, D-166）、今日・明日の日替わりの特性（`dailyTraits`：D-156）、今のマップイベントと予告（`mapEvent`：D-152）、今週の訪問者と出現率（`weeklyVisitor`：D-158。uniqueId・候補1人あたりの chance・candidateSlots・owned・nextWeekAt）、フレンドボタンの状態（`friend`：D-157。nextAt・todayCount・dailyCap・今押したときの gold・押せない理由 blocker）、留守番の見込み（`offlineForecast`：D-161, D-162）、休息ボーナスの残り、冒険者の実効ステータス、トレーニングの見積もり（`trainingQuote`・`trainingSessionCost`）、転生費用（`rebirthCost`）、パーティの合計攻撃力・技巧合計・移動時間、探索の現在位置（ログ再生）、攻略ヒント。受け取り箱の中身（`inbox`。宝箱は山ごとの数）、今日・今週のクエスト（`quests`）、ログインボーナスのカレンダー（`loginCalendar`）、今日のプレイ時間（`playtime`）。UIとCLIは計算をここに任せ、自前で式を持たない。

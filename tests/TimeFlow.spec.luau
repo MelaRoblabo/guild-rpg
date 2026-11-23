@@ -266,14 +266,14 @@ return function(t)
 			end
 			expect(play("dt_exp") > play(nil)).toBeTruthy()
 		end)
-		it("D-173 乱数の消費順を変えたので engineVersion は 2", function()
-			expect(Expedition.ENGINE_VERSION).toBe(2)
+		it("D-173 D-174 乱数の消費順を変えたので engineVersion は 3", function()
+			expect(Expedition.ENGINE_VERSION).toBe(3)
 			local s = newState()
 			local log = Expedition.simulate(
 				{ seed = 1, departAt = T0, dungeonId = "dng_graveyard", members = snapsOf(s) },
 				master
 			)
-			expect(log.engineVersion).toBe(2)
+			expect(log.engineVersion).toBe(3)
 		end)
 	end)
 

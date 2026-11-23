@@ -98,6 +98,23 @@ return {
 	},
 	hireFreeRerolls = 3,
 	specialVisitorChance = 0.005, -- 仮
+	-- 今週の訪問者（D-158, D-170。06章 §18）：候補1人ごとに、まずこの確率で今週の訪問者を判定する
+	weeklyVisitorChance = 0.03, -- 仮（M7b-6）
+
+	-- フレンドボタン（D-157。06章 §20）。量は仮（M7b-6）
+	--   ゴールド = floor(friendRewardGold × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))
+	friendRewardIntervalSeconds = 600, -- 仮（M7b-6）。押したら次に押せるまでの秒（押さないとたまらない）
+	friendRewardMaxFriends = 3, -- 報酬が増えるのは3人分まで
+	friendRewardGold = 100, -- 仮（M7b-6）。友達1人のときのゴールド
+	friendRewardBonusPerFriend = 0.25, -- 仮（M7b-6）。2人目から1人ごとに増える割合
+	friendRewardDailyCap = 12, -- 仮（M7b-6）。1日に押せる回数
+
+	-- 紹介（D-157, D-180。05章 GrantReferral）。報酬は受け取り箱へ（rewards の形はクエストと同じ）。量は仮（M7b-6）
+	referralWeeklyCap = 3, -- 仮（M7b-6）。招待した側が報酬を受け取れる人数（週）
+	referralRewards = {
+		invitee = { items = { itm_slot_ticket = 2 } }, -- 仮（M7b-6）。招待された側（1回だけ）
+		inviter = { items = { itm_slot_ticket = 2 } }, -- 仮（M7b-6）。招待した側（相手1人ごと）
+	},
 
 	-- 見た目（D-050）
 	appearanceGenderWeights = {

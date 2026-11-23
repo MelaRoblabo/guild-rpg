@@ -259,9 +259,12 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
   ② ①が外れた（または①を飛ばした）ら、specialVisitorChance（0.5%）で判定
      → 当たれば、今週の訪問者以外の持っていない visitor のユニークから均等に1人（login のユニークは除く）
 候補枠の数だけ判定する（枠が多いほど出やすいのは意図どおり）
+同じ雇用の候補に同じユニークは2人出さない（①で当たった後の枠は①を飛ばす。②の候補からも除く）
+今週の訪問者の抽選 = Rng.pickWeighted（均等）。候補の並びは Uniques のデータの順
+乱数の消費順（候補1人ごと）= ①の判定（飛ばすときは引かない）→ ②の判定 →（当たれば）②の候補から1人 →（外れたら）一般の候補
 ```
 
-`weeklyVisitorChance` の値と週に何人回すかは未決（M7b-6）。
+`weeklyVisitorChance` は 0.03（仮）。値と週に何人回すかは M7b-6 で決める。実装は `src/core/Visitor.luau`、雇用画面のバナーは `Game.query.weeklyVisitor`（今週の訪問者・候補1人あたりの出現率・仲間済みか・次の週の区切り）。
 
 ## 19. 特別な宝箱（D-166, D-142）
 
@@ -289,6 +292,10 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 プレイ時間の足し方：オンラインの advance ごとに 経過秒 = ctx.now − 前回の advance の時刻（ログイン時の留守の計算で前回の時刻は ctx.now になるので、ログイン直後の最初の advance は 0）
               日が変わっていたら seconds・claimedSteps を 0 に戻し、足すのは今日の区切り（Calendar.dayStart）より後の分だけ
 フレンド    ：ctx.now ≥ friend.nextAt のとき押せる。報酬は人数 min(friendCount, friendRewardMaxFriends) で少し増える。押したら nextAt = ctx.now + friendRewardIntervalSeconds（押さないとたまらない）
+              ゴールド = floor(friendRewardGold × (1 + friendRewardBonusPerFriend × (min(friendCount, friendRewardMaxFriends) − 1)))
+              friendCount はサーバーが数えて ctx.friendCount で渡す（M7b-5）。1 未満なら押せない（NO_FRIEND）
+              1日に friendRewardDailyCap 回まで（friend.dayIndex が今日と違えば todayCount を 0 として数える）
+紹介        ：招待された側は1回だけ。招待した側は相手（UserId）1人ごと・週に referralWeeklyCap 人まで（referral.weekIndex が今週と違えば weekCount を 0 として数える）。どちらも受け取り箱へ
 ```
 
 量は未決（M7b-6）。
@@ -299,6 +306,9 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 専用ギフト（Gifts.exclusive）に限り、partyEffect を持てる（例：パーティ全員の移動が少し速い・宝箱が少し増える）
 同じ効果はパーティ内で重ねない（道案内と同じ扱い：§7、D-070）
 効き方：移動は片道秒に掛ける（§7）、宝箱は数に掛けて端数は確率で切り上げ（§5、D-173）
+種類  ：travelMult（0 < value ≤ 1）・chestMult（value ≥ 1）の2つだけ（決定の例の範囲）
+宝箱  ：掛ける対象は探索で得た元の宝箱（日替わりの特性 chestMult で増えた分には掛けない）。日替わりの分の後ろに足す
+移動  ：片道秒 = … × 日替わりの travelMult × 専用ギフトの travelMult（道案内とは別の効果なので両方掛かる）
 ```
 
 ゲーム仕様書04章の「補正の発生源は個体のみ」の例外。効果の種類と量は、専用ギフトの中身が決まってから足す（D-165）。

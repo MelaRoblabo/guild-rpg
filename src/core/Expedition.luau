@@ -4,13 +4,15 @@
 
 local Combat = require("./Combat")
 local Events = require("./Events")
+local ExclusiveGift = require("./ExclusiveGift")
 local Formulas = require("./Formulas")
 local Rng = require("./Rng")
 
 local Expedition = {}
 
 -- v2：日替わりの特性 chestMult の端数の判定を最後に足した（07章 §3 の 4、D-173）
-Expedition.ENGINE_VERSION = 2
+-- v3：専用ギフトのパーティ効果 chestMult の端数の判定をその後に足した（07章 §3 の 5、D-174）
+Expedition.ENGINE_VERSION = 3
 
 export type Input = {
 	seed: number,
@@ -62,6 +64,9 @@ export type Log = {
 	dailyTraitId: string?,
 	traitChests: number?, -- 日替わりの特性 chestMult で増えた宝箱の数（rewards.chests に含む）
 	traitChestSources: { number }?, -- 増えた宝箱それぞれの元の宝箱の番号（rewards.chests の何番目か）
+	partyChests: number?, -- 専用ギフトのパーティ効果 chestMult で増えた宝箱の数（rewards.chests に含む。日替わりの分の後ろ：D-174）
+	partyChestSources: { number }?, -- その元の宝箱の番号
+	partyEffectGiftIds: { string }?, -- 効いた専用ギフトのパーティ効果（演出用）
 	timeMult: number?,
 	rewards: Events.Rewards,
 }
@@ -100,7 +105,9 @@ function Expedition.simulate(input: Input, master: any): Log
 	end
 
 	local travelMult = if trait and trait.effect == "travelMult" then trait.value else 1
-	local travel, travelGiftId = Formulas.travelSeconds(input.members, dungeon, K, travelMult)
+	-- 専用ギフトのパーティ全体の効果（D-174、06章 §21）：移動は片道秒に掛ける。同じ効果は重ねない
+	local party = ExclusiveGift.partyEffects(input.members, master)
+	local travel, travelGiftId = Formulas.travelSeconds(input.members, dungeon, K, travelMult * party.travelMult)
 	local rewards: Events.Rewards = { exp = {}, gold = 0, chests = {}, items = {}, floorsCleared = 0, guildExp = 0 }
 	local floors: { FloorLog } = {}
 	local offset = travel
@@ -233,15 +240,13 @@ function Expedition.simulate(input: Input, master: any): Log
 	else
 		rewards.floorsCleared = reached - 1
 	end
-	-- 日替わりの特性 chestMult（D-173、07章 §3 の 4）：宝箱1個ごとに、整数部ぶん増やし、端数は確率で +1
-	local traitChests = nil
-	local traitChestSources = nil -- 増えた宝箱それぞれの元の宝箱が rewards.chests の何番目か（D-186）
-	if trait and trait.effect == "chestMult" then
-		traitChests = 0
-		traitChestSources = {}
-		local whole = math.floor(trait.value - 1)
-		local frac = (trait.value - 1) - whole
-		local base = table.clone(rewards.chests)
+	-- 宝箱の数を増やす効果（D-173）：元の宝箱1個ごとに、整数部ぶん増やし、端数は確率で +1
+	-- どの効果も「探索で得た元の宝箱」（base）に掛ける。増えた宝箱は rewards.chests の後ろに足す
+	local base = table.clone(rewards.chests)
+	local function multiplyChests(value: number): (number, { number })
+		local added, sources = 0, {}
+		local whole = math.floor(value - 1)
+		local frac = (value - 1) - whole
 		for i, c in base do
 			local extra = whole
 			if frac > 0 and rng:chance(frac) then
@@ -249,9 +254,31 @@ function Expedition.simulate(input: Input, master: any): Log
 			end
 			for _ = 1, extra do
 				table.insert(rewards.chests, { rank = c.rank })
-				table.insert(traitChestSources, i)
+				table.insert(sources, i)
 			end
-			traitChests += extra
+			added += extra
+		end
+		return added, sources
+	end
+	-- 日替わりの特性 chestMult（07章 §3 の 4）
+	local traitChests = nil
+	local traitChestSources = nil -- 増えた宝箱それぞれの元の宝箱が rewards.chests の何番目か（D-186）
+	if trait and trait.effect == "chestMult" then
+		traitChests, traitChestSources = multiplyChests(trait.value)
+	end
+	-- 専用ギフトのパーティ効果 chestMult（07章 §3 の 5、D-174）
+	local partyChests = nil
+	local partyChestSources = nil
+	if party.chestMult > 1 then
+		partyChests, partyChestSources = multiplyChests(party.chestMult)
+	end
+	local partyEffectGiftIds = nil
+	if party.travelGiftId or party.chestGiftId then
+		partyEffectGiftIds = {}
+		for _, id in { party.travelGiftId, party.chestGiftId } do
+			if id and not table.find(partyEffectGiftIds, id) then
+				table.insert(partyEffectGiftIds, id)
+			end
 		end
 	end
 	-- ギルド経験値（Q-017）。初回踏破のボーナスは状態に依存するため M2 で加算する
@@ -286,6 +313,9 @@ function Expedition.simulate(input: Input, master: any): Log
 		dailyTraitId = input.dailyTraitId,
 		traitChests = traitChests,
 		traitChestSources = traitChestSources,
+		partyChests = partyChests,
+		partyChestSources = partyChestSources,
+		partyEffectGiftIds = partyEffectGiftIds,
 		timeMult = if timeMult ~= 1 then timeMult else nil,
 		rewards = rewards,
 	}
@@ -332,11 +362,18 @@ function Expedition.rewardsAt(log: Log, elapsed: number, K: any): any
 			end
 		end
 	end
-	-- 日替わりの特性で増えた宝箱は、元の宝箱を持ち帰るときだけ
-	local baseCount = #full.chests - #(log.traitChestSources or {})
-	for j, src in log.traitChestSources or {} do
+	-- 日替わりの特性・専用ギフトのパーティ効果で増えた宝箱は、元の宝箱を持ち帰るときだけ（この順に後ろに並ぶ）
+	local traitSources = log.traitChestSources or {}
+	local partySources = log.partyChestSources or {}
+	local baseCount = #full.chests - #traitSources - #partySources
+	for j, src in traitSources do
 		if included[src] then
 			table.insert(chests, full.chests[baseCount + j])
+		end
+	end
+	for j, src in partySources do
+		if included[src] then
+			table.insert(chests, full.chests[baseCount + #traitSources + j])
 		end
 	end
 	return {

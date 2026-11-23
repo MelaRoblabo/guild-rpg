@@ -33,7 +33,7 @@ end
 local ID = 64 -- uid・マスターID の長さの上限
 local WHICH = enum({ "previous", "current" })
 
--- クライアントから受け付けるコマンドと引数（05章 M2〜M5b、M7b）。GrantPurchase（サーバー専用）は含めない
+-- クライアントから受け付けるコマンドと引数（05章 M2〜M5b、M7b）。GrantPurchase・GrantReferral（サーバー専用）は含めない
 Protocol.CLIENT_COMMANDS = {
 	SetPartySlot = { partyIndex = int(1, 20), slot = int(1, 4), adventurerUid = str(ID, true) },
 	Equip = { adventurerUid = str(ID), equipmentUid = str(ID) },
@@ -61,10 +61,11 @@ Protocol.CLIENT_COMMANDS = {
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
 	ClaimInbox = {}, -- D-164
+	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）
 } :: { [string]: { [string]: Field } }
 
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）
-Protocol.SERVER_ONLY = { GrantPurchase = true }
+Protocol.SERVER_ONLY = { GrantPurchase = true, GrantReferral = true }
 
 local function checkField(name: string, f: Field, v: any): string?
 	if v == nil then

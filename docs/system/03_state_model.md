@@ -151,16 +151,18 @@ export type PlayerState = {
 		seconds: number,              -- 今日のオンラインの合計秒（上限 playtimeDailyCapSeconds）
 		claimedSteps: number,         -- 受け取り箱へ送った段階の数
 	},
-	friend: {                         -- フレンドボタン（D-157）
+	friend: {                         -- フレンドボタン（D-157）。version 9
 		nextAt: number,               -- 次に押せる時刻
 		dayIndex: number, todayCount: number,  -- 1日の上限の数え方
 	},
-	referral: {                       -- 紹介（D-157）
+	referral: {                       -- 紹介（D-157）。version 9
 		referredBy: number?,          -- 招待した人の UserId（ReferredByPlayerId。サーバーが入れる）
 		inviteeRewardDone: boolean,   -- 招待された側の報酬を渡したか（1回だけ）
+		inviterDelivered: boolean,    -- 招待された側：招待した人へ届け物を書いたか（同じ招待で2回届けない。読み書きは Friend.inviterDelivered / markInviterDelivered。書くきっかけの判定はサーバー：M7b-5）
 		rewardedInvitees: { [string]: boolean },  -- 招待した側：報酬を渡した相手の UserId（文字列キー）
+		claimedDeliveries: { [string]: boolean }, -- 招待した側：受け取った届け物の id（例 "referral:<招待された人の UserId>"）。同じ id は二度受け取らない
 		weekIndex: number, weekCount: number,     -- 招待した側の人数の上限（週）
-	},                                -- 招待した側への報酬は「届け物」として別の保存場所に置き、次のログインで受け取り箱へ入れる（D-180。このセーブには書かない。詳細は M7b-5）
+	},                                -- 招待した側への報酬は「届け物」として別の保存場所に置き、次のログインで受け取り箱へ入れる（D-180。届け物そのものはこのセーブには書かない。詳細は M7b-5）
 	merchant: { eventSlot: number, bought: { boolean } }?,  -- 今の旅の商人の品のうち買ったもの（D-152）。品ぞろえは eventSlot と seed から決まるので保存しない
 	raid: { eventSlot: number, damage: number, defeated: boolean }?,  -- 今のレイドボスの進み具合（D-152。自分専用）
 	rareDungeonSlots: { [string]: number }?,  -- レアダンジョンに出発したパーティ（partyIndex → eventSlot。1パーティ1回まで：D-152）
@@ -216,7 +218,17 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 
 新規のセーブも同じ初期値を持つ（`Game.newState`）。
 
-### version 8 → 9 以降（M7b-4 後半以降の各段階）
+### version 8 → 9（M7b-4 後半の担当A）　`Migration.CURRENT = 9`
+
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `friend` | `nextAt = 0, dayIndex = -1, todayCount = 0` | D-157 |
+| `referral` | `inviteeRewardDone = false, inviterDelivered = false, rewardedInvitees = {}, claimedDeliveries = {}, weekIndex = -1, weekCount = 0`（`referredBy` は nil。サーバーが入れる） | D-157, D-180 |
+| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える（その位置に置く）。今は専用ギフトを持つユニークがいないので何も変わらない | D-165, D-177, D-185 |
+
+新規のセーブも同じ初期値を持つ（`Game.newState`）。移行には master が要る（無ければ何も変えずに失敗する）。ユニークは雇用・初回踏破・受け取り箱のどれで加入しても、加入したときに専用ギフトを持つ（`Hiring.newAdventurer`）。
+
+### version 9 → 10 以降（M7b-4 後半以降の各段階）
 
 次の項目は、それを使う段階で version を上げて足す。どの段階かは 12章「M7b の進め方」の内容に合わせ、足した段階でこの表を「version n → n+1」の節に移す。
 
@@ -224,9 +236,6 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 | --- | --- | --- | --- |
 | `expeditions[*]` | `eventSlot`・`raidDamage` は nil | D-152 | M7b-4 後半 |
 | `equipment[*]` | `fromMerchant` は nil | D-175 | M7b-4 後半 |
-| `friend` | `nextAt = 0, dayIndex = -1, todayCount = 0` | D-157 | M7b-4〜5（未定） |
-| `referral` | `inviteeRewardDone = false, rewardedInvitees = {}, weekIndex = -1, weekCount = 0` | D-157 | M7b-4〜5（未定） |
 | `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 | M7b-4 後半 |
-| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177, D-185 | M7b-4 後半 |
 
 新規のセーブ（`Game.newState`）は、その時点の version で足した項目を初期値で持ち、`settings.autoSell` は StarterSet の D-167 の初期値（オン）にする。
