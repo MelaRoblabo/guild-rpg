@@ -120,6 +120,7 @@
 | `raidTravelSeconds` | レイドへの片道秒（30。M7b-6 で 60 から短くした：オンラインの価値 D-161）。`mapEventWindowSeconds + raidTravelSeconds ≤ mapEventIntervalSeconds` を検証（最後のダメージが次の時間帯より前に入る） | D-152 |
 | `merchantItemCount` | `{ min = 3, max = 5 }`。品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン） | D-152, D-189 |
 | `merchantDungeonCount` | 2（品を引くダンジョン＝踏破済みのうち深い方からこの数。一番深いダンジョンとその1つ浅いダンジョン。06章 §12）。検証：1以上の整数 | D-202 |
+| `merchantRarityBias` | 12（品のレアリティの重み＝宝箱の表の重み × この値 ^ (rank − 2)。コモンは除く。「誰かの今の装備より良い品」が約15%になるよう自動プレイで合わせた。06章 §12）。検証：1以上 | D-204 |
 | `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 10 / 0.5 / 0.5（10 は M7b-6 で見直して据え置き：D-198。係数 0.5 は仮のまま） | D-152, D-198 |
 | `rewardShareTargets` | §13 の表（まだ置いていない。自動プレイの `Ledger.TARGETS` に写して比べる） | D-160, D-200 |
 
@@ -233,7 +234,7 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 
 - `LoginBonus`：`{ days = { 1〜6日目の rewards（6行） }, fallback = rewards }`。1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク（`cycle` 周目は loginOrder の順で `cycle` 番目）。ログイン用のユニークがいない・そのユニークを持っている（受け取り箱に届いている）・ユニークが一巡した後は `fallback`（レアな宝箱＋チケット。M7b-6 で `special:login` のランク3（レア）50個＋チケット20）。量は M7b-6 で配分（D-160）に合わせた（1〜6日目の合計：ゴールド係数510・宝箱1300・チケット50・ポーション2（5日目の見た目変更・見た目維持 各1。量を優先：D-201））。ゴールドは `goldMult`。（D-155, D-190）
 - ログイン用のユニークの中身（誰か・人数）は未決（Q-025）。M7b-4 では仕組みだけを作り、Uniques に `acquire = "login"` の行は置かない（いないので7日目は毎周 fallback）。
-- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%。`goldMult` で踏破した一番深いダンジョンに応じて増える：D-190）と宝箱（`special:playtime`）。量は M7b-6 で配分（D-160。D-200 で「プレイ時間」の列はプレイ時間報酬だけになった）に寄せた：`goldMult` は 5・10分 8、20〜60分 10、90・120分 12（1段あたりオンライン1時間の直接のゴールドの約5%。D-154 の「数%」の上の方にとどめた）、宝箱は 10分 30・30分 40・60分 60・120分 80、チケットは 30分 1・60分 1・120分 2。（D-154）
+- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%。`goldMult` で踏破した一番深いダンジョンに応じて増える：D-190）と宝箱（`special:playtime`）。量は M7b-6 で配分（D-160。D-200 で「プレイ時間」の列はプレイ時間報酬だけになった）に寄せた：`goldMult` は 5・10分 16、20〜60分 20、90・120分 24（コアで配分の約10%：D-205。D-154 の「数%」より D-160 を優先）、宝箱は 10分 30・30分 40・60分 60・120分 80、チケットは 30分 1・60分 1・120分 2。（D-154）
 
 ## 11. 特別な宝箱（SpecialChests.luau、D-166）
 
@@ -264,7 +265,7 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 ## 12. マップイベント・旅の商人（MapEvents.luau・Merchant.luau、D-152）
 
 - `MapEvents`：`kinds`（`{ id, kind }`。`mev_rare_dungeon`＝rareDungeon・`mev_raid`＝raid・`mev_merchant`＝merchant）と、出る場所の一覧 `places`（`{ id }`。中身は M8 のマップ設計で決める。M7b-4 は `mev_place_1〜4` の仮）。種類の割合は `mapEventKindWeights`（未決（M7b-6））。検証：割合の id は kinds を指す、kind の重複なし、場所は1行以上。
-- 旅の商人の決まりは別のファイルを作らず `Constants` に置く：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで（品ごとに、踏破した一番深いダンジョンとその1つ浅いダンジョン（`merchantDungeonCount`。踏破が1つならそのダンジョン、未踏破なら古い墓地：D-187, D-202）から1つ選び、そのダンジョンの `chestRarityWeights` からコモンを除いた表（コモンしかなければコモン：D-189）と宝箱の中身の抽選で作る。06章 §12）。
+- 旅の商人の決まりは別のファイルを作らず `Constants` に置く：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで（品ごとに、踏破した一番深いダンジョンとその1つ浅いダンジョン（`merchantDungeonCount`。踏破が1つならそのダンジョン、未踏破なら古い墓地：D-187, D-202）から1つ選び、そのダンジョンの `chestRarityWeights` からコモンを除き、上位ほど重くした表（`merchantRarityBias`：D-204。コモンしかなければコモン：D-189）と宝箱の中身の抽選で作る。06章 §12）。
 
 ## 13. 報酬の入手先の配分（rewardShareTargets、D-160）
 

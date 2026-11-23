@@ -215,6 +215,9 @@ return {
 	merchantItemCount = { min = 3, max = 5 }, -- 品の数（プレイヤーごと）
 	-- 品を引くダンジョン（D-202）：踏破済みのうち深い方からこの数（2 ＝ 一番深いダンジョンとその1つ浅いダンジョン）
 	merchantDungeonCount = 2,
+	-- 品のレアリティの重み（D-204）：宝箱の表の重み × merchantRarityBias ^ (rank − 2)（コモンは除く：D-189）。
+	--   「誰かの今の装備より良い品」が約15%になるように自動プレイで合わせる（docs/reports/M7b6_balance.md）
+	merchantRarityBias = 12,
 	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）。M7b-6 で見直し、据え置き（D-198）
 	merchantGradeCoef = 0.5, -- 仮（M7b-6）
 	merchantModifierCoef = 0.5, -- 仮（M7b-6）
