@@ -34,6 +34,8 @@ return function(t)
 				{ type = "HireStart" },
 				{ type = "HireChoose", which = "previous" },
 				{ type = "SetAutoSell", enabled = true, maxRarity = 2 },
+				{ type = "OpenChests", pileKey = "special:rare:dng_sky_throne" }, -- D-166
+				{ type = "BulkSell", equipmentUids = { "eq_1" } }, -- D-167
 			}
 			for _, c in cases do
 				local ok, err = Protocol.validateCommand(c)
@@ -54,6 +56,8 @@ return function(t)
 				{ type = "Rename", adventurerUid = "adv_1", name = string.rep("あ", 30) }, -- 長すぎる
 				{ type = "Sell", equipmentUids = { a = "eq_1" } }, -- 配列でない
 				{ type = "SetLock", uid = "eq_1", locked = "yes" }, -- 真偽値でない
+				{ type = "OpenChests", dungeonId = "dng_ruins" }, -- 宝箱の山は pileKey（D-166）
+				{ type = "BulkSell" }, -- 対象の装備がない
 			}
 			for _, c in bad do
 				local ok = Protocol.validateCommand(c)
@@ -76,7 +80,7 @@ return function(t)
 		step({ type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" }, T0)
 		step({ type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, T0)
 		step(nil, T0 + 600)
-		step({ type = "OpenChests", dungeonId = "dng_graveyard" }, T0 + 600)
+		step({ type = "OpenChests", pileKey = "dng_graveyard" }, T0 + 600)
 		step({ type = "HireStart" }, T0 + 610)
 		step({ type = "HirePick", candidateIndex = 1 }, T0 + 611)
 		step({ type = "HireReroll" }, T0 + 612)

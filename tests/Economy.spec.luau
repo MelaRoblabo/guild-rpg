@@ -145,15 +145,15 @@ return function(t)
 			local s = newState()
 			s.expansions.warehouseSize = 100000
 			Chest.add(s, "dng_sky_throne", 6, 3)
-			expect(exec(s, { type = "OpenChests", dungeonId = "dng_sky_throne" }).ok).toBeTruthy()
+			expect(exec(s, { type = "OpenChests", pileKey = "dng_sky_throne" }).ok).toBeTruthy()
 			expect(master.expansions.exp_unlock).toBe(nil)
 		end)
 		it("D-089 まとめ開きは既定で chestBatchOpen 個。残りが少なければその数", function()
 			local s = pile("dng_ruins", { 150, 50 })
-			local r = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins" }))
+			local r = ev(exec(s, { type = "OpenChests", pileKey = "dng_ruins" }))
 			expect(r.opened).toBe(K.chestBatchOpen)
 			expect(r.remaining).toBe(200 - K.chestBatchOpen)
-			local r2 = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins" }))
+			local r2 = ev(exec(s, { type = "OpenChests", pileKey = "dng_ruins" }))
 			expect(r2.opened).toBe(200 - K.chestBatchOpen)
 			expect(Chest.total(s)).toBe(0)
 		end)
@@ -161,7 +161,7 @@ return function(t)
 			"D-089 山からはランクの残り数で重み付けして引く（数の比率どおりに出る）",
 			function()
 				local s = pile("dng_ruins", { 3000, 1000 })
-				local r = ev(exec(s, { type = "OpenChests", dungeonId = "dng_ruins", count = 2000 }))
+				local r = ev(exec(s, { type = "OpenChests", pileKey = "dng_ruins", count = 2000 }))
 				local high = 0
 				for _, x in r.normal do
 					high += if x.rank == 2 then 1 else 0
@@ -177,7 +177,7 @@ return function(t)
 			function()
 				local d = master.dungeons.dng_castle
 				local s = pile(d.id, { 20, 20, 20, 20, 20, 20 })
-				local r = ev(exec(s, { type = "OpenChests", dungeonId = d.id }))
+				local r = ev(exec(s, { type = "OpenChests", pileKey = d.id }))
 				expect(#r.normal + #r.special).toBe(100)
 				for _, x in r.normal do
 					expect(x.rank < d.chestEffectMinRarity).toBeTruthy()
@@ -225,7 +225,7 @@ return function(t)
 						{ uid = "ch_3", rank = 1, dungeonId = "dng_tower", obtainedAt = T0 },
 					},
 				}
-				Migration.migrate(old)
+				Migration.migrate(old, master)
 				expect(old.version).toBe(Migration.CURRENT)
 				expect(old.chests.dng_ruins).toEqual({ 0, 0, 2, 0, 0 })
 				expect(old.chests.dng_tower).toEqual({ 1, 0, 0, 0, 0 })
@@ -235,44 +235,158 @@ return function(t)
 		)
 	end)
 
-	describe("派遣費（D-079）", function()
-		local feeDungeon = nil
-		for _, d in master.dungeonList do
-			if d.dispatchFee and feeDungeon == nil then
-				feeDungeon = d
+	describe("宝箱の山（D-166, D-171）", function()
+		it(
+			"D-166 宝箱は宝箱の山の鍵で保存する。普通の山は dungeonId、特別な山は special:...",
+			function()
+				local s = newState()
+				Chest.add(s, "dng_ruins", 2, 3)
+				Chest.add(s, "special:raid", 3, 2)
+				Chest.add(s, "special:rare:dng_castle", 1, 1)
+				expect(s.chests.dng_ruins).toEqual({ 0, 3 })
+				expect(s.chests["special:raid"]).toEqual({ 0, 0, 2 })
+				expect(Chest.total(s)).toBe(6)
+				expect(Chest.countByRank(s, master)).toEqual({ 1, 3, 2, 0, 0, 0 })
+				expect(Chest.isSpecialPile("special:raid")).toBe(true)
+				expect(Chest.isSpecialPile("dng_ruins")).toBe(false)
 			end
-		end
-		it("D-079 派遣費のあるダンジョンは出発時にゴールドが減る", function()
+		)
+		it(
+			"D-166 見せる一覧は宝箱の山ごとの数（普通の山の後に特別な山。レアリティは含まない）",
+			function()
+				local s = newState()
+				Chest.add(s, "special:raid", 3, 2)
+				Chest.add(s, "dng_castle", 2, 4)
+				Chest.add(s, "dng_ruins", 1, 1)
+				Chest.add(s, "special:rare:dng_castle", 1, 5)
+				expect(Game.query.chestsByPile(s, master)).toEqual({
+					{ pileKey = "dng_ruins", count = 1 },
+					{ pileKey = "dng_castle", count = 4 },
+					{ pileKey = "special:raid", count = 2 },
+					{ pileKey = "special:rare:dng_castle", count = 5 },
+				})
+			end
+		)
+		it("D-166 ない山は PILE_NOT_FOUND、宝箱がない山は NO_CHEST", function()
 			local s = newState()
-			s.unlockedDungeons[feeDungeon.id] = true
-			s.gold = feeDungeon.dispatchFee - 1
-			expect(exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = feeDungeon.id }).error).toBe(
-				"NOT_ENOUGH_GOLD"
-			)
-			s.gold = feeDungeon.dispatchFee
-			expect(exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = feeDungeon.id }).ok).toBeTruthy()
+			expect(exec(s, { type = "OpenChests", pileKey = "dng_nope" }).error).toBe("PILE_NOT_FOUND")
+			expect(exec(s, { type = "OpenChests" }).error).toBe("PILE_NOT_FOUND")
+			expect(exec(s, { type = "OpenChests", pileKey = "dng_ruins" }).error).toBe("NO_CHEST")
+		end)
+		it(
+			"D-166 特別な山（special:...）があっても壊れない（中身の表は M7b-4。今は開けずに残す）",
+			function()
+				local s = newState()
+				Chest.add(s, "special:raid", 3, 2)
+				Chest.add(s, "special:rare:dng_castle", 1, 1)
+				Chest.add(s, "dng_graveyard", 1, 1)
+				local before = Game._deepClone(s)
+				expect(exec(s, { type = "OpenChests", pileKey = "special:raid" }).error).toBe("PILE_NOT_FOUND")
+				expect(exec(s, { type = "OpenChests", pileKey = "special:rare:dng_castle" }).error).toBe(
+					"PILE_NOT_FOUND"
+				)
+				expect(s).toEqual(before)
+				-- 普通の山は開けられ、特別な山の数はそのまま
+				local r = exec(s, { type = "OpenChests", pileKey = "dng_graveyard" })
+				expect(r.ok).toBeTruthy()
+				expect(r.events[1].pileKey).toBe("dng_graveyard")
+				expect(s.chests["special:raid"]).toEqual({ 0, 0, 2 })
+				-- 時間経過・保存の形も壊れない
+				exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
+				local e = Game.query.expeditionOf(s, 1)
+				Game.advance(s, ctx(e.returnAt))
+				local serde = require("@lune/serde")
+				local decoded = serde.decode("json", serde.encode("json", s))
+				expect(decoded.chests["special:rare:dng_castle"]).toEqual({ 1 })
+			end
+		)
+	end)
+
+	describe("セーブの移行 version 5 → 6（D-177 の M7b-2 分）", function()
+		local Migration = require("../src/core/Migration")
+		local function v5State()
+			local s = newState()
+			s.version = 5
+			s.settings.autoSell = { enabled = false, maxRarity = 1, keepModified = true }
+			s.items = { itm_bone_fragment = 3, itm_sky_feather = 2, itm_slot_ticket = 4 }
+			s.chests = { dng_ruins = { 2, 1 }, dng_castle = { 0, 0, 5 } }
+			s.gold = 1000
+			return s
+		end
+		it("D-177 version 6 になる", function()
+			expect(Migration.CURRENT).toBe(6)
+			expect(newState().version).toBe(6)
+			local s = Migration.migrate(v5State(), master)
+			expect(s.version).toBe(6)
+		end)
+		it("D-177 自動売却の設定は初期値（オン）にする", function()
+			local s = Migration.migrate(v5State(), master)
+			expect(s.settings.autoSell).toEqual(master.raw.StarterSet.autoSell)
+			expect(s.settings.autoSell.enabled).toBe(true)
+		end)
+		it(
+			"D-177 持っている売却用アイテムは今までと同じ売却価格で売ってゴールドにする",
+			function()
+				local s = Migration.migrate(v5State(), master)
+				local expected = 1000
+					+ master.items.itm_bone_fragment.sellPrice * 3
+					+ master.items.itm_sky_feather.sellPrice * 2
+				expect(s.gold).toBe(expected)
+				expect(s.items).toEqual({ itm_slot_ticket = 4 }) -- 売却用でないものは残す
+			end
+		)
+		it("D-177 宝箱の鍵は dungeonId のまま宝箱の山の鍵として使う", function()
+			local s = Migration.migrate(v5State(), master)
+			expect(s.chests).toEqual({ dng_ruins = { 2, 1 }, dng_castle = { 0, 0, 5 } })
+			expect(exec(s, { type = "OpenChests", pileKey = "dng_castle" }).ok).toBeTruthy()
+		end)
+		it("D-177 移行には master が要る（無ければ何も変えずに失敗する）", function()
+			local s = v5State()
+			local before = Game._deepClone(s)
+			expect(function()
+				Migration.migrate(s)
+			end).toThrow("master")
+			expect(s).toEqual(before)
+		end)
+	end)
+
+	describe("派遣費の廃止（D-163）", function()
+		it("D-163 どのダンジョンにも派遣費がない（マスターデータ）", function()
+			for _, d in master.dungeonList do
+				expect(d.dispatchFee).toBe(nil)
+			end
+			local MasterData = require("../src/core/MasterData")
+			local bad = Fixtures.clone(require("../src/data"))
+			bad.Dungeons[#bad.Dungeons].dispatchFee = 1000
+			expect(function()
+				MasterData.load(bad)
+			end).toThrow("dispatchFee")
+		end)
+		it("D-163 最深部のダンジョンでも所持金0で出発でき、ゴールドは減らない", function()
+			local s = newState()
+			local deepest = master.dungeonList[#master.dungeonList]
+			s.unlockedDungeons[deepest.id] = true
+			s.gold = 0
+			local r = exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = deepest.id })
+			expect(r.ok).toBeTruthy()
 			expect(s.gold).toBe(0)
 		end)
-		it("D-079 自動周回はゴールドが足りなければ止まる", function()
+		it("D-163 自動再派遣は所持金0でも止まらない", function()
 			local s = newState()
-			s.unlockedDungeons[feeDungeon.id] = true
-			s.gold = feeDungeon.dispatchFee
-			exec(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = feeDungeon.id })
-			exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = feeDungeon.id })
+			local deepest = master.dungeonList[#master.dungeonList]
+			s.unlockedDungeons[deepest.id] = true
+			s.gold = 0
+			exec(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = deepest.id })
+			exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = deepest.id })
 			local e = Game.query.expeditionOf(s, 1)
 			e.log.rewards.gold = 0
 			e.log.rewards.chests = {}
 			local events = Game.advance(s, ctx(e.returnAt))
-			local stopped = nil
 			for _, ev in events do
-				if ev.type == "AutoRepeatStopped" then
-					stopped = ev.reason
-				end
+				expect(ev.type ~= "AutoRepeatStopped").toBeTruthy()
 			end
-			expect(stopped).toBe("NOT_ENOUGH_GOLD")
-		end)
-		it("D-079 初級ダンジョンには派遣費がない", function()
-			expect(master.dungeons.dng_graveyard.dispatchFee).toBe(nil)
+			expect(s.parties[1].autoRepeat ~= nil).toBeTruthy()
+			expect(Game.query.expeditionOf(s, 1) ~= nil).toBeTruthy()
 		end)
 	end)
 

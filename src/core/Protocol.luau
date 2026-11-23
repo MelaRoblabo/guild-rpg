@@ -33,15 +33,16 @@ end
 local ID = 64 -- uid・マスターID の長さの上限
 local WHICH = enum({ "previous", "current" })
 
--- クライアントから受け付けるコマンドと引数（05章 M2〜M5b）。GrantPurchase（サーバー専用）は含めない
+-- クライアントから受け付けるコマンドと引数（05章 M2〜M5b、M7b）。GrantPurchase（サーバー専用）は含めない
 Protocol.CLIENT_COMMANDS = {
 	SetPartySlot = { partyIndex = int(1, 20), slot = int(1, 4), adventurerUid = str(ID, true) },
 	Equip = { adventurerUid = str(ID), equipmentUid = str(ID) },
 	Unequip = { adventurerUid = str(ID), slot = enum({ "weapon", "armor", "sub" }) },
 	Dispatch = { partyIndex = int(1, 20), dungeonId = str(ID) },
 	SetAutoRepeat = { partyIndex = int(1, 20), dungeonId = str(ID, true) },
-	OpenChests = { dungeonId = str(ID), count = int(1, 1000, true) },
+	OpenChests = { pileKey = str(ID), count = int(1, 1000, true) }, -- 宝箱の山の鍵（D-166）
 	Sell = { equipmentUids = strList(1000, ID, true), itemId = str(ID, true), count = int(1, 1000000, true) },
+	BulkSell = { equipmentUids = strList(1000, ID) }, -- D-167
 	SetLock = { uid = str(ID), locked = bool() },
 	HireStart = {},
 	HirePick = { candidateIndex = int(1, 20) },

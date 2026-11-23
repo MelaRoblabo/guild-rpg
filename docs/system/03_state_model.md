@@ -32,7 +32,7 @@ export type EquipmentItem = {
 	modifierValue: number?,
 	equippedBy: string?,      -- 冒険者 uid
 	locked: boolean,
-	fromMerchant: boolean?,   -- 旅の商人で買った装備。一括売却・自動売却で売らない（D-152, D-175）。version 6 で追加
+	fromMerchant: boolean?,   -- 旅の商人で買った装備。一括売却・自動売却で売らない（D-152, D-175）。M7b-4 の段階で追加（version はその段階で上げる）
 }
 
 -- 宝箱（D-084, D-166）：倉庫とは別の「宝箱置き場」。1個ずつの記録は持たず、宝箱の山×ランクの数だけ。上限なし
@@ -58,7 +58,7 @@ export type Expedition = {
 	returnAt: number,
 	log: ExpeditionLog,               -- 07章。出発時に確定し変更しない
 	collected: boolean,
-	offline: boolean?,                -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない。version 6 で追加
+	offline: boolean?,                -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない。M7b-3 の段階で追加（version はその段階で上げる）
 	dailyTraitId: string?,            -- 出発時に当たっていた日替わりの特性（D-156）。留守番も出発した日の特性
 	eventSlot: number?,               -- マップイベントへの派遣なら、そのイベントの時間帯の番号（D-152、06章 §12）
 	raidDamage: number?,              -- レイドへの派遣なら、出発時に計算したダメージ（到着時刻に入れる。D-152）
@@ -131,7 +131,7 @@ export type PlayerState = {
 	lastAdvancedAt: number,
 	itemLog: { ItemLogEntry },        -- 有料・無料の入手経路の記録（10章。直近N件）
 
-	-- ここから version 6 で追加（D-152〜D-168。Migration v5→v6）
+	-- ここから M7b-3 以降の段階で追加（D-152〜D-168。段階ごとに version を上げる：下の「セーブの移行」）
 	lastSavedAt: number,              -- 最後に保存した時刻＝ログアウト時刻。留守の計算の基準（D-161）。サーバーが保存のときに ctx.now を書く（11章）
 	restBonusSeconds: number,         -- 休息ボーナスの残り秒（D-161。上限 restBonusMaxSeconds）
 	quests: {                         -- D-153
@@ -178,26 +178,38 @@ export type PlayerState = {
 - 売却用アイテム（素材）は常に自動で売るので、`items` には入らない（D-167）。
 - 専用ギフト（D-165）は状態の形を変えない。`giftIds` に入るギフトの1つで、専用かどうかはマスターデータ Gifts の印で見る（04章 §8）。
 
-## セーブの移行（version 5 → 6、M7b-2）
+## セーブの移行（M7b は段階ごとに version を上げる）
 
-D-152〜D-168 で足す状態をまとめて version 6 にする（影響と修正リスト #8-1）。`Migration.CURRENT = 6`。まだ公開前なので、一番簡単な形にする（D-177）。
+D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の段階ごとに version を1つ上げる**（影響と修正リスト #8-1）。段階ごとにテストつきで動く形にするため。まだ公開前なので、どの段階も一番簡単な形にする（D-177）。
+
+- `Migration.migrate(state, master)` にはマスターデータを渡す（売却価格・初期値を使う手順があるため）。master が無いと v5 → v6 で失敗し、状態は変えない。Roblox のサーバー（`src/server/PlayerSessions`）も master を渡す（M7b-5 で直す。それまで version 5 のセーブは読み込みに失敗して切断される。上書きはしない）。
+
+### version 5 → 6（M7b-2）　`Migration.CURRENT = 6`
 
 | 項目 | 旧版からの変換 | 根拠 |
 | --- | --- | --- |
 | `chests` | 鍵は dungeonId のまま宝箱の山の鍵として扱う（変換しない） | D-166, D-177 |
-| `expeditions[*]` | `offline`・`dailyTraitId`・`eventSlot`・`raidDamage` は nil（旧版の探索は普通の探索） | D-161, D-156, D-152 |
-| `equipment[*]` | `fromMerchant` は nil | D-175 |
-| `lastSavedAt` | `lastAdvancedAt` を入れる | D-161 |
-| `restBonusSeconds` | 0 | D-161 |
-| `quests` | 空（次の advance で今日・今週の分を作る） | D-153 |
-| `login` | `lastDayIndex = -1, day = 1, cycle = 1`（次のオンラインの advance で1日目） | D-155 |
-| `playtime` | `dayIndex = -1, seconds = 0, claimedSteps = 0` | D-154 |
-| `friend` | `nextAt = 0, dayIndex = -1, todayCount = 0` | D-157 |
-| `referral` | `inviteeRewardDone = false, rewardedInvitees = {}, weekIndex = -1, weekCount = 0` | D-157 |
-| `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 |
-| `inbox` | 空 | D-164 |
-| `settings.autoSell` | 初期値（`enabled = true, maxRarity = 2, keepModified = true`）に合わせる | D-167, D-177 |
-| `items` の売却用アイテム | 売ってゴールドにする（売却価格は今までと同じ） | D-167, D-177 |
-| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177, D-185 |
+| `settings.autoSell` | 初期値（StarterSet の `autoSell`：`enabled = true, maxRarity = 2, keepModified = true`）に合わせる | D-167, D-177 |
+| `items` の売却用アイテム | 売ってゴールドにする（売却価格は今までと同じ `sellPrice × 数`）。`items` から消す | D-167, D-177 |
 
-新規のセーブ（StarterSet）は上の新しい項目を初期値で持ち、`settings.autoSell` は D-167 の初期値（オン）にする。
+### version 6 → 7 以降（M7b-3 以降の各段階）
+
+次の項目は、それを使う段階で version を上げて足す。どの段階かは 12章「M7b の進め方」の内容に合わせ、足した段階でこの表を「version n → n+1」の節に移す。
+
+| 項目 | 旧版からの変換 | 根拠 | 足す段階（予定） |
+| --- | --- | --- | --- |
+| `lastSavedAt` | `lastAdvancedAt` を入れる | D-161 | M7b-3 |
+| `restBonusSeconds` | 0 | D-161 | M7b-3 |
+| `expeditions[*]` | `offline`・`dailyTraitId` は nil（旧版の探索は普通の探索） | D-161, D-156 | M7b-3 |
+| `expeditions[*]` | `eventSlot`・`raidDamage` は nil | D-152 | M7b-4 |
+| `equipment[*]` | `fromMerchant` は nil | D-175 | M7b-4 |
+| `quests` | 空（次の advance で今日・今週の分を作る） | D-153 | M7b-4 |
+| `login` | `lastDayIndex = -1, day = 1, cycle = 1`（次のオンラインの advance で1日目） | D-155 | M7b-4 |
+| `playtime` | `dayIndex = -1, seconds = 0, claimedSteps = 0` | D-154 | M7b-4 |
+| `friend` | `nextAt = 0, dayIndex = -1, todayCount = 0` | D-157 | M7b-4〜5（未定） |
+| `referral` | `inviteeRewardDone = false, rewardedInvitees = {}, weekIndex = -1, weekCount = 0` | D-157 | M7b-4〜5（未定） |
+| `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 | M7b-4 |
+| `inbox` | 空 | D-164 | M7b-4 |
+| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177, D-185 | M7b-4 |
+
+新規のセーブ（`Game.newState`）は、その時点の version で足した項目を初期値で持ち、`settings.autoSell` は StarterSet の D-167 の初期値（オン）にする。

@@ -50,7 +50,7 @@ end
 
 if fs.isFile(savePath) then
 	save = serde.decode("json", fs.readFile(savePath))
-	Migration.migrate(save.state)
+	Migration.migrate(save.state, master)
 else
 	newGame(1)
 end
@@ -152,7 +152,27 @@ local function handle(tokens: { string }): (boolean, any)
 			say(`不明なコマンド: {c}（help で一覧）`)
 			return false, events
 		end
+		if cmd.type == "BulkSell" and #cmd.equipmentUids == 0 then
+			-- sellweak の対象を省いたら直前の開封結果（09章、D-167）
+			cmd.equipmentUids = save.lastOpenedEquipment or {}
+		end
 		result = run(cmd)
+		if result.ok and cmd.type == "OpenChests" then
+			-- 開封結果に残った装備を覚えておく（sellweak 用。ゲームの状態ではなくテキスト版のセーブに置く）
+			local uids = {}
+			for _, ev in result.events or {} do
+				if ev.type == "ChestsOpened" then
+					for _, list in { ev.normal, ev.special } do
+						for _, r in list do
+							for _, uid in r.equipmentUids do
+								table.insert(uids, uid)
+							end
+						end
+					end
+				end
+			end
+			save.lastOpenedEquipment = uids
+		end
 		if result.ok then
 			if c == "repeat" and tokens[3] ~= "off" then
 				say(

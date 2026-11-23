@@ -31,6 +31,8 @@ local ERRORS = {
 	DUNGEON_LOCKED = "そのダンジョンはまだ解放されていません",
 	PARTY_EMPTY = "パーティに誰もいません",
 	NO_CHEST = "開ける宝箱がありません",
+	PILE_NOT_FOUND = "その宝箱の山はありません",
+	NOTHING_TO_SELL = "今の装備より弱い品はありません",
 	ITEM_LOCKED = "保護中の品です",
 	ITEM_NOT_SELLABLE = "このアイテムは売れません",
 	NOT_ENOUGH_ITEMS = "数が足りません",
@@ -67,6 +69,12 @@ local ERRORS = {
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
 }
+
+-- 宝箱の山の名前（普通の山はダンジョン名、特別な宝箱は鍵のまま：D-166）
+local function pileName(pileKey: string, master: any): string
+	local d = master.dungeons[pileKey]
+	return if d then d.name else pileKey
+end
 
 function Text.errorText(code: string?): string
 	return ERRORS[code or ""] or tostring(code)
@@ -129,13 +137,13 @@ function Text.status(save: any, master: any): string
 		local rep = if p.autoRepeat then ` ／ 自動再派遣：{master.dungeons[p.autoRepeat.dungeonId].name}` else ""
 		table.insert(lines, `パーティ{i} [{table.concat(names, " ")}] {partyStatus(save, i, master)}{rep}`)
 	end
-	-- D-087：見せるのはダンジョンごとの数だけ（レアリティは開けるまで分からない）
-	local piles = Game.query.chestsByDungeon(s, master)
+	-- D-087, D-166：見せるのは宝箱の山ごとの数だけ（レアリティは開けるまで分からない）
+	local piles = Game.query.chestsByPile(s, master)
 	local totalChests = 0
 	local chestText = {}
 	for _, c in piles do
 		totalChests += c.count
-		table.insert(chestText, `{master.dungeons[c.dungeonId].name}×{c.count}`)
+		table.insert(chestText, `{pileName(c.pileKey, master)}×{c.count}`)
 	end
 	local wh = Game.query.warehouse(s)
 	table.insert(
@@ -266,8 +274,7 @@ function Text.dungeons(save: any, master: any): string
 			then "踏破済"
 			elseif s.unlockedDungeons[d.id] then "解放済"
 			else "未解放"
-		local fee = if d.dispatchFee then `・派遣費{d.dispatchFee}G` else ""
-		table.insert(lines, `{d.id} {d.name}（{d.floors}F・難度{d.tier}{fee}）{mark}`)
+		table.insert(lines, `{d.id} {d.name}（{d.floors}F・難度{d.tier}）{mark}`)
 	end
 	return table.concat(lines, "\n")
 end
@@ -368,7 +375,11 @@ function Text.events(events: { any }, save: any, master: any): string
 				t
 					.. `パーティ{e.partyIndex}が{d.name}から帰還：{if e.result == "clear"
 						then "踏破"
-						else "撤退（" .. e.reachedFloor .. "F）"} 宝箱{e.chests}個 {e.gold}G`
+						else "撤退（" .. e.reachedFloor .. "F）"} 宝箱{e.chests}個 {e.gold}G{if (
+							e.itemsSoldGold or 0
+						) > 0
+						then `（素材を売却 {e.itemsSoldGold}G）`
+						else ""}`
 			)
 		elseif e.type == "LevelUp" then
 			table.insert(lines, t .. `{advName(save, e.uid)} が Lv{e.level} に上がった`)
@@ -413,12 +424,20 @@ function Text.events(events: { any }, save: any, master: any): string
 				if r.autoSoldGold and r.autoSoldGold > 0 then
 					table.insert(got, `（自動売却 {#r.autoSold}個 {r.autoSoldGold}G）`)
 				end
+				if r.soldItemsGold and r.soldItemsGold > 0 then
+					local names = {}
+					for id, n in r.soldItems do
+						table.insert(names, `{master.items[id].name}×{n}`)
+					end
+					table.sort(names)
+					table.insert(got, `（素材を売却 {table.concat(names, "・")} {r.soldItemsGold}G）`)
+				end
 				return table.concat(got, "、")
 			end
 			table.insert(
 				lines,
 				t
-					.. `{master.dungeons[e.dungeonId].name}の宝箱を{e.opened}個開けた（残り{e.remaining}個）`
+					.. `{pileName(e.pileKey, master)}の宝箱を{e.opened}個開けた（残り{e.remaining}個）`
 					.. (
 						if e.stoppedBy == "WAREHOUSE_FULL"
 							then " ※倉庫がいっぱいで途中で止めました"
@@ -643,7 +662,7 @@ function Text.view(save: any, master: any): any
 		gold = s.gold,
 		guildExp = s.guild.exp,
 		parties = parties,
-		unopenedChests = Game.query.chestsByDungeon(s, master),
+		unopenedChests = Game.query.chestsByPile(s, master),
 		warehouse = wh,
 		unlockedDungeons = unlocked,
 	}

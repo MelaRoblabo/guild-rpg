@@ -8,7 +8,7 @@ return function(t)
 	describe(
 		"D-101 テキストの書式 → コマンド（テキスト版とデバッグ画面で共通）",
 		function()
-			it("D-101 主な書式が対応するコマンドになる", function()
+			it("D-101 / D-166 / D-167 主な書式が対応するコマンドになる", function()
 				expect(CommandText.parse("go 1 dng_graveyard")).toEqual({
 					type = "Dispatch",
 					partyIndex = 1,
@@ -28,6 +28,17 @@ return function(t)
 				expect(CommandText.parse("choose prev")).toEqual({ type = "HireChoose", which = "previous" })
 				expect(CommandText.parse("rb-choose cur")).toEqual({ type = "RebirthChoose", which = "current" })
 				expect(CommandText.parse("unlock eq_9")).toEqual({ type = "SetLock", uid = "eq_9", locked = false })
+				expect(CommandText.parse("open dng_ruins 10")).toEqual({
+					type = "OpenChests",
+					pileKey = "dng_ruins",
+					count = 10,
+				})
+				expect(CommandText.parse("open special:raid")).toEqual({ type = "OpenChests", pileKey = "special:raid" })
+				expect(CommandText.parse("sellweak eq_1 eq_2")).toEqual({
+					type = "BulkSell",
+					equipmentUids = { "eq_1", "eq_2" },
+				})
+				expect(CommandText.parse("sellweak")).toEqual({ type = "BulkSell", equipmentUids = {} })
 				expect(CommandText.parse("train adv_1 max")).toEqual({
 					type = "Train",
 					adventurerUid = "adv_1",
@@ -50,6 +61,8 @@ return function(t)
 					"repeat 1 off",
 					"open dng_graveyard",
 					"open dng_graveyard 10",
+					"open special:rare:dng_sky_throne",
+					"sellweak eq_1 eq_2",
 					"sell eq_1 eq_2",
 					"sell item itm_bone_fragment",
 					"lock eq_1",

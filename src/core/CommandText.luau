@@ -14,7 +14,8 @@ CommandText.HELP = [[
   unequip <adv_uid> <weapon|armor|sub>  外す
   go <n> <dng_id>            派遣
   repeat <n> <dng_id|off>    自動再派遣の設定
-  open <dng> [個数]          そのダンジョンの宝箱をまとめて開ける（省略時 最大100個）
+  open <山> [個数]           その宝箱の山をまとめて開ける（山はダンジョンIDか special:<種類>。省略時 最大100個）
+  sellweak [eq_uid...]       開封結果のうち今の装備より弱いものを一括売却（テキスト版は省略で直前の開封結果）
   sell <eq_uid...>           装備を売る
   sell item <itm_id> [個数]   アイテムを売る
   lock <uid> / unlock <uid>  保護の切り替え
@@ -76,7 +77,10 @@ function CommandText.fromTokens(tokens: { string }): any?
 			dungeonId = if tokens[3] == "off" then nil else tokens[3],
 		}
 	elseif c == "open" then
-		return { type = "OpenChests", dungeonId = tokens[2], count = tonumber(tokens[3]) }
+		return { type = "OpenChests", pileKey = tokens[2], count = tonumber(tokens[3]) }
+	elseif c == "sellweak" then
+		-- 対象は開封結果に出た装備（D-167）。uid を省いたときは呼び出し側が直前の開封結果で埋める
+		return { type = "BulkSell", equipmentUids = table.move(tokens, 2, #tokens, 1, {}) }
 	elseif c == "sell" then
 		if tokens[2] == "item" then
 			return { type = "Sell", itemId = tokens[3], count = tonumber(tokens[4]) or 1 }

@@ -82,14 +82,29 @@ function Chest.rollContents(rank: number, dungeon: any, rng: Rng.Rng, master: an
 	return contents
 end
 
--- 宝箱の保管（D-084）：倉庫とは別に「ダンジョン×ランクごとの数」だけを持つ。上限なし
--- state.chests[dungeonId] = { ランク1の数, …, 最上位ランクの数 }（長さはレアリティの数。D-085）
+-- 宝箱の保管（D-084, D-166）：倉庫とは別に「宝箱の山×ランクごとの数」だけを持つ。上限なし
+-- state.chests[pileKey] = { ランク1の数, …, 最上位ランクの数 }（長さは出た最上位ランクまで。D-085）
+-- 宝箱の山の鍵（pileKey）：普通のダンジョンの宝箱は dungeonId、特別な宝箱は "special:<種類>"（D-166, D-171）
 -- レアリティが増えたら、足りない分を0で伸ばす
-function Chest.add(state: any, dungeonId: string, rank: number, n: number)
-	local row = state.chests[dungeonId]
+Chest.SPECIAL_PREFIX = "special:"
+
+function Chest.isSpecialPile(pileKey: string): boolean
+	return string.sub(pileKey, 1, #Chest.SPECIAL_PREFIX) == Chest.SPECIAL_PREFIX
+end
+
+-- 普通の宝箱の山なら、そのダンジョン（中身の表・演出ライン）。特別な宝箱の表は M7b-4 で足すので、今は nil
+function Chest.pileDungeon(pileKey: string, master: any): any?
+	if Chest.isSpecialPile(pileKey) then
+		return nil
+	end
+	return master.dungeons[pileKey]
+end
+
+function Chest.add(state: any, pileKey: string, rank: number, n: number)
+	local row = state.chests[pileKey]
 	if row == nil then
 		row = {}
-		state.chests[dungeonId] = row
+		state.chests[pileKey] = row
 	end
 	for r = #row + 1, rank do
 		row[r] = 0
@@ -97,8 +112,8 @@ function Chest.add(state: any, dungeonId: string, rank: number, n: number)
 	row[rank] += n
 end
 
-function Chest.count(state: any, dungeonId: string, rank: number): number
-	local row = state.chests[dungeonId]
+function Chest.count(state: any, pileKey: string, rank: number): number
+	local row = state.chests[pileKey]
 	return if row then row[rank] or 0 else 0
 end
 
@@ -123,19 +138,19 @@ function Chest.total(state: any): number
 	return n
 end
 
--- そのダンジョンの未開封の数
-function Chest.dungeonTotal(state: any, dungeonId: string): number
+-- その宝箱の山の未開封の数
+function Chest.pileTotal(state: any, pileKey: string): number
 	local n = 0
-	for _, v in state.chests[dungeonId] or {} do
+	for _, v in state.chests[pileKey] or {} do
 		n += v
 	end
 	return n
 end
 
 -- 山から1つ引く（ランクごとの残り数で重み付け。D-089）。数は減らさない
-function Chest.draw(state: any, dungeonId: string, rng: Rng.Rng): number
+function Chest.draw(state: any, pileKey: string, rng: Rng.Rng): number
 	local entries = {}
-	for r, v in state.chests[dungeonId] do
+	for r, v in state.chests[pileKey] do
 		if v > 0 then
 			table.insert(entries, { rank = r, weight = v })
 		end
@@ -146,22 +161,34 @@ function Chest.draw(state: any, dungeonId: string, rng: Rng.Rng): number
 end
 
 -- 宝箱を1つ開封して状態に反映する（数を減らすのと倉庫の空き確認は呼び出し側）
+-- chest = { pileKey, rank }。中身の表は普通の山ならそのダンジョン（特別な宝箱は M7b-4）
+-- 売却用アイテム（素材）は常にその場で売る（D-167）。items には残したものだけ、売った素材は soldItems に入れる
 function Chest.open(state: any, chest: any, rng: Rng.Rng, master: any): any
-	local dungeon = master.dungeons[chest.dungeonId]
+	local dungeon = Chest.pileDungeon(chest.pileKey, master)
+	assert(dungeon, `中身の表がない宝箱の山: {chest.pileKey}`)
 	local contents = Chest.rollContents(chest.rank, dungeon, rng, master)
 	local created = {}
 	for _, e in contents.equipment do
 		table.insert(created, Inventory.newEquipment(state, e).uid)
 	end
+	local kept, soldItems, soldItemsGold = {}, {}, 0
 	for itemId, c in contents.items do
-		Inventory.addItem(state, itemId, c)
+		local gold = Inventory.gainItem(state, itemId, c, master)
+		if gold > 0 then
+			soldItems[itemId] = c
+			soldItemsGold += gold
+		else
+			kept[itemId] = c
+		end
 	end
 	state.gold += contents.gold
 	return {
-		dungeonId = chest.dungeonId,
+		pileKey = chest.pileKey,
 		rank = chest.rank,
 		equipmentUids = created,
-		items = contents.items,
+		items = kept,
+		soldItems = soldItems,
+		soldItemsGold = soldItemsGold,
 		gold = contents.gold,
 	}
 end

@@ -95,7 +95,6 @@ local function snapshotHour(h: number)
 		spentExp = state.stats.goldSpentOnExpansions or 0,
 		spentTrain = state.stats.goldSpentOnTraining or 0,
 		spentRebirth = state.stats.goldSpentOnRebirth or 0,
-		spentFees = state.stats.goldSpentOnFees or 0,
 		chests = (function()
 			local n = 0
 			for _, v in Game.query.chestsByRank(state, master) do
@@ -193,23 +192,22 @@ local spendLines = {
 	"",
 	"## ゴールドの出入り（1時間ごと。支出は累計）",
 	"",
-	"| 時間 | 収入(この1時間) | 所持金 | 拡張 | 転生費用 | トレーニング | 派遣費 | 未開封の宝箱 | トレーニング場 |",
-	"| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+	"| 時間 | 収入(この1時間) | 所持金 | 拡張 | 転生費用 | トレーニング | 未開封の宝箱 | トレーニング場 |",
+	"| --- | --- | --- | --- | --- | --- | --- | --- |",
 }
 local prevTotal = 500
 for _, h in hourly do
-	local total = h.gold + h.spentExp + h.spentTrain + h.spentRebirth + h.spentFees
+	local total = h.gold + h.spentExp + h.spentTrain + h.spentRebirth
 	table.insert(
 		spendLines,
 		string.format(
-			"| %d | %s | %s | %s | %s | %s | %s | %d | %d |",
+			"| %d | %s | %s | %s | %s | %s | %d | %d |",
 			h.hour,
 			short(total - prevTotal),
 			short(h.gold),
 			short(h.spentExp),
 			short(h.spentRebirth),
 			short(h.spentTrain),
-			short(h.spentFees),
 			h.chests,
 			h.trainingLevel
 		)

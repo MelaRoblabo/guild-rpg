@@ -13,7 +13,6 @@
 --                     書いていない上位のレアリティは0。レアリティを増やしたら必要なダンジョンに足す
 -- chestEffectMinRarity : このレアリティ以上の宝箱は開けるとき演出が入る（D-089）。演出の派手さはレアリティで決まる
 --                     演出が入る割合は Constants.chestEffectRate（10〜15%）に収める（D-090。検証でエラーになる）
--- dispatchFee  : 派遣費（D-079）。上級ダンジョンだけ。出発のたびにゴールドが減る（仮）
 
 local BAL = { hp = 8, atk = 0.9, pdef = 0.4, mdef = 0.4 }
 local ARMORED = { hp = 8, atk = 0.9, pdef = 1.0, mdef = 0.3 }
@@ -152,7 +151,6 @@ return {
 	},
 	{
 		id = "dng_labyrinth",
-		dispatchFee = 1000,
 		name = "地下大迷宮",
 		stage = 7,
 		timeTarget = 144,
@@ -175,7 +173,6 @@ return {
 	},
 	{
 		id = "dng_abbey",
-		dispatchFee = 2500,
 		name = "呪われた修道院",
 		stage = 8,
 		timeTarget = 156,
@@ -196,7 +193,6 @@ return {
 	},
 	{
 		id = "dng_iron_fortress",
-		dispatchFee = 5000,
 		name = "鋼鉄の要塞",
 		stage = 9,
 		timeTarget = 165,
@@ -217,7 +213,6 @@ return {
 	},
 	{
 		id = "dng_dragon_nest",
-		dispatchFee = 10000,
 		name = "竜の巣",
 		stage = 10,
 		timeTarget = 175,
@@ -238,7 +233,6 @@ return {
 	},
 	{
 		id = "dng_demon_gate",
-		dispatchFee = 18000,
 		name = "魔界の門",
 		stage = 11,
 		timeTarget = 247, -- D-097／D-098：パーティ5つで帰還間隔約30秒。撤退も長くなるよう移動を延ばす
@@ -259,7 +253,6 @@ return {
 	},
 	{
 		id = "dng_sky_throne",
-		dispatchFee = 30000,
 		name = "天空の玉座",
 		stage = 12,
 		timeTarget = 265, -- D-097／D-098：同上

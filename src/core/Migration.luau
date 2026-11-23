@@ -1,12 +1,14 @@
 --!strict
--- セーブデータの移行（docs/system/03_state_model.md）
+-- セーブデータの移行（docs/system/03_state_model.md「セーブの移行」）
 -- 形式を変えたら CURRENT を上げ、STEPS[旧版] に旧版→新版の変換を追加する。
+-- M7b は段階ごとに version を上げる（v5→v6 は M7b-2、以降の段階は v6→v7 …）。
+-- マスターデータが要る手順（売却価格・初期値）があるので、migrate には master を渡す。
 
 local Migration = {}
 
-Migration.CURRENT = 5
+Migration.CURRENT = 6
 
-local STEPS: { [number]: (any) -> () } = {
+local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
 	-- v1 → v2：トレーニング場（D-077）と解錠技術（D-078）
 	[1] = function(state)
@@ -40,15 +42,45 @@ local STEPS: { [number]: (any) -> () } = {
 		end
 		state.version = 5
 	end,
+	-- v5 → v6（M7b-2。D-177 のうちこの段階の分）
+	--   宝箱の鍵：dungeonId のまま宝箱の山の鍵として使う（変換しない。D-166）
+	--   自動売却：初期値（オン）に合わせる（D-167）
+	--   売却用アイテム：持っている分を今までと同じ売却価格で売ってゴールドにする（D-167）
+	[5] = function(state, master)
+		assert(master, "version 5 → 6 の移行には master が要る")
+		state.settings = state.settings or {}
+		state.settings.autoSell = table.clone(master.raw.StarterSet.autoSell)
+		local items = state.items or {}
+		local ids = {}
+		for itemId in items do
+			table.insert(ids, itemId)
+		end
+		table.sort(ids)
+		for _, itemId in ids do
+			local item = master.items[itemId]
+			local n = items[itemId]
+			if item and item.kind == "sellable" then
+				if n > 0 then
+					local gold = item.sellPrice * n
+					state.gold = (state.gold or 0) + gold
+					if state.stats then
+						state.stats.goldFromSales = (state.stats.goldFromSales or 0) + gold
+					end
+				end
+				items[itemId] = nil
+			end
+		end
+		state.version = 6
+	end,
 }
 
-function Migration.migrate(state: any): any
+function Migration.migrate(state: any, master: any?): any
 	assert(type(state) == "table" and type(state.version) == "number", "セーブデータに version がない")
 	assert(state.version <= Migration.CURRENT, `未来の版のセーブデータ: {state.version}`)
 	while state.version < Migration.CURRENT do
 		local step = STEPS[state.version]
 		assert(step, `移行手順がない: {state.version}`)
-		step(state)
+		step(state, master)
 	end
 	return state
 end

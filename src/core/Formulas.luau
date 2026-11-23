@@ -56,6 +56,22 @@ function Formulas.equipMult(rarity: number, grade: number, itemLevel: number, K:
 	return K.equipRarityMult[rarity] * (1 + K.equipGradeCoef * grade) * K.equipTierMult ^ (itemLevel - 1)
 end
 
+-- 06章 §17：一括売却で比べる値（D-167, D-175）。武器＝攻撃力補正、防具＝物理防御＋魔法防御（§2 の性能値）
+-- 補助（盾・アクセサリー）は対象外なので nil
+function Formulas.bulkSellValue(inst: any, master: any): number?
+	local base = master.equipmentBases[inst.baseId]
+	if not base then
+		return nil
+	end
+	local mult = Formulas.equipMult(inst.rarity, inst.grade, inst.itemLevel or 1, master.K)
+	if base.slot == "weapon" then
+		return math.floor((base.atk or 0) * mult)
+	elseif base.slot == "armor" then
+		return math.floor((base.pdef or 0) * mult) + math.floor((base.mdef or 0) * mult)
+	end
+	return nil
+end
+
 -- D-082：装備の経験値補正 = expPct × レアリティ係数 × (1 + 0.1×グレード)。アイテムレベルでは伸びない
 function Formulas.equipExpPct(inst: any, master: any): number
 	local base = master.equipmentBases[inst.baseId]

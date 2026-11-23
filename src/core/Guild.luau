@@ -31,7 +31,7 @@ function Guild.addExp(state: any, amount: number, master: any, events: { any }, 
 		local row = master.raw.GuildLevels.levels[state.guild.level]
 		local rewards = if row then row.rewards else {}
 		for itemId, n in rewards do
-			Inventory.addItem(state, itemId, n)
+			Inventory.gainItem(state, itemId, n, master) -- 売却用アイテムなら売る（D-167）
 			if itemId == "itm_slot_ticket" then
 				state.stats.ticketsFromGuild = (state.stats.ticketsFromGuild or 0) + n
 			end

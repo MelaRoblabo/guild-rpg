@@ -60,9 +60,9 @@ Policy.itemScore = itemScore
 
 -- 開けられるダンジョンの宝箱を、まとめ開き（D-089）で開けられるだけ開ける
 local function openAll(state: any, ctx: Ctx)
-	for _, c in Game.query.chestsByDungeon(state, ctx.master) do
+	for _, c in Game.query.chestsByPile(state, ctx.master) do
 		for _ = 1, 1000 do
-			if not exec(state, { type = "OpenChests", dungeonId = c.dungeonId }, ctx).ok then
+			if not exec(state, { type = "OpenChests", pileKey = c.pileKey }, ctx).ok then
 				break
 			end
 		end
@@ -138,12 +138,7 @@ local function sellJunk(state: any, ctx: Ctx)
 	if #toSell > 0 then
 		exec(state, { type = "Sell", equipmentUids = toSell }, ctx)
 	end
-	for id, n in state.items do
-		local it = master.items[id]
-		if it and it.kind == "sellable" and n > 0 then
-			exec(state, { type = "Sell", itemId = id, count = n }, ctx)
-		end
-	end
+	-- 売却用アイテム（素材）は手に入れたときに自動で売られる（D-167）
 end
 
 local function buyExpansions(state: any, ctx: Ctx)
@@ -401,7 +396,7 @@ local function chooseDungeon(state: any, partyIndex: number, ctx: Ctx, rng: Rng.
 	end
 	local unlocked = {}
 	for _, d in master.dungeonList do
-		if state.unlockedDungeons[d.id] and (d.dispatchFee or 0) <= state.gold then -- 派遣費（D-079）
+		if state.unlockedDungeons[d.id] then
 			table.insert(unlocked, d)
 		end
 	end

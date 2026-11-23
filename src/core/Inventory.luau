@@ -1,6 +1,8 @@
 --!strict
 -- 倉庫・装備の付け外し・売却・保護（ゲーム仕様書06章 §4・§6、Q-020）
 
+local Formulas = require("./Formulas")
+
 local Inventory = {}
 
 local SLOTS = { "weapon", "armor", "sub" }
@@ -23,6 +25,20 @@ end
 
 function Inventory.addItem(state: any, itemId: string, count: number)
 	state.items[itemId] = (state.items[itemId] or 0) + count
+end
+
+-- アイテムを手に入れる。売却用アイテム（素材）は常にその場で売り、items に入れない（D-167）
+-- 売って得たゴールドを返す（売らなかったら 0）
+function Inventory.gainItem(state: any, itemId: string, count: number, master: any): number
+	local item = master.items[itemId]
+	if item and item.kind == "sellable" then
+		local gold = item.sellPrice * count
+		state.gold += gold
+		state.stats.goldFromSales = (state.stats.goldFromSales or 0) + gold
+		return gold
+	end
+	Inventory.addItem(state, itemId, count)
+	return 0
 end
 
 -- 装備を新しく作って倉庫に入れる
@@ -83,6 +99,36 @@ function Inventory.unequip(state: any, adv: any, slot: string): string?
 	state.equipment[uid].equippedBy = nil
 	adv.equipment[slot] = nil
 	return nil
+end
+
+-- 06章 §17：一括売却で売る装備か（D-167, D-175）
+-- 「弱い」＝その枠（武器・防具）で付けられる冒険者が1人以上いて、全員がその枠に装備していて、
+-- 全員の今の装備より比べる値が低い。修飾語つき・保護中・装備中・商人で買ったもの・補助は売らない
+function Inventory.isWeakForBulkSell(state: any, item: any, master: any): boolean
+	if item.modifierId ~= nil or item.locked or item.equippedBy ~= nil or item.fromMerchant then
+		return false
+	end
+	local value = Formulas.bulkSellValue(item, master)
+	if value == nil then
+		return false -- 補助は対象外
+	end
+	local slot = master.equipmentBases[item.baseId].slot
+	local wearers = 0
+	for _, adv in state.adventurers do
+		if Inventory.canEquip(adv.jobId, item.baseId, master) then
+			wearers += 1
+			local curUid = adv.equipment[slot]
+			local cur = if curUid then state.equipment[curUid] else nil
+			if cur == nil then
+				return false -- その枠が空いている冒険者がいれば売らない（D-175）
+			end
+			local curValue = Formulas.bulkSellValue(cur, master)
+			if curValue == nil or value >= curValue then
+				return false
+			end
+		end
+	end
+	return wearers > 0
 end
 
 -- 06章 §6：売却価格

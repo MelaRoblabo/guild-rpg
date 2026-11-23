@@ -12,6 +12,9 @@ return {
 		warehouseSize = 300,
 		trainingLevel = 1, -- D-077
 	},
+	-- 自動売却の初期値（D-167）：最初からオン。コモン・アンコモンを売り、修飾語つきは残す
+	-- 売却用アイテム（素材）はこの設定にかかわらず常に自動で売る（D-167）
+	autoSell = { enabled = true, maxRarity = 2, keepModified = true },
 	adventurers = {
 		{
 			name = "アルド",

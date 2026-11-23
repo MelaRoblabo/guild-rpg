@@ -83,7 +83,7 @@ function Game.newState(master: any, seed: number, now: number): any
 		clearedDungeons = {},
 		hireSession = nil,
 		rebirthSession = nil,
-		settings = { autoSell = { enabled = false, maxRarity = 1, keepModified = true } },
+		settings = { autoSell = table.clone(S.autoSell) }, -- D-167：最初からオン
 		stats = {},
 		createdAt = now,
 		lastAdvancedAt = now,
@@ -127,12 +127,8 @@ function Game.newState(master: any, seed: number, now: number): any
 	return state
 end
 
--- 派遣（D-026）。departAt を指定できる（自動再派遣は帰還時刻から出発する）
--- 派遣費（D-079）は呼び出し側で払えることを確かめてから呼ぶ
+-- 派遣（D-026）。departAt を指定できる（自動再派遣は帰還時刻から出発する）。派遣費は廃止（D-163）
 local function dispatch(state: any, partyIndex: number, dungeonId: string, departAt: number, master: any): any
-	local fee = master.dungeons[dungeonId].dispatchFee or 0
-	state.gold -= fee
-	bump(state, "goldSpentOnFees", fee)
 	local _, seed = takeRng(state)
 	local snaps = Party.snapshots(state, partyIndex, master)
 	local log =
@@ -157,11 +153,8 @@ local function dispatch(state: any, partyIndex: number, dungeonId: string, depar
 	return e
 end
 
--- 自動再派遣できない理由（できるなら nil）
-local function autoRepeatBlocker(state: any, master: any, dungeonId: string): string?
-	if state.gold < (master.dungeons[dungeonId].dispatchFee or 0) then
-		return "NOT_ENOUGH_GOLD" -- D-079
-	end
+-- 自動再派遣できない理由（できるなら nil）。派遣費の不足による停止は D-163 で削除
+local function autoRepeatBlocker(state: any): string?
 	if Inventory.warehouseFree(state) <= 0 then
 		return "WAREHOUSE_FULL"
 	end
@@ -176,10 +169,12 @@ local function collect(state: any, e: any, master: any, events: { any })
 	local rng = takeRng(state)
 
 	state.gold += r.gold
+	-- 売却用アイテム（素材）は常にその場で売る（D-167）
+	local itemsSoldGold = 0
 	for itemId, c in r.items do
-		Inventory.addItem(state, itemId, c)
+		itemsSoldGold += Inventory.gainItem(state, itemId, c, master)
 	end
-	-- 宝箱はギルドの宝箱置き場へ（倉庫とは別、上限なし：D-084）
+	-- 宝箱はギルドの宝箱置き場へ（倉庫とは別、上限なし：D-084）。普通の探索の山の鍵は dungeonId（D-166）
 	for _, c in r.chests do
 		Chest.add(state, e.dungeonId, c.rank, 1)
 	end
@@ -225,6 +220,7 @@ local function collect(state: any, e: any, master: any, events: { any })
 		chests = #r.chests,
 		gold = r.gold,
 		items = r.items,
+		itemsSoldGold = itemsSoldGold,
 		guildExp = guildExp,
 	})
 	for _, lu in levelUps do
@@ -292,7 +288,7 @@ function Game.advance(state: any, ctx: Ctx): { any }
 
 		local party = state.parties[nextE.partyIndex]
 		if party and party.autoRepeat then
-			local blocker = autoRepeatBlocker(state, master, party.autoRepeat.dungeonId)
+			local blocker = autoRepeatBlocker(state)
 			if not ctx.online then
 				-- オフライン中は再派遣しない（企画書§16.8 案A）。設定は残す
 				continue
@@ -411,10 +407,6 @@ handlers.Dispatch = function(state, cmd, ctx)
 	if Party.isEmpty(p) then
 		return fail("PARTY_EMPTY")
 	end
-	local fee = ctx.master.dungeons[cmd.dungeonId].dispatchFee or 0
-	if state.gold < fee then
-		return fail("NOT_ENOUGH_GOLD") -- D-079
-	end
 	local e = dispatch(state, cmd.partyIndex, cmd.dungeonId, ctx.now, ctx.master)
 	return {
 		ok = true,
@@ -425,7 +417,6 @@ handlers.Dispatch = function(state, cmd, ctx)
 				partyIndex = cmd.partyIndex,
 				dungeonId = cmd.dungeonId,
 				returnAt = e.returnAt,
-				fee = fee,
 			},
 		},
 	}
@@ -451,17 +442,19 @@ handlers.SetAutoRepeat = function(state, cmd, ctx)
 end
 
 handlers.OpenChests = function(state, cmd, ctx)
-	-- D-087：プレイヤーに見えるのは「どのダンジョンの宝箱が何個」だけ。レアリティは開けるまで分からない
-	-- D-089：まとめ開き。指定ダンジョンの山から最大 count 個（省略時 chestBatchOpen）を、残り数で重み付けして1つずつ引く
+	-- D-087：プレイヤーに見えるのは「どの宝箱の山が何個」だけ。レアリティは開けるまで分からない
+	-- D-089, D-166：まとめ開き。指定した宝箱の山から最大 count 個（省略時 chestBatchOpen）を、残り数で重み付けして1つずつ引く
 	local master = ctx.master
-	local d = master.dungeons[cmd.dungeonId]
+	local pileKey = cmd.pileKey
+	-- 特別な宝箱（special:...）の中身の表は M7b-4 で足す。それまでは開けられる山として扱わない
+	local d = if type(pileKey) == "string" then Chest.pileDungeon(pileKey, master) else nil
 	if not d then
-		return fail("DUNGEON_NOT_FOUND")
+		return fail("PILE_NOT_FOUND")
 	end
 	if cmd.count ~= nil and (type(cmd.count) ~= "number" or cmd.count < 1 or cmd.count ~= math.floor(cmd.count)) then
 		return fail("INVALID_COUNT")
 	end
-	local available = Chest.dungeonTotal(state, d.id)
+	local available = Chest.pileTotal(state, pileKey)
 	if available == 0 then
 		return fail("NO_CHEST")
 	end
@@ -476,10 +469,10 @@ handlers.OpenChests = function(state, cmd, ctx)
 			stoppedBy = "WAREHOUSE_FULL" -- 途中で倉庫がいっぱいになった
 			break
 		end
-		local rank = Chest.draw(state, d.id, pickRng)
-		Chest.add(state, d.id, rank, -1)
-		local res = Chest.open(state, { dungeonId = d.id, rank = rank }, takeRng(state), master)
-		-- 自動売却（06章 §6）：保護中の品は対象外（開けたばかりの品は保護されていない）
+		local rank = Chest.draw(state, pileKey, pickRng)
+		Chest.add(state, pileKey, rank, -1)
+		local res = Chest.open(state, { pileKey = pileKey, rank = rank }, takeRng(state), master)
+		-- 自動売却（06章 §6、D-167）：保護中の品は対象外（開けたばかりの品は保護されていない）
 		local auto = state.settings.autoSell
 		if auto.enabled then
 			local kept = {}
@@ -500,7 +493,7 @@ handlers.OpenChests = function(state, cmd, ctx)
 			end
 			res.equipmentUids = kept
 		end
-		-- D-089：ダンジョンごとの発生ライン以上のレアリティなら演出あり（派手さはレアリティで決まる）
+		-- D-089：宝箱の山ごとの発生ライン以上のレアリティなら演出あり（派手さはレアリティで決まる）
 		res.effect = rank >= d.chestEffectMinRarity
 		opened += 1
 		res.order = opened
@@ -526,15 +519,41 @@ handlers.OpenChests = function(state, cmd, ctx)
 			{
 				type = "ChestsOpened",
 				at = ctx.now,
-				dungeonId = d.id,
+				pileKey = pileKey,
 				opened = opened,
 				normal = normal,
 				special = special,
-				remaining = Chest.dungeonTotal(state, d.id),
+				remaining = Chest.pileTotal(state, pileKey),
 				stoppedBy = stoppedBy,
 			},
 		},
 	}
+end
+
+-- 一括売却（05章 BulkSell、06章 §17、D-167, D-175）：開封結果に出た装備のうち「今の装備より弱い」ものを全部売る
+-- もう無い品（売った・自動売却された）は飛ばす
+handlers.BulkSell = function(state, cmd, ctx)
+	local master = ctx.master
+	local targets = {}
+	local seen = {}
+	for _, uid in cmd.equipmentUids or {} do
+		local e = state.equipment[uid]
+		if e and not seen[uid] and Inventory.isWeakForBulkSell(state, e, master) then
+			seen[uid] = true
+			table.insert(targets, uid)
+		end
+	end
+	if #targets == 0 then
+		return fail("NOTHING_TO_SELL")
+	end
+	local total = 0
+	for _, uid in targets do
+		total += Inventory.equipmentSellPrice(state.equipment[uid], master)
+		state.equipment[uid] = nil
+	end
+	state.gold += total
+	bump(state, "goldFromSales", total)
+	return { ok = true, events = { { type = "Sold", at = ctx.now, gold = total, equipmentUids = targets } } }
 end
 
 handlers.Sell = function(state, cmd, ctx)
@@ -1121,14 +1140,39 @@ function Game.query.sellPrice(item: any, master: any): number
 	return Inventory.equipmentSellPrice(item, master)
 end
 
--- 未開封の宝箱のランクごとの数（D-084）
--- 未開封の宝箱：ダンジョンごとの数（プレイヤーに見せてよいのはこれだけ：D-087）
+-- 未開封の宝箱：普通のダンジョンの山ごとの数（プレイヤーに見せてよいのはこれだけ：D-087）
 function Game.query.chestsByDungeon(state: any, master: any): { any }
 	local out = {}
 	for _, d in master.dungeonList do
-		local n = Chest.dungeonTotal(state, d.id)
+		local n = Chest.pileTotal(state, d.id)
 		if n > 0 then
 			table.insert(out, { dungeonId = d.id, count = n })
+		end
+	end
+	return out
+end
+
+-- 未開封の宝箱：宝箱の山ごとの数（D-087, D-166。レアリティは返さない）
+-- 普通の山はダンジョンの順、続けて特別な宝箱の山を鍵の順に並べる
+function Game.query.chestsByPile(state: any, master: any): { any }
+	local out = {}
+	for _, d in master.dungeonList do
+		local n = Chest.pileTotal(state, d.id)
+		if n > 0 then
+			table.insert(out, { pileKey = d.id, count = n })
+		end
+	end
+	local others = {}
+	for key in state.chests do
+		if not master.dungeons[key] then
+			table.insert(others, key)
+		end
+	end
+	table.sort(others)
+	for _, key in others do
+		local n = Chest.pileTotal(state, key)
+		if n > 0 then
+			table.insert(out, { pileKey = key, count = n })
 		end
 	end
 	return out

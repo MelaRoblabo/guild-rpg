@@ -547,7 +547,7 @@ local function validateContent(c: Checker, d: any)
 				end
 			end
 			if g.dispatchFee ~= nil then
-				c:integer(p .. ".dispatchFee", g.dispatchFee, 0) -- D-079
+				c:error(p .. ".dispatchFee", "派遣費は廃止（D-163）")
 			end
 			c:integer(p .. ".battleReward.exp", if type(g.battleReward) == "table" then g.battleReward.exp else nil, 0)
 			c:integer(
@@ -596,6 +596,18 @@ local function validateLootAndStarter(c: Checker, d: any)
 	c:integer("StarterSet.gold", S.gold, 0)
 	for _, key in { "partySlots", "candidateSlots", "rosterSize", "warehouseSize", "trainingLevel" } do
 		c:integer(`StarterSet.expansions.{key}`, if type(S.expansions) == "table" then S.expansions[key] else nil, 1)
+	end
+	-- 自動売却の初期値（D-167）
+	local A = S.autoSell
+	if type(A) ~= "table" then
+		c:error("StarterSet.autoSell", "テーブルが必要")
+	else
+		for _, key in { "enabled", "keepModified" } do
+			if type(A[key]) ~= "boolean" then
+				c:error(`StarterSet.autoSell.{key}`, "真偽値が必要")
+			end
+		end
+		c:integer("StarterSet.autoSell.maxRarity", A.maxRarity, 1, rarityCount(d))
 	end
 	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
 	if c:array("StarterSet.adventurers", S.adventurers) then
