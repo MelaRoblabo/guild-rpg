@@ -4,6 +4,8 @@
 --   lune run tools/sim/progression                       現在の値で測る
 --   lune run tools/sim/progression -- --tune 4 --write   周回ごとの経験値倍率（expCycleMult）を目標時間に合わせて
 --                                                        4回反復調整し、src/data/Constants.luau に書き込む
+--   lune run tools/sim/progression -- --rescale-guild-tickets 0.4
+--                                                        今の GuildLevels のチケットの数だけを倍率で直す（必要経験値はそのまま）
 -- 想定するプレイ：
 --   - パーティは初期の4人（StarterSet）のまま。プレイヤーは常に探索を続ける（待ち時間なし）
 --   - 行き先は「踏破率50%以上のうち、1秒あたりの経験値が最も多いダンジョン」。未踏破の最深ダンジョンの
@@ -26,7 +28,7 @@ local Types = require("../../src/core/Types")
 -- 目標：周回ごとの所要時間（時間）。0周目＝最初の転生まで（D-071）
 local TARGET_HOURS = { 1, 1, 2, 4, 8, 16, 24, 48, 72 }
 
-local opts = { tune = 0, write = false, writeGuild = false, seeds = 2 }
+local opts: any = { tune = 0, write = false, writeGuild = false, seeds = 2, rescaleGuild = nil }
 do
 	local a = process.args
 	local i = 1
@@ -36,6 +38,9 @@ do
 			i += 1
 		elseif a[i] == "--seeds" then
 			opts.seeds = tonumber(a[i + 1]) or 2
+			i += 1
+		elseif a[i] == "--rescale-guild-tickets" then
+			opts.rescaleGuild = tonumber(a[i + 1])
 			i += 1
 		elseif a[i] == "--write-guild" then
 			opts.writeGuild = true
@@ -334,7 +339,10 @@ report(secs, clears)
 -- その周回のレベルアップ報酬に均等に割り振る。10の倍数のレベルではポーションも配る。
 local PLAY_SHARE = 0.5 -- 遊んで手に入る割合
 -- M6：AIテストプレイでチケットが大きく余ったため、配布量を約1/3にする（D-097）
-local TICKET_SUPPLY_SCALE = 1 / 3
+-- M7b-6：入手先の配分（D-160）でギルドレベルの分を約25%にするため、さらに GUILD_TICKET_SHARE_SCALE を掛ける
+--   （減らした分はクエスト・ログインボーナスのチケットで足す。docs/reports/M7b6_balance.md）
+local GUILD_TICKET_SHARE_SCALE = 0.4
+local TICKET_SUPPLY_SCALE = 1 / 3 * GUILD_TICKET_SHARE_SCALE
 local ROLLS_FIRST, ROLLS_LAST = 100, 300 -- 1キャラが「良い結果」に届く期待回数（転生1回目・8回目）
 local LEVELS_PER_CYCLE = 10
 
@@ -407,6 +415,19 @@ if opts.writeGuild then
 	table.insert(out, "}")
 	fs.writeFile("src/data/GuildLevels.luau", table.concat(out, "\n") .. "\n")
 	print("書き込み: src/data/GuildLevels.luau")
+end
+
+-- 今のギルドレベル表のチケットだけを倍率で直す（必要経験値・ポーションはそのまま。--rescale-guild-tickets <倍率>）
+-- 表全体を作り直すと必要経験値も変わるので、配分（D-160）の調整ではチケットの数だけを動かす
+if opts.rescaleGuild then
+	local path = "src/data/GuildLevels.luau"
+	local text = fs.readFile(path)
+	local replaced, n = string.gsub(text, "itm_slot_ticket = (%d+)", function(v: string): string
+		return `itm_slot_ticket = {math.max(1, math.floor(tonumber(v) :: number * opts.rescaleGuild + 0.5))}`
+	end)
+	assert(n > 0, "GuildLevels.luau にチケットが見つからない")
+	fs.writeFile(path, replaced)
+	print(`書き込み: {path}（チケット × {opts.rescaleGuild}、{n}行）`)
 end
 
 if opts.write then

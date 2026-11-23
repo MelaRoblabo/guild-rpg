@@ -320,6 +320,11 @@ local function rebirthReserve(state: any, master: any): number
 	return sum
 end
 
+-- 商人の計測（D-198 の価格倍率の見直し用。行動には使わない）
+local merchantSeen: { [number]: boolean } = {}
+local merchantStats = { offers = 0, priceSum = 0, upgrades = 0, affordable = 0, bought = 0, spent = 0 }
+Policy.merchantStats = merchantStats
+
 -- 旅の商人（D-152）：今の時間帯が商人なら、誰かの今の装備より良い品を、予算（転生の備えを除いた所持金 × merchantBudgetShare）内で買う
 local function buyFromMerchant(state: any, ctx: Ctx)
 	if not behavior.merchant then
@@ -334,24 +339,39 @@ local function buyFromMerchant(state: any, ctx: Ctx)
 	if not m or not m.open then
 		return
 	end
+	-- 測るだけ（行動は変えない）：品を見た回数・そのうち誰かの装備より良い品・予算内だった品・買った品と額
+	local seen = merchantSeen[cur.eventSlot] == nil
+	merchantSeen[cur.eventSlot] = true
 	for i, item in m.items do
 		if not item.bought then
 			local budget = (state.gold - rebirthReserve(state, master)) * behavior.merchantBudgetShare
-			if item.price <= budget then
-				local slot = master.equipmentBases[item.baseId].slot
-				local sc = itemScore(item, master)
-				local upgrade = false
-				for _, a in state.adventurers do
-					if Inventory.canEquip(a.jobId, item.baseId, master) then
-						local eq = a.equipment[slot]
-						if eq == nil or itemScore(state.equipment[eq], master) < sc then
-							upgrade = true
-							break
-						end
+			local slot = master.equipmentBases[item.baseId].slot
+			local sc = itemScore(item, master)
+			local upgrade = false
+			for _, a in state.adventurers do
+				if Inventory.canEquip(a.jobId, item.baseId, master) then
+					local eq = a.equipment[slot]
+					if eq == nil or itemScore(state.equipment[eq], master) < sc then
+						upgrade = true
+						break
 					end
 				end
+			end
+			if seen then
+				merchantStats.offers += 1
+				merchantStats.priceSum += item.price
 				if upgrade then
-					exec(state, { type = "BuyFromMerchant", eventSlot = cur.eventSlot, itemIndex = i }, ctx)
+					merchantStats.upgrades += 1
+					if item.price <= budget then
+						merchantStats.affordable += 1
+					end
+				end
+			end
+			if item.price <= budget and upgrade then
+				local r = exec(state, { type = "BuyFromMerchant", eventSlot = cur.eventSlot, itemIndex = i }, ctx)
+				if r.ok then
+					merchantStats.bought += 1
+					merchantStats.spent += item.price
 				end
 			end
 		end

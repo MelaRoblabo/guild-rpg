@@ -56,9 +56,11 @@ function Ledger.new(master: any): any
 		pileMix = {}, -- 普通のダンジョンの山 → { adventure = n, offline = m }（未開封の数）
 		equipSource = {}, -- 装備の uid → Weights（売ったときの入手先）
 		value = { -- 1時間あたりの価値（D-161）。オンラインで出した探索と留守番の探索
-			online = { gold = 0, chests = 0, exp = 0, returns = 0 },
-			offline = { gold = 0, chests = 0, exp = 0, returns = 0 },
+			-- raidChests：レイド（オンラインでだけ出せる派遣）の宝箱。帰還ではなく受け取り箱に届くので別に数える
+			online = { gold = 0, chests = 0, exp = 0, returns = 0, raidChests = 0 },
+			offline = { gold = 0, chests = 0, exp = 0, returns = 0, raidChests = 0 },
 		},
+		raids = {}, -- レイドの時間帯 → { hp, hits = { ダメージ… }, defeated }（D-179 の HP・ダメージの確認）
 	}
 	for _, r in Ledger.RESOURCES do
 		L.totals[r] = {}
@@ -135,6 +137,11 @@ function Ledger.onAdvance(L: any, events: { any })
 			v.returns += 1
 		elseif ev.type == "GuildLevelUp" then
 			addItems(L, ev.rewards, "guild")
+		elseif ev.type == "RaidHit" then
+			local r = L.raids[ev.eventSlot] or { hp = ev.hp, hits = {}, defeated = false }
+			L.raids[ev.eventSlot] = r
+			table.insert(r.hits, ev.damage)
+			r.defeated = r.defeated or ev.defeated
 		end
 	end
 end
@@ -149,6 +156,9 @@ function Ledger.onCommand(L: any, _state: any, cmd: any, result: any, extra: any
 			addItems(L, r.items, src)
 			for _, c in r.chests or {} do
 				add(L, "chests", src, c.count)
+				if entry.source == "raid" then
+					L.value.online.raidChests += c.count
+				end
 			end
 		end
 		return
@@ -213,6 +223,34 @@ function Ledger.expGained(state: any, snap: any, expToNext: (number, number) -> 
 		end
 	end
 	return sum
+end
+
+-- レイドの要約（D-179）：出た時間帯の数・討伐率・参加パーティ数・1パーティのダメージ÷HP・討伐に要ったパーティ数の分布
+function Ledger.raidSummary(L: any): any
+	local s = { slots = 0, defeated = 0, parties = 0, ratios = {}, needed = { 0, 0, 0, 0 }, notEnough = 0 }
+	for _, r in L.raids do
+		s.slots += 1
+		s.parties += #r.hits
+		if r.defeated then
+			s.defeated += 1
+		end
+		local acc, need = 0, nil
+		for i, d in r.hits do
+			table.insert(s.ratios, d / math.max(1, r.hp))
+			acc += d
+			if need == nil and acc > r.hp then
+				need = i
+			end
+		end
+		if need then
+			local k = math.min(need, 4)
+			s.needed[k] += 1
+		else
+			s.notEnough += 1
+		end
+	end
+	table.sort(s.ratios)
+	return s
 end
 
 -- 列（D-160 の表）ごとの割合（%）。resources は合わせて数える報酬の一覧

@@ -462,6 +462,90 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 			)
 		)
 	end
+	do
+		-- レイドはオンラインでだけ出せる派遣だが、宝箱は帰還ではなく受け取り箱に届くので上の行に入らない。足した行も出す
+		local a = per(on.chests + on.raidChests, hOn)
+		local b, c = per(off.chests, hOff), per(off.chests, hAct)
+		table.insert(
+			lines,
+			string.format(
+				"| 宝箱（レイドの宝箱を含む） | %s | %s | %s | %s | %s |",
+				short(a),
+				short(b),
+				ratio(a, b),
+				short(c),
+				ratio(a, c)
+			)
+		)
+	end
+
+	-- 旅の商人（D-198：価格の倍率の見直し）
+	do
+		local ms = Policy.merchantStats
+		local income = 0
+		for _, res in { "gold", "chestGold" } do
+			for _, n in L.totals[res] do
+				income += n
+			end
+		end
+		table.insert(lines, "")
+		table.insert(lines, "## 旅の商人（D-198：価格の倍率の見直し）")
+		table.insert(lines, "")
+		table.insert(
+			lines,
+			string.format(
+				"- 見た品 %d（平均価格 %s）、誰かの装備より良い品 %d、そのうち予算内 %d、買った品 %d（使った額 %s、ゴールドの収入（宝箱込み）の %.2f%%）",
+				ms.offers,
+				short(if ms.offers > 0 then ms.priceSum / ms.offers else 0),
+				ms.upgrades,
+				ms.affordable,
+				ms.bought,
+				short(ms.spent),
+				if income > 0 then ms.spent / income * 100 else 0
+			)
+		)
+	end
+
+	-- レイド（D-179：1〜3パーティで倒せたり倒せなかったり）
+	do
+		local rs = Ledger.raidSummary(L)
+		table.insert(lines, "")
+		table.insert(lines, "## レイド（D-179：HP とダメージの仮の式の確認）")
+		table.insert(lines, "")
+		if rs.slots == 0 then
+			table.insert(lines, "- 出発なし")
+		else
+			local function q(p: number): string
+				local n = #rs.ratios
+				return string.format("%.2f", rs.ratios[math.clamp(math.floor(n * p) + 1, 1, n)])
+			end
+			table.insert(
+				lines,
+				string.format(
+					"- 出発した時間帯 %d、討伐 %d（%.0f%%）、1時間帯あたりの参加パーティ %.2f",
+					rs.slots,
+					rs.defeated,
+					rs.defeated / rs.slots * 100,
+					rs.parties / rs.slots
+				)
+			)
+			table.insert(
+				lines,
+				`- 1パーティのダメージ÷HP：10%点 {q(0.1)}・中央値 {q(0.5)}・90%点 {q(0.9)}`
+			)
+			table.insert(
+				lines,
+				string.format(
+					"- 討伐に要ったパーティ数（到着順）：1 = %d、2 = %d、3 = %d、4以上 = %d、参加した全員でも届かない = %d",
+					rs.needed[1],
+					rs.needed[2],
+					rs.needed[3],
+					rs.needed[4],
+					rs.notEnough
+				)
+			)
+		end
+	end
 
 	-- 報酬の入手先の配分（D-160）
 	table.insert(lines, "")
