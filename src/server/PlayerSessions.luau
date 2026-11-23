@@ -15,7 +15,9 @@ local Game = require("@game/ReplicatedStorage/Core/Game")
 local Migration = require("@game/ReplicatedStorage/Core/Migration")
 local Config = require("./Config")
 local Deliveries = require("./Deliveries")
+local FriendCounter = require("./FriendCounter")
 local Persistence = require("./Persistence")
+local Referral = require("./Referral")
 
 local PlayerSessions = {}
 PlayerSessions.__index = PlayerSessions
@@ -31,6 +33,9 @@ export type Session = {
 	lastView: any, -- 最後に送った要約（差分の元：D-103）
 	commandTimes: { number }, -- 直近1秒に受けたコマンドの時刻（送りすぎの制限）
 	busy: boolean, -- コマンド・時間経過の処理中
+	-- 紹介の届け物を書く処理（11章 §3.7、Referral）
+	referralBusy: boolean?, -- 書いている途中
+	referralRetryAt: number?, -- 書けなかったとき、次に試す時刻
 }
 
 local MSG_LOCKED =
@@ -63,6 +68,10 @@ function PlayerSessions.new(master: any)
 	self.deliveries = Deliveries.new()
 	self.sessions = {} :: { [number]: Session }
 	self.onLoaded = nil :: ((Session, { any }) -> ())?
+	-- コマンド・時間経過以外で状態を変えたとき（紹介の報酬など）に、クライアントへ知らせる（Network が入れる）
+	self.onChanged = nil :: ((Session, { any }) -> ())?
+	-- 同じサーバーにいる友達の数（D-157、11章 §2.1）
+	self.friends = FriendCounter.new()
 	-- 処理中の読み込み・保存の数。サーバー終了時は、退出時の保存や読み込み中のものも終わるまで待つ（M7-5 で発見）
 	self.inFlight = 0
 	self.closing = false
@@ -73,6 +82,38 @@ end
 
 function PlayerSessions.ctx(self: any, online: boolean): any
 	return { now = os.time(), master = self.master, online = online }
+end
+
+-- そのプレイヤーのコマンド用の ctx。同じサーバーにいる友達の数を friendCount に入れる（D-157。ClaimFriendReward が読む）
+function PlayerSessions.ctxFor(self: any, session: Session, online: boolean): any
+	local ctx = self:ctx(online)
+	ctx.friendCount = self.friends:count(session.userId)
+	return ctx
+end
+
+-- 紹介の届け物を書く必要があれば、別の処理で書く（D-157・D-180・D-192、11章 §3.7）。
+-- コマンド・時間経過・読み込みのあとに呼ぶ。待ちを入れない
+function PlayerSessions.checkReferral(self: any, session: Session)
+	if self.sessions[session.userId] ~= session then
+		return
+	end
+	if not Referral.needsDelivery(session, self.master, os.time()) then
+		return
+	end
+	task.spawn(Referral.deliver, session, {
+		deliveries = self.deliveries,
+		ctxFor = function(s: any): any
+			return self:ctxFor(s, true)
+		end,
+		onChanged = function(s: any, events: { any })
+			if self.onChanged then
+				self.onChanged(s, events)
+			end
+		end,
+		isCurrent = function(s: any): boolean
+			return self.sessions[s.userId] == s
+		end,
+	})
 end
 
 function PlayerSessions.get(self: any, player: Player): Session?
@@ -162,6 +203,8 @@ local function loadPlayer(self: any, player: Player)
 		return
 	end
 	local state = stateOrErr
+	-- 紹介：新規のプレイヤーなら招待した人（ReferredByPlayerId）を記録する（D-157、11章 §3.7）。待ちを入れない
+	Referral.recordOnLoad(player, state, isNew)
 
 	-- 留守番（05章 §3、06章 §13・§14、D-161・D-172・D-186）。ログイン1回につきここで1回だけ。
 	-- 留守の始まりは core の Game.offlineStart（lastSavedAt と lastAdvancedAt の遅いほう）。
@@ -203,6 +246,7 @@ local function loadPlayer(self: any, player: Player)
 	if self.onLoaded then
 		self.onLoaded(session, offlineEvents)
 	end
+	self:checkReferral(session)
 
 	-- 届け物を受け取ったら、すぐ保存してから届け物を消す（保存より先に消すと、落ちたときに届け物を失う）
 	if #granted > 0 then

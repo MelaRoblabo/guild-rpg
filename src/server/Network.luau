@@ -3,6 +3,7 @@
 --   Command（RemoteFunction）：コマンドを受けて検証 → advance → execute。Sync は全体と連番を返す
 --   StateChanged（RemoteEvent）：参加時は全体、以後は前回送った要約との差分と連番
 --   定期の時間経過：帰還・自動再派遣が起きたら差分を送る
+--   サーバーの都合で状態を変えたとき（紹介の報酬など：reason = "server"）も差分を送る
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -61,6 +62,9 @@ function Network.start(sessions: any)
 	sessions.onLoaded = function(session: any, offlineEvents: { any })
 		push(session, "load", offlineEvents)
 	end
+	sessions.onChanged = function(session: any, events: { any })
+		push(session, "server", events)
+	end
 
 	-- 送りすぎの制限（1人あたり1秒に commandRateLimit 回）
 	local function rateLimited(session: any): boolean
@@ -104,7 +108,8 @@ function Network.start(sessions: any)
 		end
 		session.busy = true
 		local ok, resultOrErr = pcall(function()
-			local ctx = sessions:ctx(true)
+			-- 同じサーバーにいる友達の数を ctx.friendCount に入れる（D-157。ClaimFriendReward が読む）
+			local ctx = sessions:ctxFor(session, true)
 			local advanced = Game.advance(session.state, ctx)
 			local result = Game.execute(session.state, command, ctx)
 			return { advanced = advanced, result = result }
@@ -117,6 +122,7 @@ function Network.start(sessions: any)
 
 		local result = resultOrErr.result
 		push(session, "command", concat(resultOrErr.advanced, result.events or {}))
+		sessions:checkReferral(session) -- 紹介の進み具合に届いたか（D-192）
 		return { ok = result.ok, error = result.error, events = Protocol.redactEvents(result.events or {}) }
 	end
 
@@ -133,6 +139,7 @@ function Network.start(sessions: any)
 						warn(`[Network] 時間経過の処理でエラー（{session.userId}）：{eventsOrErr}`)
 					elseif #eventsOrErr > 0 then
 						push(session, "advance", eventsOrErr)
+						sessions:checkReferral(session) -- 紹介の進み具合に届いたか（D-192）
 					end
 				end
 			end

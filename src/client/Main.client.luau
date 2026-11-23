@@ -18,9 +18,11 @@ local stateRemote = remotes:WaitForChild("StateChanged") :: RemoteEvent
 
 local CommandText = require("@game/ReplicatedStorage/Core/CommandText")
 local Data = require("@game/ReplicatedStorage/Data")
+local Game = require("@game/ReplicatedStorage/Core/Game")
 local MasterData = require("@game/ReplicatedStorage/Core/MasterData")
 local Protocol = require("@game/ReplicatedStorage/Core/Protocol")
 local DebugView = require("./DebugView")
+local NotificationPrompt = require("./NotificationPrompt")
 
 local master = MasterData.load(Data)
 
@@ -166,7 +168,9 @@ end)
 
 -- 入力 ----------------------------------------------------------------------
 
-local HELP = "使えるコマンド\n  help / sync（全体を取り直す）\n" .. CommandText.HELP
+local HELP = "使えるコマンド\n  help / sync（全体を取り直す）\n"
+	.. "  notify                     通知の許可の画面を出す（D-181。設定画面に置くものの仮）\n"
+	.. CommandText.HELP
 
 local function submit(line: string)
 	line = string.match(line, "^%s*(.-)%s*$") or ""
@@ -180,11 +184,25 @@ local function submit(line: string)
 	elseif line == "sync" then
 		task.spawn(resync)
 		return
+	elseif line == "notify" then
+		local shown = NotificationPrompt.prompt(function()
+			log("通知の許可の画面を閉じた")
+		end)
+		log(
+			if shown
+				then "通知の許可の画面を出した"
+				else "通知の許可の画面を出せない（13歳未満・出したばかりなど）"
+		)
+		return
 	end
 	local command = CommandText.parse(line)
 	if command == nil then
 		log("不明なコマンド（help で一覧）")
 		return
+	end
+	-- eventgo・buy で時間帯を省いたら、今の時間帯で埋める（テキスト版と同じ：D-152）
+	if (command.type == "DispatchEvent" or command.type == "BuyFromMerchant") and command.eventSlot == nil then
+		command.eventSlot = Game.query.mapEvent(now(), master).current.eventSlot
 	end
 	local ok, r = pcall(function()
 		return commandRemote:InvokeServer(command)
