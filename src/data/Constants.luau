@@ -50,9 +50,10 @@ return {
 	growthVariance = 1,
 	-- 必要経験値 = floor(expBase × Lv^expExponent × expCycleMult[転生回数+1])（D-071）
 	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
+	-- M7b-6：自動プレイで最大の育成までの暦日数（D-161, D-199）に合わせ、全周回を1.10倍にした（docs/reports/M7b6_balance.md）
 	expBase = 100,
 	expExponent = 1.5,
-	expCycleMult = { 1.482, 1.033, 1.486, 2.455, 3.636, 5.853, 9.87, 11.84, 15.6 },
+	expCycleMult = { 1.63, 1.136, 1.635, 2.701, 4, 6.438, 10.86, 13.02, 17.16 },
 	levelCapInitial = 20, -- D-071
 	levelCapPerRebirth = 10,
 	levelCapMax = 100,
@@ -112,7 +113,7 @@ return {
 	--                    × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))
 	friendRewardIntervalSeconds = 600, -- 仮（M7b-6）。押したら次に押せるまでの秒（押さないとたまらない）
 	friendRewardMaxFriends = 3, -- 報酬が増えるのは3人分まで
-	friendRewardGoldMult = 1, -- 仮（M7b-6）。友達1人のときの係数（rewardGoldBase に掛ける）
+	friendRewardGoldMult = 7, -- M7b-6（配分 D-160 のフレンド約5%）。友達1人のときの係数（rewardGoldBase に掛ける）
 	friendRewardBonusPerFriend = 0.25, -- 仮（M7b-6）。2人目から1人ごとに増える割合
 	friendRewardDailyCap = 12, -- 仮（M7b-6）。1日に押せる回数
 
@@ -195,38 +196,40 @@ return {
 	mapEventIntervalSeconds = 300, -- 5分ごとに1つ
 	mapEventNoticeSeconds = 60, -- 1分前に予告
 	mapEventWindowSeconds = 180, -- 出発・購入できるのは出てから3分間
-	mapEventKindWeights = { -- 種類の割合（仮。M7b-6）
-		{ id = "mev_rare_dungeon", weight = 1 },
+	mapEventKindWeights = { -- 種類の割合（M7b-6：配分 D-160 のマップイベントとオンラインの価値 D-161 に合わせた）
+		{ id = "mev_rare_dungeon", weight = 3 },
 		{ id = "mev_raid", weight = 1 },
-		{ id = "mev_merchant", weight = 1 },
+		{ id = "mev_merchant", weight = 6 },
 	},
 	-- レアダンジョン（D-152, D-171, D-173）
 	rareDungeonChestMult = 1.5, -- 宝箱の数の倍率。1.5〜2 の範囲で仮（M7b-6）。端数は確率で切り上げ
 	-- レイドボス（D-152, D-179。06章 §12）。HP とダメージの式は仮（M7b-6 で決める）
 	--   HP     = floor(踏破済みの一番深いダンジョンの base.hp × raidHpMult × 一様乱数[raidHpSpread.min, max))（プレイヤーごと）
 	--   ダメージ = floor(パーティ全員の攻撃力（出発時の実効値）の合計 × raidDamagePerAtk)
-	raidHpMult = 1, -- 仮（M7b-6）
-	raidHpSpread = { min = 0.8, max = 1.2 }, -- 仮（M7b-6）
-	raidDamagePerAtk = 1, -- 仮（M7b-6）
-	raidTravelSeconds = 60, -- レイドへの片道秒（到着でダメージを入れ、同じ秒数で帰る）。仮（M7b-6）
+	raidHpMult = 3, -- M7b-6：1パーティでときどき・2パーティでたいてい・3パーティでほぼ倒せる（D-179）
+	raidHpSpread = { min = 0.6, max = 1.4 }, -- M7b-6（同上）
+	raidDamagePerAtk = 1, -- M7b-6（HP の側で合わせたので 1 のまま）
+	raidTravelSeconds = 30, -- レイドへの片道秒（到着でダメージを入れ、同じ秒数で帰る）。M7b-6：オンラインの価値（D-161）のため 60→30
 	-- 旅の商人（D-152。06章 §12）
 	-- 品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン：D-189）
 	merchantItemCount = { min = 3, max = 5 }, -- 品の数（プレイヤーごと）
-	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）
+	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）。M7b-6 で見直し、据え置き（D-198）
 	merchantGradeCoef = 0.5, -- 仮（M7b-6）
 	merchantModifierCoef = 0.5, -- 仮（M7b-6）
 
 	-- クエスト（D-153。06章 §15）。お題の候補と報酬は src/data/Quests.luau
 	questDailyCount = 3,
 	questWeeklyCount = 4, -- 3〜5 のうち仮（M7b-6）
-	-- 全部達成のボーナス（rewards の形は Quests と同じ）。量は仮（M7b-6）
+	-- 全部達成のボーナス（rewards の形は Quests と同じ）。量は M7b-6 で配分（D-160）に合わせた
 	questDailyBonus = {
-		chests = { { pileKey = "special:quest", count = 2 } },
-		items = { itm_slot_ticket = 1 },
+		goldMult = 60,
+		chests = { { pileKey = "special:quest", count = 150 } },
+		items = { itm_slot_ticket = 10, itm_potion_appearance_change = 6, itm_potion_appearance_keep = 6 },
 	},
 	questWeeklyBonus = {
-		chests = { { pileKey = "special:quest", count = 5 } },
-		items = { itm_slot_ticket = 3, itm_potion_appearance_keep = 1 },
+		goldMult = 220,
+		chests = { { pileKey = "special:quest", count = 700 } },
+		items = { itm_slot_ticket = 40, itm_potion_appearance_change = 25, itm_potion_appearance_keep = 25 },
 	},
 
 	-- プレイ時間（D-154。06章 §20）。段階と報酬は src/data/PlaytimeRewards.luau
