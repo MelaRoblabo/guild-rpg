@@ -40,7 +40,7 @@
 
 - `id` の重複がない。参照先の `id` が存在する。
 - 確率の表は合計が 1（許容誤差 1e-9）。重み表は全部 0 以上で合計 > 0。
-- 演出率（D-090）の 10〜15% の検査は普通のダンジョンの `chestRarityWeights` だけ。特別な宝箱は `SpecialChests` の行ごとの基準で検査する（D-166）。
+- 演出率（D-090）の 10〜15% の検査は普通のダンジョンの `chestRarityWeights` だけ。特別な宝箱は `SpecialChests` の行ごとの基準で検査する（D-166）。レアダンジョンの山は、相当するダンジョンの表をレアダンジョン用の基準（20〜30%）で検査する（D-171）。
 - 専用ギフト（`exclusive = true`）は、持ち主のユニークが1人だけ参照している（D-165）。ログインボーナス用のユニーク（`acquire = "login"`）は今週の訪問者の候補に入らない（D-155, D-158）。
 - 必須項目が揃っている。数値の範囲（確率は 0〜1、レアリティは 1〜5 など）。
 - 見た目は 16 カテゴリ × 15 種が揃っている（コンテンツが揃うまでは警告に留めるフラグを持つ）。
@@ -107,11 +107,12 @@
 | `friendRewardMaxFriends` | 3（報酬が増えるのは3人分まで） | D-157 |
 | `friendRewardDailyCap` | 未決（M7b-6） | D-157 |
 | `referralWeeklyCap` / `referralProgressCondition` | 未決（M7b-6。例 週3人 / 初転生） | D-157 |
-| `weeklyVisitorMult` | 未決（M7b-6。例 0.5%→3%） | D-158 |
+| `weeklyVisitorChance` | 今週の訪問者の別枠の確率（候補1人ごと）。未決（M7b-6。例 0.03） | D-158, D-170 |
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
 | `mapEventKindWeights` | レアダンジョン / レイドボス / 旅の商人：未決（M7b-6） | D-152 |
 | `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6） | D-152 |
-| `raidHp` | 未決（M7b-6。決め方も未決） | D-152 |
+| `rareDungeonEffectRate` | 0.20〜0.30（レアダンジョンの山の演出率の基準） | D-171 |
+| `raidHp` | 未決（M7b-6。HP とダメージの式も M7b-6） | D-152, D-179 |
 | `merchantItemCount` | 3〜5 | D-152 |
 | `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 約10 / 未決 / 未決（M7b-6） | D-152 |
 | `rewardShareTargets` | §13 の表 | D-160 |
@@ -144,6 +145,7 @@
 
 - **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、必要なら `chestEffectMinRarity` を見直す。検証が長さの食い違いをエラーにする。
 - 派遣費 `dispatchFee` は廃止（D-163。D-079 を廃止）。テンプレート・calibrate・Dungeons から消す。
+- レアダンジョンの山（`special:rare:<dungeonId>`）は、そのダンジョンの `chestRarityWeights` をそのまま使う。演出ラインだけ別に `rareChestEffectMinRarity` をテンプレートに書き、calibrate が写す。この演出ライン以上が出る割合が `rareDungeonEffectRate`（20〜30%）に収まるかを検証する（D-171）。
 - 経験値は「深いダンジョンほど1秒あたりの経験値が前の1.08倍以上」になるよう calibrate が引き上げる（D-097）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 
@@ -171,19 +173,21 @@
 | `travelMult` | 移動時間 −30% | 未決（M7b-6） |
 
 - 候補の行と効果量は未決（M7b-6）。どの日にどのダンジョン・特性が当たるかは 06章 §16。
+- 日ごとの特性なので「ダンジョン補正はない」（D-038・D-047）の例外。効果は個体補正・経験値補正の上限の外で掛ける（D-173）。
 
 ## 8. ユニーク・ギフトの追加項目（Uniques.luau・Gifts.luau）
 
 | ファイル | 項目 | 内容 | 根拠 |
 | --- | --- | --- | --- |
-| Uniques | `acquire` | `visitor`（雇用の特別な訪問者）・`firstClear:<dungeonId>`（初回踏破）に `login`（ログインボーナス7日目）を足す。`login` のユニークは雇用に出さない | D-055, D-155 |
+| Uniques | `acquire` | `visitor`（雇用の特別な訪問者）・`firstClear:<dungeonId>`（初回踏破）・`login`（ログインボーナス7日目）の3つだけ。ギルドレベル報酬の経路は廃止。`login` のユニークは雇用に出さない | D-055, D-155, D-169 |
 | Uniques | `loginOrder` | `login` のユニークを配る順（1周ごとに別のユニーク）。人数は未決（Q-025） | D-155 |
-| Uniques | `visitorWeight` | 特別な訪問者の抽選の重み（`visitor` のユニークだけ）。値は未決（M7b-6） | D-158 |
 | Uniques | `exclusiveGiftId` | そのユニークの専用ギフト。中身は未決 | D-165 |
 | Gifts | `exclusive` | 専用ギフトの印。true なら一般の抽選（雇用の初期ギフト・転生で増えるギフト）に出さない。最大4つの枠（D-024）には数える | D-165 |
+| Gifts | `partyEffect` | 専用ギフトに限り、パーティ全体に効く効果（例：全員の移動が少し速い・宝箱が少し増える）を持てる。同じ効果はパーティ内で重ねない（道案内と同じ）。ゲーム仕様書04章の「補正の発生源は個体のみ」の例外 | D-174 |
 
 - ユニークの強さの基準は「雇用の新人の平均より上、当たりよりは下」（D-165）。`baseStats` はこの基準で決め直す（数値は未決、シミュレーションで確認）。
 - 専用ギフトの効果の種類は、中身が決まってから必要な分だけ足す（D-165）。
+- ユニークの入手経路は上の3つ（初回踏破・ログインボーナス・雇用の特別な訪問者）。今週の訪問者は雇用の特別な訪問者の中で出やすくするもの（D-169, D-170）。
 
 ## 9. クエストのお題（Quests.luau、D-153）
 
@@ -212,14 +216,15 @@
 
 | id | pileKey | 出どころ | 演出率の基準 |
 | --- | --- | --- | --- |
-| `spc_rare` | `special:rare` | レアダンジョン（D-152） | 未決（M7b-6。例 20〜30%） |
+| `spc_rare` | `special:rare:<相当するダンジョン>` | レアダンジョン（D-152）。中身の表は相当するダンジョンの `chestRarityWeights` を使う（行に表を持たない） | `rareDungeonEffectRate`（20〜30%）（D-171） |
 | `spc_raid` | `special:raid` | レイドのレアな宝箱（D-152） | 未決（M7b-6） |
 | `spc_quest` | `special:quest` | クエストの報酬（D-153） | 未決（M7b-6） |
 | `spc_login` | `special:login` | ログインボーナス（D-155） | 未決（M7b-6） |
 | `spc_playtime` | `special:playtime` | プレイ時間報酬（D-154） | 未決（M7b-6） |
 
 - 出現率（`rarityWeights`）と演出率は未決（M7b-6）。検証は行ごとに `effectRateMin`〜`effectRateMax` に収まるかを見る（D-090 の検査は普通のダンジョンだけ）。
-- 中身のアイテムレベルは「踏破した一番深いダンジョン」（06章 §19）。
+- クエスト・ログインボーナス・プレイ時間の宝箱は特別な宝箱（D-171）。D-154 の「進み具合に合った」は中身のアイテムレベルのこと。
+- 中身のアイテムレベルは「開けたときに踏破している一番深いダンジョン」（06章 §19、D-171）。
 
 ## 12. マップイベント・旅の商人（MapEvents.luau・Merchant.luau、D-152）
 
@@ -235,6 +240,7 @@
 | ゴールド | 65 | 10 | 5 | 10 | 5 | 5 | — |
 | 宝箱 | 70 | 10 | 5 | 5 | — | 10 | — |
 | ステータススロットチケット | 10 | 40 | 15 | 5 | 5 | — | 25 |
-| ポーション | 50 | 20 | 20 | — | — | 10 | — |
+| ポーション | 50 | 20 | 20 | — | — | 10 | あり（比率は M7b-6） |
 
-- ユニークキャラの入手は初回踏破・ログインボーナス7日目（D-155）・今週の訪問者（D-158）の3経路。
+- ポーションのギルドレベルの分は、ギルドレベルが10の倍数のときの見た目変更・見た目維持ポーション（D-074 のまま残す）。各入手先の比率は M7b-6 の自動プレイで決める（D-178）。
+- ユニークキャラの入手は初回踏破・ログインボーナス7日目（D-155）・雇用の特別な訪問者（今週の訪問者は出やすい）の3経路（D-169）。

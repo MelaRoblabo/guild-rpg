@@ -23,7 +23,8 @@
 ```
 攻撃力 = (攻撃区分が physical なら 実効str、magic なら 実効mag) + 武器の攻撃力補正     -- D-037, D-047
          ※ 退魔の才・退魔の修飾語は、相手がアンデッドのとき攻撃力に +率 を乗算（個体補正の上限内）
-         ※ 日替わりの特性 atkPctPhysical / atkPctMagic は、攻撃区分が合う者の攻撃力に +value（§16、D-156）
+         ※ 日替わりの特性 atkPctPhysical / atkPctMagic は、攻撃区分が合う者の攻撃力に × (1 + value)。
+           個体補正の上限（personalBonusCap）の外で掛ける（§16、D-156, D-173）
 与ダメージ = max( floor(攻撃力² ÷ (攻撃力 + 相手の対応防御)), 1 )                       -- D-068（D-007 を置き換え）
          対応防御：physical → 物理防御、magic → 魔法防御
 クリティカル率 = min( 実効dex / (実効dex + critCoef), critCap )                       -- D-010
@@ -53,7 +54,9 @@
 罠ダメージ(各生存者) = floor( 最大HP × (ダンジョンの trapDamageRate または Constants.trapDamageRate) )   -- D-067
 泉の回復(各生存者) = floor( 最大HP × fountainHealRate )                               -- D-018
 宝箱ランク（＝中の装備のレアリティ）= ダンジョンの chestRarityWeights から重み付き抽選   -- D-015, D-085
-日替わりの特性 chestMult：探索で得た宝箱の数に × value（§16、D-156。端数の扱いは要確認）
+日替わりの特性 chestMult：探索で得た宝箱の数に × value（§16、D-156）
+  端数は確率で切り上げる：宝箱1個あたり (value − 1) の確率で +1（例 1.5倍なら1個あたり50%で+1）   -- D-173
+  専用ギフトのパーティ効果で宝箱が増えるときも同じ（§21、D-174）
   （表の長さがレアリティの数より短ければ、上位は出ない。最上位はリリース時ミシック＝6）
 ```
 
@@ -70,6 +73,7 @@
 片道秒 = ceil( 距離 × travelSecondsPerDistance × clamp(ダンジョンの refAgi ÷ 平均実効agi, travelSpeedMin, travelSpeedMax) × 道案内 )
   道案内：対象地形なら × 0.7（パーティ内で重複しない。D-070）
   日替わりの特性 travelMult：片道秒に × value（§16、D-156）
+  専用ギフトのパーティ効果（移動）：パーティ内で重ねない（道案内と同じ。§21、D-174）
 再生秒 = 戦闘ターン数合計 × replaySecondsPerTurn + イベント数 × replaySecondsPerEvent
 所要秒 = 片道秒 × 2 + 再生秒                       -- 撤退時も同じ式（再生は撤退したフロアまで）
 留守番の所要秒 = 所要秒 × offlineTimeMult            -- §13、D-161
@@ -81,8 +85,9 @@
 勝利時の経験値 = 戦闘報酬の経験値を勝利時点の生存者で等分（端数切り捨て）            -- D-041
   個人倍率 = (1 + rebirthExpBonusPerCount × 転生回数) × (1 + min(経験値補正, expBonusCap))
   経験値補正 = 大食らい 0.25 ＋ 装備の経験値補正の合計                                     -- D-082
-  休息ボーナス：帰還時に残りがあれば、さらに × restBonusExpMult（修練の護符と重ねて効く。expBonusCap の外）   -- §14、D-161
-  日替わりの特性 expMult：出発時に当たっていれば × value                                   -- §16、D-156
+  休息ボーナス：帰還時に残りがあれば、さらに × restBonusExpMult（修練の護符と重ねて効く。expBonusCap の外）   -- §14、D-161, D-173
+  日替わりの特性 expMult：出発時に当たっていれば × value（休息ボーナスと掛け合わせる。expBonusCap の外）       -- §16、D-156, D-173
+  個人倍率（全体）= (1 + rebirthExpBonusPerCount × 転生回数) × (1 + min(経験値補正, expBonusCap)) × 休息ボーナス × 日替わり
   装備の経験値補正 = expPct × equipRarityMult[rarity] × (1 + equipGradeCoef × grade)       -- アイテムレベルでは伸びない
 必要経験値(Lv→Lv+1) = floor(100 × Lv^1.5 × expCycleMult[転生回数+1])   -- D-071
 レベルアップ時の成長(各項目) = max(0, 職業の基準値 + rng:int(−growthVariance, +growthVariance))   -- D-043
@@ -94,7 +99,7 @@
 
 ```
 1回の費用   = floor(trainGoldCoef × Lv ^ trainGoldExponent)          -- Lv は行う時点のレベル
-1回の経験値 = trainingFacility[トレーニング場のレベル].expPerSession -- 倍率（転生・ギフト・装備）は掛けない
+1回の経験値 = trainingFacility[トレーニング場のレベル].expPerSession -- 倍率（転生・ギフト・装備・休息ボーナス：D-173）は掛けない
 上げられる上限 = min(本人の levelCap, trainingFacility[...].levelCap)
 上限に達したら余った経験値は捨てる。ゴールドが1回の費用に足りなくなったら止める
 ```
@@ -145,8 +150,11 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
 種類・場所   ：Rng.new(Rng.derive(calendarSeed, eventSlot)) で mapEventKindWeights と場所の一覧から抽選   -- 全員共通
 中身         ：Rng.new(Rng.derive(state.seed, eventSlot)) で抽選（ボスのHP・商人の品）              -- プレイヤーごと。rngCounter は進めない
 商人の価格   ：floor( 売却価格（§10） × merchantPriceMult × (1 + merchantGradeCoef × grade) × (修飾語つきなら 1 + merchantModifierCoef) )   -- 係数は未決（M7b-6）
-レアダンジョン：強さは踏破済みの一番深いダンジョンと同じ。宝箱の数 × rareDungeonChestMult。宝箱は特別な宝箱 special:rare（§19）
-レイド       ：その時間帯に出発したパーティのダメージ（出発時に計算）の合計 > raidHp なら討伐   -- HP とダメージの計算の仕方は未決
+買える間     ：イベントの出発と同じ3分間（mapEventWindowSeconds）                                 -- D-179
+レアダンジョン：強さは踏破済みの一番深いダンジョンと同じ。宝箱の数 × rareDungeonChestMult（端数は確率で切り上げ：D-173）
+              宝箱の山は special:rare:<相当するダンジョン>（踏破済みの一番深いダンジョンの1段上）。中身はそのダンジョンの表   -- §19、D-171
+レイド       ：その時間帯に出発したパーティのダメージ（出発時に計算）の合計 > raidHp なら討伐。宝箱は参加したパーティごとに1つ   -- D-179
+              HP とダメージの式は M7b-6 で決める
 ```
 
 サーバー全体で状態を持たない：時刻と固定の種だけから決まるので、どのサーバーでも同じ結果になる。
@@ -162,17 +170,20 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
 ```
 
 - 留守番の探索には `offline = true` の印を付け、クエストに数えない・休息ボーナスを使わない。
+- 6時間より前にログインしたら、帰っていない留守番の探索はログインの時点で帰還させる（結果は出発時に決まっている）。留守中は倉庫がいっぱいでも止めない（D-172）。
 - 日替わりの特性は出発した日（出発時刻の dayIndex）の特性を当てる（§16）。
 - ログイン時の計算量の目安：5パーティで約70回分。
 
-## 14. 休息ボーナス（D-161）
+## 14. 休息ボーナス（D-161, D-173）
 
 ```
 たまる量 = (ログイン時刻 − lastSavedAt) × restBonusRate                   -- 留守にした時間の半分
 restBonusSeconds = min(restBonusSeconds + たまる量, restBonusMaxSeconds)   -- 上限4時間
-消費     = オンラインの advance で、経過秒だけ restBonusSeconds を減らす（0 未満にしない）
-効き方   = オンライン中に帰還した探索（offline でない）の経験値に、残りが 0 より大きければ × restBonusExpMult
-重ね方   = 修練の護符（装備の経験値補正、D-082）とは重ねて効く：(1 + min(経験値補正, expBonusCap)) × restBonusExpMult
+消費     = オンラインの advance で、経過秒だけ restBonusSeconds を減らす（0 未満にしない。探索しているかは問わない）
+効き方   = オンライン中に帰還した探索（offline でない）の経験値に、帰還時に残りが 0 より大きければ × restBonusExpMult
+重ね方   = 修練の護符（装備の経験値補正、D-082）・日替わりの expMult と掛け合わせる。expBonusCap（+100%）の外で掛ける
+           (1 + min(経験値補正, expBonusCap)) × restBonusExpMult × (日替わりの expMult)
+トレーニングの経験値には掛けない（§8b）
 ```
 
 倍率・たまる速さは未決（M7b-6）。
@@ -186,7 +197,7 @@ restBonusSeconds = min(restBonusSeconds + たまる量, restBonusMaxSeconds)   -
 
 量の式・候補は未決（M7b-6）。
 
-## 16. 日替わりの特性（D-156）
+## 16. 日替わりの特性（D-156, D-173）
 
 ```
 rng = Rng.new(Rng.derive(calendarSeed, dayIndex))                       -- 全員共通
@@ -202,39 +213,49 @@ rng = Rng.new(Rng.derive(calendarSeed, dayIndex))                       -- 全�
 | `atkPctPhysical` / `atkPctMagic` | 攻撃区分が合う者の攻撃力（§3） |
 | `travelMult` | 片道秒（§7） |
 
-レアリティを上げる特性は置かない（D-156）。
+- レアリティを上げる特性は置かない（D-156）。
+- 日ごとの特性なので「ダンジョン補正はない」（D-038・D-047）の例外として認める。攻撃力は個体補正の上限（+50%）、経験値は経験値補正の上限（+100%）の外で掛ける。宝箱の数の端数は確率で切り上げる（D-173）。
 
-## 17. 一括売却の「弱い」（D-167）
+## 17. 一括売却の「弱い」（D-167, D-175）
 
 ```
-装備 x が「弱い」 ⇔ x の枠（武器・防具・補助）で、x を付けられる冒険者が1人以上いて、
-                   その全員について 性能値(x) < その冒険者が今その枠に付けている装備の性能値
-性能値 = §2 の性能値
+装備 x が「弱い」 ⇔ x の枠（武器・防具）で、x を付けられる冒険者が1人以上いて、
+                   その全員が今その枠に装備を付けていて、
+                   その全員について 比べる値(x) < 今その枠に付けている装備の比べる値
+比べる値 = 武器：攻撃力補正（§2 の性能値）／防具：物理防御 + 魔法防御（§2 の性能値の合計）
 ```
 
-- 要確認：今その枠が空いている冒険者がいるときの扱い、性能値が複数ある装備（防具の物理防御・魔法防御、ステータス補正つき）の比べ方。
+- その枠が空いている冒険者が1人でもいれば「弱い」としない（売らない）。
+- 補助（盾・アクセサリー）は目的が分かれるので対象外（D-120 の自動装備と同じ考え）。
+- 修飾語つき・保護中・装備中・商人で買ったもの（`fromMerchant`）は売らない。対象は開封結果に出た装備。
 
-- 保護中・装備中の装備は対象外。対象は開封結果に出た装備。
-
-## 18. 今週の訪問者（D-158）
+## 18. 今週の訪問者（D-158, D-170）
 
 ```
 rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。週の区切りは月曜（§11）
 今週の訪問者 = acquire = "visitor" のユニークから1人を抽選（login のユニークは入れない：D-155）
-特別な訪問者の抽選の重み = visitorWeight × (今週の訪問者なら weeklyVisitorMult、ほかは 1)
-  対象は持っていないユニークだけ。候補枠の数だけ判定する（枠が多いほど出やすい）
+
+雇用候補1人ごとに：
+  ① 今週の訪問者を持っていなければ、weeklyVisitorChance で判定 → 当たればその候補は今週の訪問者
+  ② ①が外れた（または①を飛ばした）ら、specialVisitorChance（0.5%）で判定
+     → 当たれば、今週の訪問者以外の持っていない visitor のユニークから均等に1人（login のユニークは除く）
+候補枠の数だけ判定する（枠が多いほど出やすいのは意図どおり）
 ```
 
-倍率・重み・週に何人回すかは未決（M7b-6）。
+`weeklyVisitorChance` の値と週に何人回すかは未決（M7b-6）。
 
 ## 19. 特別な宝箱（D-166, D-142）
 
 ```
 ランク           = SpecialChests の rarityWeights から重み付き抽選
+                   （レアダンジョンの山 special:rare:<dng> は、そのダンジョンの chestRarityWeights：D-171）
 演出率の検査     = 行ごとに effectMinRarity 以上が出る割合が effectRateMin〜effectRateMax（D-090 の検査は普通のダンジョンだけ）
+                   （レアダンジョンの山は、そのダンジョンの rareChestEffectMinRarity 以上が出る割合を rareDungeonEffectRate（20〜30%）で検査：D-171）
 演出の選び方の順位 = 「その宝箱の表での順位」（D-142 の「そのダンジョンでの順位」を読み替える）
-中身のアイテムレベル = 踏破した一番深いダンジョンの tier
+中身のアイテムレベル = 開けたときに踏破している一番深いダンジョンの tier（山は数だけを保存するため：D-171）
 ```
+
+クエスト・ログインボーナス・プレイ時間の宝箱も特別な宝箱（D-171）。
 
 ## 20. プレイ時間・ログインボーナス・フレンドボタン（D-154, D-155, D-157）
 
@@ -245,3 +266,13 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 ```
 
 量は未決（M7b-6）。
+
+## 21. 専用ギフトのパーティ効果（D-174）
+
+```
+専用ギフト（Gifts.exclusive）に限り、partyEffect を持てる（例：パーティ全員の移動が少し速い・宝箱が少し増える）
+同じ効果はパーティ内で重ねない（道案内と同じ扱い：§7、D-070）
+効き方：移動は片道秒に掛ける（§7）、宝箱は数に掛けて端数は確率で切り上げ（§5、D-173）
+```
+
+ゲーム仕様書04章の「補正の発生源は個体のみ」の例外。効果の種類と量は、専用ギフトの中身が決まってから足す（D-165）。

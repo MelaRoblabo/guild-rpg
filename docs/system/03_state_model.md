@@ -32,10 +32,12 @@ export type EquipmentItem = {
 	modifierValue: number?,
 	equippedBy: string?,      -- 冒険者 uid
 	locked: boolean,
+	fromMerchant: boolean?,   -- 旅の商人で買った装備。一括売却・自動売却で売らない（D-152, D-175）。version 6 で追加
 }
 
 -- 宝箱（D-084, D-166）：倉庫とは別の「宝箱置き場」。1個ずつの記録は持たず、宝箱の山×ランクの数だけ。上限なし
 -- 宝箱の山の鍵（pileKey）：普通のダンジョンの宝箱は dungeonId、特別な宝箱は "special:<種類>"（例 "special:raid"。D-166）
+--   レアダンジョンの宝箱は "special:rare:<相当するダンジョンの id>"（1段上のダンジョン。中身はそのダンジョンの表：D-171）
 -- ランクはサーバーだけが知る。クライアント・画面に渡すのは宝箱の山ごとの合計だけ（D-087）
 -- 例：chests = { dng_ruins = { 12, 4, 1, 0, 0 }, ["special:raid"] = { 0, 0, 2 } }
 --     … 罠の遺跡の宝箱がコモン12・アンコモン4・レア1、レイドのレアな宝箱がレア2
@@ -63,9 +65,10 @@ export type Expedition = {
 }
 
 -- 受け取り箱（D-164）：クエスト・プレイ時間・ログインボーナス・レイドなどの報酬の受け取り口。フレンドボタンの報酬は入れない（D-157）
+-- 受け取れない報酬（所属枠・倉庫がいっぱいなど）は受け取り箱に残す。期限はない（D-176）
 export type InboxEntry = {
 	uid: string,                      -- "inb_<連番>"（nextUid から）
-	source: "quest" | "playtime" | "login" | "raid",
+	source: "quest" | "playtime" | "login" | "raid" | "referral",  -- referral は紹介の届け物（D-180）
 	at: number,                       -- 届いた時刻（ctx.now）
 	rewards: {
 		gold: number?,
@@ -154,7 +157,7 @@ export type PlayerState = {
 		inviteeRewardDone: boolean,   -- 招待された側の報酬を渡したか（1回だけ）
 		rewardedInvitees: { [string]: boolean },  -- 招待した側：報酬を渡した相手の UserId（文字列キー）
 		weekIndex: number, weekCount: number,     -- 招待した側の人数の上限（週）
-	},
+	},                                -- 招待した側への報酬は「届け物」として別の保存場所に置き、次のログインで受け取り箱へ入れる（D-180。このセーブには書かない。詳細は M7b-5）
 	merchant: { eventSlot: number, bought: { boolean } }?,  -- 今の旅の商人の品のうち買ったもの（D-152）。品ぞろえは eventSlot と seed から決まるので保存しない
 	raid: { eventSlot: number, damage: number, defeated: boolean }?,  -- 今のレイドボスの進み具合（D-152。自分専用）
 	rareDungeonSlots: { [string]: number }?,  -- レアダンジョンに出発したパーティ（partyIndex → eventSlot。1パーティ1回まで：D-152）
@@ -177,12 +180,13 @@ export type PlayerState = {
 
 ## セーブの移行（version 5 → 6、M7b-2）
 
-D-152〜D-168 で足す状態をまとめて version 6 にする（影響と修正リスト #8-1）。`Migration.CURRENT = 6`。
+D-152〜D-168 で足す状態をまとめて version 6 にする（影響と修正リスト #8-1）。`Migration.CURRENT = 6`。まだ公開前なので、一番簡単な形にする（D-177）。
 
 | 項目 | 旧版からの変換 | 根拠 |
 | --- | --- | --- |
-| `chests` | 鍵を宝箱の山に広げる。普通のダンジョンの山の鍵は dungeonId のままなので、中身はそのまま使える | D-166 |
+| `chests` | 鍵は dungeonId のまま宝箱の山の鍵として扱う（変換しない） | D-166, D-177 |
 | `expeditions[*]` | `offline`・`dailyTraitId`・`eventSlot`・`raidDamage` は nil（旧版の探索は普通の探索） | D-161, D-156, D-152 |
+| `equipment[*]` | `fromMerchant` は nil | D-175 |
 | `lastSavedAt` | `lastAdvancedAt` を入れる | D-161 |
 | `restBonusSeconds` | 0 | D-161 |
 | `quests` | 空（次の advance で今日・今週の分を作る） | D-153 |
@@ -192,7 +196,8 @@ D-152〜D-168 で足す状態をまとめて version 6 にする（影響と修�
 | `referral` | `inviteeRewardDone = false, rewardedInvitees = {}, weekIndex = -1, weekCount = 0` | D-157 |
 | `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 |
 | `inbox` | 空 | D-164 |
-| `settings.autoSell` | 旧版の値を残す（新規のセーブだけ初期値オン。旧版の扱いは要確認） | D-167 |
-| `items` の売却用アイテム | 要確認（常に自動で売るので、残っている分の扱いが決まっていない） | D-167 |
+| `settings.autoSell` | 初期値（`enabled = true, maxRarity = 2, keepModified = true`）に合わせる | D-167, D-177 |
+| `items` の売却用アイテム | 売ってゴールドにする（売却価格は今までと同じ） | D-167, D-177 |
+| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177 |
 
 新規のセーブ（StarterSet）は上の新しい項目を初期値で持ち、`settings.autoSell` は D-167 の初期値（オン）にする。

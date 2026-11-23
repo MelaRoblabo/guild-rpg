@@ -15,6 +15,7 @@ guild-rpg/
 │  │  ├─ Game.luau           窓口：execute / advance / newState
 │  │  ├─ Types.luau          状態・マスターデータ・コマンド・イベントの型
 │  │  ├─ Rng.luau            乱数（08章）
+│  │  ├─ Calendar.luau       日・週の番号を ctx.now から出す（06章 §11、D-168, D-184）
 │  │  ├─ Formulas.luau       計算式（06章）。他モジュールは式をここから使う
 │  │  ├─ MasterData.luau     マスターデータの読み込みと検証（04章）
 │  │  ├─ Combat.luau         戦闘1回分
@@ -30,7 +31,8 @@ guild-rpg/
 │  │  ├─ Inventory.luau      倉庫・アイテム・装備の付け外し・売却
 │  │  ├─ Guild.luau          ギルドレベル・拡張・ダンジョン解放
 │  │  └─ Migration.luau      セーブデータの移行
-│  ├─ data/                  マスターデータ（Luauテーブル。04章）
+│  ├─ data/                  マスターデータ（Luauテーブル。04章）。M7b で DailyTraits・Quests・LoginBonus・
+│  │                         PlaytimeRewards・SpecialChests・MapEvents・Merchant を追加（D-152〜D-166）
 │  ├─ server/                Roblox サーバー（M7で作成）
 │  └─ client/                Roblox クライアント（M7は簡易画面のみ、UIはM8）
 ├─ tools/                    Lune で動く開発ツール
