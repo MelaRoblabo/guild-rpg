@@ -70,10 +70,11 @@ function DebugView.render(view: any, master: any, now: number): string
 		add(`パーティ{i} [{table.concat(names, " ")}] {status}{rep}`)
 	end
 
-	-- 宝箱（ダンジョンごとの数だけ：D-087）と倉庫
+	-- 宝箱（山ごとの数だけ。特別な宝箱の山も含む：D-087・D-166）と倉庫
+	-- view.chests は { pileKey, count }（ランクなし）。前の形 { dungeonId, count } も読む（まとめるまでの互換）
 	local chestText = {}
-	for _, c in view.chests do
-		table.insert(chestText, `{c.dungeonId}×{c.count}`)
+	for _, c in view.chests or {} do
+		table.insert(chestText, `{c.pileKey or c.dungeonId}×{c.count}`)
 	end
 	local wh = Game.query.warehouse(view)
 	add(`宝箱 {if #chestText > 0 then table.concat(chestText, " ") else "なし"} ／ 倉庫 {wh.used}/{wh.size}`)
