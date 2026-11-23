@@ -182,7 +182,7 @@ export type PlayerState = {
 
 D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の段階ごとに version を1つ上げる**（影響と修正リスト #8-1）。段階ごとにテストつきで動く形にするため。まだ公開前なので、どの段階も一番簡単な形にする（D-177）。
 
-- `Migration.migrate(state, master)` にはマスターデータを渡す（売却価格・初期値を使う手順があるため）。master が無いと v5 → v6 で失敗し、状態は変えない。Roblox のサーバー（`src/server/PlayerSessions`）も master を渡す（M7b-5 で直す。それまで version 5 のセーブは読み込みに失敗して切断される。上書きはしない）。
+- `Migration.migrate(state, master)` にはマスターデータを渡す（売却価格・初期値を使う手順があるため）。master が無いと v5 → v6 で失敗し、状態は変えない。Roblox のサーバー（`src/server/PlayerSessions`）も master を渡す（2026-11-23 に対応済み）。
 
 ### version 5 → 6（M7b-2）　`Migration.CURRENT = 6`
 

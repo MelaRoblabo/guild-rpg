@@ -80,7 +80,7 @@ local function loadPlayer(self: any, player: Player)
 			local seed = Random.new():NextInteger(1, 2 ^ 31 - 1)
 			return Game.newState(self.master, seed, os.time())
 		end
-		return Migration.migrate(record.state)
+		return Migration.migrate(record.state, self.master)
 	end)
 	if not ok then
 		-- 移行に失敗したデータは上書きしない。ロックだけ解放して切断する
