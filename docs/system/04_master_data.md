@@ -65,7 +65,7 @@
 | `personalBonusCap` | 0.50 | D-070 |
 | （道案内・大食らいの効果量はギフトのデータに持つ） | — | 04章 §5 |
 | `growthVariance` | 1（±1、最低0） | D-043 |
-| `expBase` / `expExponent` / `expCycleMult` | 100 / 1.5 / 周回ごとの倍率（`tools/sim/progression` が自動調整） | D-071 |
+| `expBase` / `expExponent` / `expCycleMult` | 100 / 1.5 / 周回ごとの倍率（`tools/sim/progression` が自動調整。M7b-6 で自動プレイの暦日数（D-161, D-199）に合わせて全周回 ×1.10） | D-071, D-161 |
 | `levelCapInitial` / `levelCapPerRebirth` / `levelCapMax` | 20 / 10 / 100 | D-071 |
 | `rebirthExpBonusPerCount` | 0.5（仮） | 07章 |
 | `rebirthGiftAddAt` / `giftMax` | {2, 4, 6} / 4 | D-024 |
@@ -96,16 +96,16 @@
 | `chestEffectRate` | 0.10〜0.15（開封演出が入る割合の基準。普通のダンジョンだけ） | D-090, D-166 |
 | `offlineTimeMult` | 10（留守番の探索1回の時間の倍率） | D-161 |
 | `offlineMaxSeconds` | 21600（1回の留守で6時間まで。拡張しない） | D-161 |
-| `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（たまる速さは未決（M7b-6）） | D-161 |
-| `restBonusExpMult` | 2（未決（M7b-6）） | D-161 |
+| `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（D-161。M7b-6 の自動プレイで変えていない） | D-161 |
+| `restBonusExpMult` | 2（D-161。M7b-6 の自動プレイで変えていない） | D-161 |
 | `dailyTraitBands` | `{ min = 1, max = 4 }`, `{ min = 5, max = 8 }`, `{ min = 9, max = 12 }`（難度＝ダンジョンの tier の帯） | D-156 |
 | `calendarSeed` | 20260101（日替わり・今週の訪問者・マップイベント・クエストのお題の共通の乱数の元。値は任意の固定値） | D-156, D-158, D-152, D-153 |
 | `questDailyCount` / `questWeeklyCount` | 3 / 4（ウィークリーは 3〜5 のうち仮。M7b-6） | D-153 |
-| `questDailyBonus` / `questWeeklyBonus` | 全部達成のボーナス（報酬の形は §9）。デイリー：クエストの宝箱2・チケット1、ウィークリー：クエストの宝箱5・チケット3・見た目維持ポーション1（仮。M7b-6） | D-153 |
+| `questDailyBonus` / `questWeeklyBonus` | 全部達成のボーナス（報酬の形は §9）。デイリー：ゴールド係数60・クエストの宝箱150・チケット10・見た目変更／維持ポーション各6、ウィークリー：ゴールド係数220・クエストの宝箱700・チケット40・見た目変更／維持ポーション各25（M7b-6 で配分 D-160 に合わせた） | D-153 |
 | `playtimeDailyCapSeconds` | 7200（1日2時間まで） | D-154 |
 | `friendRewardIntervalSeconds` | 600（仮。M7b-6） | D-157 |
 | `friendRewardMaxFriends` | 3（報酬が増えるのは3人分まで） | D-157 |
-| `friendRewardGoldMult` / `friendRewardBonusPerFriend` | 1 / 0.25（仮。M7b-6）。ゴールド = floor(基準のダンジョンの rewardGoldBase × friendRewardGoldMult × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))（06章 §20・§22） | D-157, D-190 |
+| `friendRewardGoldMult` / `friendRewardBonusPerFriend` | 7 / 0.25（7 は M7b-6 で配分 D-160 のフレンド約5%に合わせた。0.25 は仮）。ゴールド = floor(基準のダンジョンの rewardGoldBase × friendRewardGoldMult × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))（06章 §20・§22） | D-157, D-190 |
 | `friendRewardDailyCap` | 12（1日に押せる回数。仮。M7b-6） | D-157 |
 | `referralWeeklyCap` | 3（招待した側が報酬を受け取れる人数／週。仮。M7b-6） | D-157 |
 | `referralRewards` | `invitee`（招待された側）・`inviter`（招待した側）の報酬（形は §9 の rewards）。中身はステータススロットチケット、量はどちらも2（仮。M7b-6） | D-157, D-180, D-192 |
@@ -113,13 +113,13 @@
 | `notifyLoginHistoryCount` | 「いつも遊ぶ時刻」（ゲーム外の通知を送る時刻）に使う直近のログインの回数。7。中央値をとる（06章 §23）。検証：1以上の整数 | D-196 |
 | `weeklyVisitorChance` | 0.03（今週の訪問者の別枠の確率。候補1人ごと。仮。M7b-6） | D-158, D-170 |
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
-| `mapEventKindWeights` | `{ { id = "mev_rare_dungeon", weight }, … }`。M7b-4 は 1 / 1 / 1 の仮（M7b-6） | D-152 |
+| `mapEventKindWeights` | `{ { id = "mev_rare_dungeon", weight }, … }`。レアダンジョン 3・レイド 1・商人 6（M7b-6：配分 D-160 のマップイベントとオンラインの価値 D-161 に合わせた） | D-152 |
 | `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6）。M7b-4 は 1.5 の仮 | D-152 |
 | `rareDungeonEffectRate` | `{ min = 0.20, max = 0.30 }`（レアダンジョンの山の演出率の基準） | D-171 |
-| `raidHpMult` / `raidHpSpread` / `raidDamagePerAtk` | HP とダメージの式は未決（M7b-6）。M7b-4 は仮の式（06章 §12）で 1 / `{ min = 0.8, max = 1.2 }` / 1 | D-152, D-179 |
-| `raidTravelSeconds` | レイドへの片道秒（仮 60。M7b-6）。`mapEventWindowSeconds + raidTravelSeconds ≤ mapEventIntervalSeconds` を検証（最後のダメージが次の時間帯より前に入る） | D-152 |
+| `raidHpMult` / `raidHpSpread` / `raidDamagePerAtk` | 式は 06章 §12 の仮の式のまま。値は M7b-6 で 3 / `{ min = 0.6, max = 1.4 }` / 1（1パーティでときどき・2パーティでたいてい・3パーティでほぼ倒せる。docs/reports/M7b6_balance.md） | D-152, D-179 |
+| `raidTravelSeconds` | レイドへの片道秒（30。M7b-6 で 60 から短くした：オンラインの価値 D-161）。`mapEventWindowSeconds + raidTravelSeconds ≤ mapEventIntervalSeconds` を検証（最後のダメージが次の時間帯より前に入る） | D-152 |
 | `merchantItemCount` | `{ min = 3, max = 5 }`。品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン） | D-152, D-189 |
-| `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 10 / 未決 / 未決（M7b-6。M7b-4 は 0.5 / 0.5 の仮） | D-152 |
+| `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 10 / 0.5 / 0.5（10 は M7b-6 で見直して据え置き：D-198。係数 0.5 は仮のまま） | D-152, D-198 |
 | `rewardShareTargets` | §13 の表 | D-160 |
 
 ## 4. ダンジョン（D-068, D-069）
@@ -214,7 +214,7 @@ rewards = {
 }                                                  -- rank を省くと届いたときに SpecialChests の表で引く。書けばそのランク
 ```
 
-M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（探索10・開封10・雇用1・トレーニング5・踏破5、×パーティ数）、ウィークリーは6種類（探索50・開封50・雇用3・トレーニング25・踏破25・転生1、×パーティ数）。報酬はゴールド・クエストの宝箱・チケット・見た目変更ポーション。ゴールドの係数（仮）はデイリー 5・ウィークリー 30（古い墓地なら 500G・3000G）。
+M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（探索10・開封10・雇用1・トレーニング5・踏破5、×パーティ数）、ウィークリーは6種類（探索50・開封50・雇用3・トレーニング25・踏破25・転生1、×パーティ数）。報酬は M7b-6 で配分（D-160）に合わせ、期間ごとにどのお題も同じにした。デイリー1つ：ゴールド係数30・クエストの宝箱60・チケット5・見た目変更／維持ポーション各2。ウィークリー1つ：ゴールド係数120・クエストの宝箱350・チケット15・見た目変更ポーション18・見た目維持ポーション12。
 
 | kind | 数えるもの | period |
 | --- | --- | --- |
@@ -225,14 +225,14 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 | `clears` | 踏破（レアダンジョンの踏破も数える。レイドは数えない：D-191） | daily / weekly |
 | `rebirths` | 転生 | weekly のみ |
 
-- 量は「`amountPerParty` × パーティ数」（例：探索 ×パーティ数×10回）。お題の候補・量の式・報酬の量は未決（M7b-6）。
-- 報酬はゴールド・宝箱・ポーション・ステータススロットチケット。全部達成のボーナス（宝箱など）は `questDailyBonus` / `questWeeklyBonus` に置く（量は未決（M7b-6））。
+- 量は「`amountPerParty` × パーティ数」（例：探索 ×パーティ数×10回）。お題の候補・量の式は仮のまま（M7b-6 では変えていない）。報酬の量は M7b-6 で決めた（上）。
+- 報酬はゴールド・宝箱・ポーション・ステータススロットチケット。全部達成のボーナス（宝箱など）は `questDailyBonus` / `questWeeklyBonus` に置く（量は §3。M7b-6）。
 
 ## 10. ログインボーナス・プレイ時間（LoginBonus.luau・PlaytimeRewards.luau）
 
-- `LoginBonus`：`{ days = { 1〜6日目の rewards（6行） }, fallback = rewards }`。1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク（`cycle` 周目は loginOrder の順で `cycle` 番目）。ログイン用のユニークがいない・そのユニークを持っている（受け取り箱に届いている）・ユニークが一巡した後は `fallback`（レアな宝箱＋チケット。M7b-4 では `special:login` のランク3（レア）1個＋チケット1）。量は未決（M7b-6、M7b-4 は仮の値）。ゴールドは `goldMult`（仮：1日目 3・4日目 6）。（D-155, D-190）
+- `LoginBonus`：`{ days = { 1〜6日目の rewards（6行） }, fallback = rewards }`。1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク（`cycle` 周目は loginOrder の順で `cycle` 番目）。ログイン用のユニークがいない・そのユニークを持っている（受け取り箱に届いている）・ユニークが一巡した後は `fallback`（レアな宝箱＋チケット。M7b-6 で `special:login` のランク3（レア）50個＋チケット20）。量は M7b-6 で配分（D-160）に合わせた（1〜6日目の合計：ゴールド係数510・宝箱1300・チケット50・ポーション240）。ゴールドは `goldMult`。（D-155, D-190）
 - ログイン用のユニークの中身（誰か・人数）は未決（Q-025）。M7b-4 では仕組みだけを作り、Uniques に `acquire = "login"` の行は置かない（いないので7日目は毎周 fallback）。
-- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%。`goldMult` で踏破した一番深いダンジョンに応じて増える：D-190）と宝箱（`special:playtime`）。量は未決（M7b-6。仮の `goldMult` は 5分 1・20分 2・45分 3・90分 5・120分 5）。（D-154）
+- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%。`goldMult` で踏破した一番深いダンジョンに応じて増える：D-190）と宝箱（`special:playtime`）。量は M7b-6 で見直して据え置き（`goldMult` は 5分 1・20分 2・45分 3・90分 5・120分 5。オンライン1時間の直接のゴールドの約0.5〜3%で D-154 の「数%」に入る。プレイ時間・留守の列は留守番だけで目標を超えているので増やさない）。（D-154）
 
 ## 11. 特別な宝箱（SpecialChests.luau、D-166）
 
@@ -276,5 +276,6 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 | ステータススロットチケット | 10 | 40 | 15 | 5 | 5 | — | 25 |
 | ポーション | 50 | 20 | 20 | — | — | 10 | あり（比率は M7b-6） |
 
+- M7b-6 の結果（コアの型で合わせた。ライト・ヘビーとの差、届かない列と理由）は docs/reports/M7b6_balance.md。留守番の分（D-161）は「プレイ時間・留守」の列に入り、それだけで目標（ゴールド10・宝箱5）を超える（ライト約55%・コア約36%・ヘビー約20%）。チケットのギルドレベルの分は `tools/sim/progression` の `--rescale-guild-tickets` で数だけを0.4倍にした。
 - ポーションのギルドレベルの分は、ギルドレベルが10の倍数のときの見た目変更・見た目維持ポーション（D-074 のまま残す）。各入手先の比率は M7b-6 の自動プレイで決める（D-178）。
 - ユニークキャラの入手は初回踏破・ログインボーナス7日目（D-155）・雇用の特別な訪問者（今週の訪問者は出やすい）の3経路（D-169）。

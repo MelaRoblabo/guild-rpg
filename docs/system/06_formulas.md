@@ -165,7 +165,7 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
               参加は1パーティ1回まで（帰ってきても同じ時間帯には出られない）。討伐の後に到着したパーティにも宝箱を1つ   -- D-187
               到着 = 出発 + raidTravelSeconds（ここでダメージを入れる）、帰還 = 到着 + raidTravelSeconds（仮）
               討伐の時点で到着しているパーティの分はそのとき、後から到着したパーティの分は到着のときに受け取り箱へ（special:raid を1つずつ）
-              HP とダメージの式は M7b-6 で決める。M7b-4 の仮の式：
+              HP とダメージの式は M7b-4 の仮の式のまま（式の形は変えていない）。値は M7b-6 で合わせた（04章 §3：raidHpMult 3・raidHpSpread 0.6〜1.4）：
                 HP     = floor(基準のダンジョン（踏破済みの一番深いダンジョン。未踏破なら古い墓地：D-187）の base.hp × raidHpMult × (raidHpSpread.min + u × (max − min)))
                          u は Rng.derive(state.seed, eventSlot) の一様乱数
                          最初に出発したときに決めて state.raid.hp に保存する
@@ -214,7 +214,7 @@ restBonusSeconds = min(restBonusSeconds + たまる量, restBonusMaxSeconds)   -
 トレーニングの経験値には掛けない（§8b）
 ```
 
-倍率・たまる速さは未決（M7b-6）。
+倍率・たまる速さは D-161 の「留守の半分・上限4時間・2倍」のまま（M7b-6 の自動プレイで暦日数の目標に届いたので変えていない）。
 
 ## 15. クエストの量（D-153）
 
@@ -350,7 +350,7 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 ```
 
 - 報酬のゴールドに固定額は置かない（rewards に `gold` を書くと検証で止める）。`rewardGoldBase` はダンジョンごとに1つ（全ダンジョン必須）。ダンジョンのひな形（`tools/sim/DungeonTemplates`）に書き、calibrate が `Dungeons` に写す（D-198。`Constants` には置かない）。
-- 値（`rewardGoldBase`・各 `goldMult`・`friendRewardGoldMult`）は仮（M7b-6 の自動プレイで決める。D-154 の「1時間の収入の数%」に合わせる）。仮の `rewardGoldBase` は各ダンジョンの `battleReward.gold` に比例させ、古い墓地を 100 にした。
+- 値（各 `goldMult`・`friendRewardGoldMult`）は M7b-6 の自動プレイで配分（D-160）に合わせた（docs/reports/M7b6_balance.md）。`rewardGoldBase` は仮のまま（下）。仮の `rewardGoldBase` は各ダンジョンの `battleReward.gold` に比例させ、古い墓地を 100 にした。
 
 ## 23. ゲーム外の通知：いつも遊ぶ時刻・許可の画面（D-159, D-196）
 
