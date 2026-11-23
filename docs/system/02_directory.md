@@ -30,9 +30,12 @@ guild-rpg/
 │  │  ├─ Chest.luau          宝箱の中身抽選・開封
 │  │  ├─ Inventory.luau      倉庫・アイテム・装備の付け外し・売却
 │  │  ├─ Guild.luau          ギルドレベル・拡張・ダンジョン解放
+│  │  ├─ MapEvent.luau       マップイベントの時間帯・レアダンジョンの行き先（D-152）
+│  │  ├─ Merchant.luau       旅の商人の品ぞろえ・価格・購入（D-152）
+│  │  ├─ Raid.luau           レイドボスの HP・ダメージ・到着（D-152, D-179）
 │  │  └─ Migration.luau      セーブデータの移行
 │  ├─ data/                  マスターデータ（Luauテーブル。04章）。M7b で DailyTraits・Quests・LoginBonus・
-│  │                         PlaytimeRewards・SpecialChests・MapEvents・Merchant を追加（D-152〜D-166）
+│  │                         PlaytimeRewards・SpecialChests・MapEvents を追加（D-152〜D-166。旅の商人の決まりは Constants の merchant*）
 │  ├─ server/                Roblox サーバー（M7で作成）
 │  └─ client/                Roblox クライアント（M7は簡易画面のみ、UIはM8）
 ├─ tools/                    Lune で動く開発ツール

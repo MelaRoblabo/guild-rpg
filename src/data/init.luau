@@ -24,4 +24,5 @@ return {
 	Quests = require("@self/Quests"),
 	LoginBonus = require("@self/LoginBonus"),
 	PlaytimeRewards = require("@self/PlaytimeRewards"),
+	MapEvents = require("@self/MapEvents"),
 }

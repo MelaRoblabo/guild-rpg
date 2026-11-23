@@ -348,6 +348,43 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 		c:probability(p .. ".rareDungeonEffectRate.min", k.rareDungeonEffectRate.min)
 		c:probability(p .. ".rareDungeonEffectRate.max", k.rareDungeonEffectRate.max)
 	end
+	-- マップイベント・レアダンジョン・レイド・旅の商人（D-152, D-179）
+	c:integer(p .. ".mapEventIntervalSeconds", k.mapEventIntervalSeconds, 1)
+	c:integer(p .. ".mapEventNoticeSeconds", k.mapEventNoticeSeconds, 0)
+	c:integer(p .. ".mapEventWindowSeconds", k.mapEventWindowSeconds, 1)
+	c:weights(p .. ".mapEventKindWeights", k.mapEventKindWeights, "weight")
+	c:number(p .. ".rareDungeonChestMult", k.rareDungeonChestMult, 1)
+	c:number(p .. ".raidHpMult", k.raidHpMult, 0)
+	if c:range(p .. ".raidHpSpread", k.raidHpSpread) then
+		c:number(p .. ".raidHpSpread.min", k.raidHpSpread.min, 0)
+	end
+	c:number(p .. ".raidDamagePerAtk", k.raidDamagePerAtk, 0)
+	c:integer(p .. ".raidTravelSeconds", k.raidTravelSeconds, 0)
+	if
+		type(k.mapEventWindowSeconds) == "number"
+		and type(k.mapEventIntervalSeconds) == "number"
+		and type(k.mapEventNoticeSeconds) == "number"
+		and type(k.raidTravelSeconds) == "number"
+	then
+		if k.mapEventWindowSeconds + k.mapEventNoticeSeconds > k.mapEventIntervalSeconds then
+			c:error(p .. ".mapEventWindowSeconds", "出ている3分間と予告が次の時間帯に重なる")
+		end
+		-- レイドのダメージが次の時間帯までに入り終わるように（レイドの状態は今の時間帯の分だけ持つ：03章）
+		if k.mapEventWindowSeconds + k.raidTravelSeconds > k.mapEventIntervalSeconds then
+			c:error(
+				p .. ".raidTravelSeconds",
+				"最後に出発したパーティの到着が次の時間帯に重なる"
+			)
+		end
+	end
+	if c:range(p .. ".merchantItemCount", k.merchantItemCount) then
+		c:integer(p .. ".merchantItemCount.min", k.merchantItemCount.min, 1)
+		c:integer(p .. ".merchantItemCount.max", k.merchantItemCount.max, 1)
+	end
+	c:number(p .. ".merchantPriceMult", k.merchantPriceMult, 0)
+	c:number(p .. ".merchantGradeCoef", k.merchantGradeCoef, 0)
+	c:number(p .. ".merchantModifierCoef", k.merchantModifierCoef, 0)
+
 	c:integer(p .. ".questDailyCount", k.questDailyCount, 1)
 	c:integer(p .. ".questWeeklyCount", k.questWeeklyCount, 1)
 	c:integer(p .. ".playtimeDailyCapSeconds", k.playtimeDailyCapSeconds, 1)
@@ -1219,6 +1256,46 @@ local function validateRewardSources(c: Checker, d: any)
 	end
 end
 
+-- マップイベント（D-152、04章 §12）：種類と出る場所。割合（mapEventKindWeights）は種類を指す
+local MAP_EVENT_KINDS = { rareDungeon = true, raid = true, merchant = true }
+
+local function validateMapEvents(c: Checker, d: any)
+	local M = d.MapEvents
+	if type(M) ~= "table" then
+		c:error("MapEvents", "テーブルが必要")
+		return
+	end
+	local ids = c:uniqueIds("MapEvents.kinds", M.kinds, "mev_")
+	if type(M.kinds) == "table" then
+		local seenKind: { [string]: boolean } = {}
+		for i, r in M.kinds do
+			local p = `MapEvents.kinds[{i}].kind`
+			oneOf(c, p, r.kind, MAP_EVENT_KINDS)
+			if type(r.kind) == "string" then
+				if seenKind[r.kind] then
+					c:error(p, `kind が重複: {r.kind}`)
+				end
+				seenKind[r.kind] = true
+			end
+		end
+	end
+	local placeIds = c:uniqueIds("MapEvents.places", M.places, "mev_")
+	if type(M.places) == "table" and #M.places == 0 then
+		c:error("MapEvents.places", "1行以上が必要")
+	end
+	for id in placeIds do
+		if ids[id] then
+			c:error("MapEvents.places", `種類と同じ id: {id}`)
+		end
+	end
+	local K = d.Constants
+	if type(K) == "table" and type(K.mapEventKindWeights) == "table" then
+		for i, e in K.mapEventKindWeights do
+			c:ref(`Constants.mapEventKindWeights[{i}].id`, if type(e) == "table" then e.id else nil, ids)
+		end
+	end
+end
+
 local function byId(rows: any): { [string]: any }
 	local m = {}
 	if type(rows) == "table" then
@@ -1247,6 +1324,7 @@ function MasterData.validate(data: any): { Issue }
 	validateDailyTraits(c, data)
 	validateSpecialChests(c, data)
 	validateRewardSources(c, data)
+	validateMapEvents(c, data)
 	return c.issues
 end
 
@@ -1344,6 +1422,8 @@ function MasterData.load(data: any): any
 		loginUniques = loginUniques,
 		visitorUniques = visitorUniques,
 		playtimeRewards = data.PlaytimeRewards,
+		mapEventKinds = byId(data.MapEvents.kinds),
+		mapEventPlaces = data.MapEvents.places,
 	})
 end
 

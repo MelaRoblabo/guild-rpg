@@ -62,6 +62,9 @@ for turn = 1 .. maxTurns:
 3. 踏破時：確定宝箱ランク → 幸運判定
 4. 日替わりの特性 `chestMult` があるとき（`engineVersion` 2〜。D-173）：報酬の宝箱を得た順に1個ずつ、端数（倍率 − 1 の小数部）が 0 より大きければ +1 の判定（整数部はそのまま増やし、乱数を使わない）。特性がなければ何も引かない
 5. 専用ギフトのパーティ効果 `chestMult` があるとき（`engineVersion` 3〜。D-174）：4 と同じやり方で、探索で得た元の宝箱（4 で増えた分は含めない）に1個ずつ判定する。増えた宝箱は 4 の分の後ろに並べ、`partyChests`（数）・`partyChestSources`（元の宝箱の番号）をログに残す。途中ログインでは元の宝箱を持ち帰るときだけ持ち帰る（D-186）。効果がなければ何も引かない
+6. 宝箱の数の倍率 `input.chestMult`（レアダンジョンの `rareDungeonChestMult`）があるとき（`engineVersion` 4〜。D-152, D-173）：4 と同じやり方で、探索で得た元の宝箱（4・5 で増えた分は含めない）に1個ずつ判定する。増えた宝箱は 5 の分の後ろに並べ、`eventChests`（数）・`eventChestSources`（元の宝箱の番号）をログに残す。途中ログインの扱いは 5 と同じ。倍率がなければ何も引かない
+
+4〜6 はどれも「探索で得た元の宝箱」に掛け、増えた分どうしは掛け合わせない（足し算）。増やす処理は `Expedition.simulate` の中の `multiplyChests` 1つにまとめ、日替わり → 専用ギフト → レアダンジョンの順に呼ぶ。`engineVersion` は、5（担当A）と 6（担当B）をそれぞれ単独で入れた版がどちらも 3 だったため、両方をこの順で入れた版を 4 とする（3 のログは 4 では同じ結果にならない）。
 
 ## 4. 探索ログ（ExpeditionLog）
 
@@ -82,7 +85,13 @@ ExpeditionLog = {
 	totalSeconds: number,
 	dailyTraitId: string?,          -- 当てた日替わりの特性（D-156）
 	traitChests: number?,           -- chestMult で増えた宝箱の数（rewards.chests に含む。D-173）
-	traitChestSources: { number }?, -- 増えた宝箱それぞれの元の宝箱が rewards.chests の何番目か（D-186）
+	traitChestSources: { number }?, -- 日替わりで増えた宝箱それぞれの元の宝箱が rewards.chests の何番目か（D-186）
+	partyChests: number?,           -- 専用ギフトのパーティ効果 chestMult で増えた宝箱の数（rewards.chests に含む。日替わりの分の後ろ。D-174）
+	partyChestSources: { number }?, -- その元の宝箱の番号
+	partyEffectGiftIds: { string }?, -- 効いた専用ギフトのパーティ効果（演出用）
+	eventChests: number?,           -- レアダンジョンの倍率で増えた宝箱の数（rewards.chests に含む。専用ギフトの分の後ろ。D-152）
+	eventChestSources: { number }?, -- その元の宝箱の番号
+	chestMult: number?,             -- 宝箱の数の倍率（レアダンジョン。1 のときは nil）
 	timeMult: number?,              -- 留守番の時間の倍率（1 のときは nil。D-161）
 }
 FloorLog = {
@@ -104,11 +113,11 @@ FloorLog = {
 ## 4b. 留守番・日替わり・マップイベント（D-152, D-156, D-161）
 
 - **留守番の探索**：`input.timeMult = offlineTimeMult` で同じ `simulate` を使う。戦闘・イベント・報酬は普通の探索と同じで、`travelSeconds`・各フロアの `startOffset`/`duration`・`totalSeconds` だけを倍率で伸ばす。`Expedition.offline = true` の印を付け、クエストに数えない（D-153, D-161）。
-- **途中でログインしたとき**：6時間より前にログインしたら、まだ帰っていない留守番の探索はログインの時点で帰還させ、全員ギルドで待機にそろえる（D-172）。持ち帰るのは、ログの時間の流れ（各フロアの `startOffset + duration`）でその時点までに終わったフロアの分だけ（`Expedition.rewardsAt`。その時点で撤退したのと同じ。踏破していなければ踏破の報酬は出さない：D-186、06章 §13）。このため各フロアのログに、そのフロアで得た報酬 `gained`（経験値・ゴールド・アイテム、宝箱は `rewards.chests` の番号の範囲だけ。ランクは持たない：D-087）を記録し、日替わりで増えた宝箱は元の宝箱の番号 `traitChestSources` を記録する。乱数の消費順は変わらない。
+- **途中でログインしたとき**：6時間より前にログインしたら、まだ帰っていない留守番の探索はログインの時点で帰還させ、全員ギルドで待機にそろえる（D-172）。持ち帰るのは、ログの時間の流れ（各フロアの `startOffset + duration`）でその時点までに終わったフロアの分だけ（`Expedition.rewardsAt`。その時点で撤退したのと同じ。踏破していなければ踏破の報酬は出さない：D-186、06章 §13）。このため各フロアのログに、そのフロアで得た報酬 `gained`（経験値・ゴールド・アイテム、宝箱は `rewards.chests` の番号の範囲だけ。ランクは持たない：D-087）を記録し、日替わり・専用ギフト・レアダンジョンで増えた宝箱は元の宝箱の番号（`traitChestSources`・`partyChestSources`・`eventChestSources`）を記録する。乱数の消費順は変わらない。
 - **日替わりの特性**：`dailyTraitId` の効果を出発時の計算に入れる（攻撃力・移動時間は MemberSnapshot・片道秒の計算で、宝箱の数は報酬の計算で。06章 §16）。攻撃力は個体補正の上限の外で掛ける（D-173）。経験値の倍率は休息ボーナスと同じく帰還時に掛ける。留守番も出発した日の特性を当てる。
 - **専用ギフトのパーティ効果**：移動・宝箱の数に効く。同じ効果はパーティ内で重ねない（06章 §21、D-174）。
-- **レアダンジョン**：踏破済みの一番深いダンジョンのデータで計算し、宝箱の数に `rareDungeonChestMult` を掛け、宝箱の山は `special:rare:<相当するダンジョン>`（1段上のダンジョン。D-152, D-166, D-171）。
-- **レイドボス**：パーティのダメージは出発時に計算して `Expedition.raidDamage` に保存し、到着時刻（advance）に合計へ入れる。結果は出発時に決まる（D-152）。ダメージの式は M7b-6 で決める（D-179）。
+- **レアダンジョン**：踏破済みの一番深いダンジョンのデータで計算し、宝箱の数に `rareDungeonChestMult` を掛け（`input.chestMult`。§3 の 6）、宝箱の山は `special:rare:<相当するダンジョン>`（1段上のダンジョン。D-152, D-166, D-171）。`Expedition.chestPile` に山の鍵を持ち、帰還時にその山へ入れる。日替わりの特性は当てない（要確認）。
+- **レイドボス**：パーティのダメージは出発時に計算して `Expedition.raidDamage` に保存し、到着時刻（advance）に合計へ入れる。結果は出発時に決まる（D-152）。ダメージの式は M7b-6 で決める（D-179）。探索エンジンは使わず、到着時刻 `arriveAt`（出発 + `raidTravelSeconds`）と帰還時刻（到着 + `raidTravelSeconds`）だけを持つ。ログはフロアなしの形（`result = "raid"`）。到着の処理は advance の最初（オンライン・留守の計算とも。結果は出発時に決まっているため）、帰還では報酬を入れない（`RaidReturned`）。
 - 攻撃力・移動時間・経験値・所要秒の倍率は乱数を使わない。宝箱の数を増やす効果（`chestMult`・`rareDungeonChestMult`・専用ギフト）は端数を確率で切り上げる（宝箱1個あたり (倍率 − 1) の確率で +1：D-173）ので乱数の消費順が変わる。入れるときは `engineVersion` を上げ、§3 に順番を書き足す。
 
 ## 5. 再生位置の計算（Expedition.progressAt）

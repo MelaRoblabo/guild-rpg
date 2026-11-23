@@ -62,6 +62,8 @@ Protocol.CLIENT_COMMANDS = {
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
 	ClaimInbox = {}, -- D-164
 	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）
+	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
+	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179
 } :: { [string]: { [string]: Field } }
 
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）

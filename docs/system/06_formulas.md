@@ -147,14 +147,23 @@ weekIndex(now) = floor((dayIndex(now) + 3) / 7)      -- 週の始まり＝月曜
 eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごとに1つ
 出ている間   ：eventSlot × mapEventIntervalSeconds 〜 + mapEventWindowSeconds（出発・購入できる3分間）
 予告         ：次の時間帯の始まりの mapEventNoticeSeconds 前から
-種類・場所   ：Rng.new(Rng.derive(calendarSeed, eventSlot)) で mapEventKindWeights と場所の一覧から抽選   -- 全員共通
+種類・場所   ：Rng.new(Rng.derive(calendarSeed, eventSlot)) で mapEventKindWeights → 場所の一覧（等確率）の順に抽選   -- 全員共通
 中身         ：Rng.new(Rng.derive(state.seed, eventSlot)) で抽選（ボスのHP・商人の品）              -- プレイヤーごと。rngCounter は進めない
+商人の品     ：品の数 = rng:int(merchantItemCount.min, max)。品ごとに 候補のダンジョン（踏破済み。まだどこも踏破していなければ並びの先頭：要確認）から等確率で1つ
+              → そのダンジョンの chestRarityWeights でレアリティ → 宝箱の中身と同じ装備の抽選（アイテムレベル＝そのダンジョンの tier）
+              候補のダンジョンはその時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに踏破が進んでも品ぞろえを変えない）
 商人の価格   ：floor( 売却価格（§10） × merchantPriceMult × (1 + merchantGradeCoef × grade) × (修飾語つきなら 1 + merchantModifierCoef) )   -- 係数は未決（M7b-6）
 買える間     ：イベントの出発と同じ3分間（mapEventWindowSeconds）                                 -- D-179
-レアダンジョン：強さは踏破済みの一番深いダンジョンと同じ。宝箱の数 × rareDungeonChestMult（端数は確率で切り上げ：D-173）
+レアダンジョン：強さは踏破済みの一番深いダンジョンと同じ（まだどこも踏破していなければ並びの先頭：要確認）。宝箱の数 × rareDungeonChestMult（端数は確率で切り上げ：D-173）
+              日替わりの特性は当てない（要確認）。1段上＝tier が一番深い踏破ダンジョンより大きいもののうち tier が最も小さいダンジョン
               宝箱の山は special:rare:<相当するダンジョン>（踏破済みの一番深いダンジョンの1段上。天空の玉座を踏破した後は天空の玉座のまま：D-185）。中身はそのダンジョンの表   -- §19、D-171
-レイド       ：その時間帯に出発したパーティのダメージ（出発時に計算）の合計 > raidHp なら討伐。宝箱は参加したパーティごとに1つ   -- D-179
-              HP とダメージの式は M7b-6 で決める
+レイド       ：その時間帯に出発したパーティのダメージ（出発時に計算）の合計 > HP なら討伐。宝箱は参加したパーティごとに1つ   -- D-179
+              到着 = 出発 + raidTravelSeconds（ここでダメージを入れる）、帰還 = 到着 + raidTravelSeconds（仮）
+              討伐の時点で到着しているパーティの分はそのとき、後から到着したパーティの分は到着のときに受け取り箱へ（special:raid を1つずつ）
+              HP とダメージの式は M7b-6 で決める。M7b-4 の仮の式：
+                HP     = floor(踏破済みの一番深いダンジョンの base.hp × raidHpMult × (raidHpSpread.min + u × (max − min)))   u は Rng.derive(state.seed, eventSlot) の一様乱数
+                         最初に出発したときに決めて state.raid.hp に保存する
+                ダメージ = floor(パーティ全員の攻撃力（出発時の実効値。§3）の合計 × raidDamagePerAtk)
 ```
 
 サーバー全体で状態を持たない：時刻と固定の種だけから決まるので、どのサーバーでも同じ結果になる。
@@ -207,7 +216,7 @@ restBonusSeconds = min(restBonusSeconds + たまる量, restBonusMaxSeconds)   -
              期間の番号：daily = 1、weekly = 2。rngCounter は進めない（同じ日・同じプレイヤーなら何度計算しても同じ）
 抽選の仕方 = 候補（Quests のその期間の行、データの順）から等確率で1つずつ、重複なしで引く
 数え方     = オンライン中のコマンド・オンラインの advance の結果で数える（留守番の探索・留守中の帰還は数えない：D-161）
-             探索の回数：Dispatch・オンラインの自動再派遣（DispatchEvent は M7b-4 後半）の出発ごとに1（D-179）
+             探索の回数：Dispatch・オンラインの自動再派遣・DispatchEvent の出発ごとに1（D-179）
              宝箱を開けた数：OpenChests で開けた個数　雇用：HireChoose ごとに1　トレーニング：Train で行った回数
              踏破：オンラインの advance で帰還した探索（offline でない）の result = clear ごとに1　転生：RebirthChoose ごとに1
 達成       = progress が target に届いたら done、その行の rewards を受け取り箱へ（progress は target を超えない）

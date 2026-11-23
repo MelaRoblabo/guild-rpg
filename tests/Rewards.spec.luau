@@ -758,7 +758,8 @@ return function(t)
 				s.version = 7
 				s.quests, s.login, s.playtime, s.inbox = nil, nil, nil, nil
 				Migration.migrate(s, master)
-				expect(s.version).toBe(Migration.CURRENT) -- 7 → 8 → 9 …（v8 → 9 は Social.spec）
+				expect(s.version).toBe(Migration.CURRENT) -- 7 → 8 → 以降の版（v8 → 9 は Social.spec、v9 → 10 は MapEvent.spec）
+				expect(Migration.CURRENT >= 8).toBeTruthy()
 				expect(s.quests).toEqual(Quest.newState())
 				expect(s.login).toEqual({ lastDayIndex = -1, day = 1, cycle = 1 })
 				expect(s.playtime).toEqual({ dayIndex = -1, seconds = 0, claimedSteps = 0 })
