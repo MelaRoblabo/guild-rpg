@@ -278,14 +278,25 @@ return function(t)
 			expect(cur ~= nil and cur.departAt <= T0 + 600 and cur.returnAt > T0 + 600).toBeTruthy()
 			expect(cur.uid ~= first.uid).toBeTruthy()
 		end)
-		it("企画書§16.8 案A オフライン中は帰還まで進めるが再派遣しない", function()
-			local s = newState()
-			Game.execute(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
-			Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
-			Game.advance(s, ctx(T0 + 3600, false))
-			expect(firstExpedition(s)).toBe(nil)
-			expect(s.parties[1].autoRepeat ~= nil).toBeTruthy()
-		end)
+		it(
+			"D-161 / D-172 留守中は留守番の探索として続き、ログインの時点で全員帰還して待機（設定は残す）",
+			function()
+				local s = newState()
+				Game.execute(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
+				Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
+				local events = Game.advance(s, ctx(T0 + 3600, false))
+				local offlineDispatches = 0
+				for _, e in events do
+					if e.type == "AutoDispatched" then
+						expect(e.offline).toBe(true)
+						offlineDispatches += 1
+					end
+				end
+				expect(offlineDispatches >= 1).toBeTruthy()
+				expect(firstExpedition(s)).toBe(nil)
+				expect(s.parties[1].autoRepeat ~= nil).toBeTruthy()
+			end
+		)
 		it("Q-020 倉庫が満杯なら自動再派遣を止める（報酬は消さない）", function()
 			local s = newState()
 			Game.execute(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))

@@ -315,6 +315,25 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	c:number(p .. ".equipGradeCoef", k.equipGradeCoef, 0)
 	c:number(p .. ".equipTierMult", k.equipTierMult, 1)
 
+	-- 留守番・休息ボーナス（D-161）
+	c:number(p .. ".offlineTimeMult", k.offlineTimeMult, 1)
+	c:integer(p .. ".offlineMaxSeconds", k.offlineMaxSeconds, 1)
+	c:number(p .. ".restBonusRate", k.restBonusRate, 0)
+	c:integer(p .. ".restBonusMaxSeconds", k.restBonusMaxSeconds, 0)
+	c:number(p .. ".restBonusExpMult", k.restBonusExpMult, 1)
+
+	-- 日替わりの特性（D-156）
+	if c:array(p .. ".dailyTraitBands", k.dailyTraitBands) then
+		for i, b in k.dailyTraitBands do
+			local q = `{p}.dailyTraitBands[{i}]`
+			if c:range(q, b) then
+				c:integer(q .. ".min", b.min, 1)
+				c:integer(q .. ".max", b.max, 1)
+			end
+		end
+	end
+	c:integer(p .. ".calendarSeed", k.calendarSeed)
+
 	-- ギルド
 	c:integer(p .. ".guildExpPerFloor", k.guildExpPerFloor, 0)
 	c:integer(p .. ".guildExpClearBonus", k.guildExpClearBonus, 0)
@@ -776,6 +795,52 @@ local function validateExpansions(c: Checker, d: any)
 end
 
 -- id → 行 の索引を作る
+-- 日替わりの特性（D-156、04章 §7）
+local DAILY_TRAIT_EFFECTS = {
+	chestMult = true,
+	expMult = true,
+	atkPctPhysical = true,
+	atkPctMagic = true,
+	travelMult = true,
+}
+
+local function validateDailyTraits(c: Checker, d: any)
+	local rows = d.DailyTraits
+	if not c:array("DailyTraits", rows) then
+		return
+	end
+	if #rows == 0 then
+		c:error("DailyTraits", "1行以上が必要")
+	end
+	c:uniqueIds("DailyTraits", rows, "dt_")
+	for i, r in rows do
+		local p = `DailyTraits[{i}]`
+		oneOf(c, p .. ".effect", r.effect, DAILY_TRAIT_EFFECTS)
+		if r.effect == "chestMult" or r.effect == "expMult" then
+			c:number(p .. ".value", r.value, 1) -- 良い効果だけ（D-156）
+		elseif r.effect == "travelMult" then
+			c:number(p .. ".value", r.value, 0, 1)
+		else
+			c:number(p .. ".value", r.value, 0)
+		end
+	end
+	-- どの帯にも当たるダンジョンがあること（06章 §16）
+	local K = d.Constants
+	if type(K) == "table" and type(K.dailyTraitBands) == "table" and type(d.Dungeons) == "table" then
+		for i, b in K.dailyTraitBands do
+			local found = false
+			for _, dg in d.Dungeons do
+				if type(b) == "table" and type(dg.tier) == "number" and dg.tier >= b.min and dg.tier <= b.max then
+					found = true
+				end
+			end
+			if not found then
+				c:error(`Constants.dailyTraitBands[{i}]`, "その帯の難度のダンジョンがない")
+			end
+		end
+	end
+end
+
 local function byId(rows: any): { [string]: any }
 	local m = {}
 	if type(rows) == "table" then
@@ -801,6 +866,7 @@ function MasterData.validate(data: any): { Issue }
 	validateHiringData(c, data)
 	validateGuildLevels(c, data)
 	validateExpansions(c, data)
+	validateDailyTraits(c, data)
 	return c.issues
 end
 
@@ -852,6 +918,8 @@ function MasterData.load(data: any): any
 		appearances = byId(data.Appearances),
 		uniques = byId(data.Uniques),
 		expansions = byId(data.Expansions),
+		dailyTraits = byId(data.DailyTraits),
+		dailyTraitList = data.DailyTraits,
 	})
 end
 

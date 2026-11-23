@@ -19,4 +19,5 @@ return {
 	Uniques = require("@self/Uniques"),
 	GuildLevels = require("@self/GuildLevels"),
 	Expansions = require("@self/Expansions"),
+	DailyTraits = require("@self/DailyTraits"),
 }

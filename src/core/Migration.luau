@@ -6,7 +6,7 @@
 
 local Migration = {}
 
-Migration.CURRENT = 6
+Migration.CURRENT = 7
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -71,6 +71,16 @@ local STEPS: { [number]: (any, any) -> () } = {
 			end
 		end
 		state.version = 6
+	end,
+	-- v6 → v7（M7b-3。留守番・休息ボーナス・日替わりの特性：D-161, D-156）
+	--   lastSavedAt：lastAdvancedAt を入れる / restBonusSeconds：0
+	--   探索の offline・dailyTraitId：nil のまま（旧版の探索は普通の探索で、特性なし）
+	[6] = function(state)
+		if state.lastSavedAt == nil then
+			state.lastSavedAt = state.lastAdvancedAt
+		end
+		state.restBonusSeconds = state.restBonusSeconds or 0
+		state.version = 7
 	end,
 }
 

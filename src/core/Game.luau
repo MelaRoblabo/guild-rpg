@@ -6,7 +6,9 @@
 --   Game.query.*                              表示用の読み取り（状態を変えない）
 -- ctx = { now: number, master: any, online: boolean }
 
+local Calendar = require("./Calendar")
 local Chest = require("./Chest")
+local DailyTrait = require("./DailyTrait")
 local Expedition = require("./Expedition")
 local Formulas = require("./Formulas")
 local Growth = require("./Growth")
@@ -87,6 +89,8 @@ function Game.newState(master: any, seed: number, now: number): any
 		stats = {},
 		createdAt = now,
 		lastAdvancedAt = now,
+		lastSavedAt = now, -- 最後に保存した時刻（留守の始まり：D-161）。サーバーが保存のときに書く（M7b-5）
+		restBonusSeconds = 0, -- 休息ボーナスの残り秒（D-161）
 	}
 	for i = 1, state.expansions.partySlots do
 		state.parties[i] = { index = i, slots = Party.newSlots(), autoRepeat = nil }
@@ -127,19 +131,33 @@ function Game.newState(master: any, seed: number, now: number): any
 	return state
 end
 
--- 派遣（D-026）。departAt を指定できる（自動再派遣は帰還時刻から出発する）。派遣費は廃止（D-163）
-local function dispatch(state: any, partyIndex: number, dungeonId: string, departAt: number, master: any): any
+-- 探索を1回計算する（状態には入れない。乱数は1本使う）
+-- 日替わりの特性は出発時刻の日のものを固定する（D-156）。留守番は所要秒を offlineTimeMult 倍にする（D-161）
+local function planExpedition(
+	state: any,
+	partyIndex: number,
+	dungeonId: string,
+	departAt: number,
+	master: any,
+	offline: boolean
+): any
 	local _, seed = takeRng(state)
 	local snaps = Party.snapshots(state, partyIndex, master)
-	local log =
-		Expedition.simulate({ seed = seed, departAt = departAt, dungeonId = dungeonId, members = snaps }, master)
-	local uid = newUid(state, "ex")
+	local traitId = DailyTrait.traitIdFor(dungeonId, departAt, master)
+	local log = Expedition.simulate({
+		seed = seed,
+		departAt = departAt,
+		dungeonId = dungeonId,
+		members = snaps,
+		dailyTraitId = traitId,
+		timeMult = if offline then master.K.offlineTimeMult else nil,
+	}, master)
 	local memberUids = {}
 	for _, s in snaps do
 		table.insert(memberUids, s.uid)
 	end
-	local e = {
-		uid = uid,
+	return {
+		uid = "",
 		partyIndex = partyIndex,
 		dungeonId = dungeonId,
 		seed = seed,
@@ -147,10 +165,24 @@ local function dispatch(state: any, partyIndex: number, dungeonId: string, depar
 		returnAt = departAt + log.totalSeconds,
 		memberUids = memberUids,
 		log = log,
+		offline = if offline then true else nil, -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない
+		dailyTraitId = traitId,
 	}
-	state.expeditions[uid] = e
+end
+
+local function commitExpedition(state: any, e: any): any
+	e.uid = newUid(state, "ex")
+	state.expeditions[e.uid] = e
 	bump(state, "expeditions")
+	if e.offline then
+		bump(state, "offlineExpeditions")
+	end
 	return e
+end
+
+-- 派遣（D-026）。departAt を指定できる（自動再派遣は帰還時刻から出発する）。派遣費は廃止（D-163）
+local function dispatch(state: any, partyIndex: number, dungeonId: string, departAt: number, master: any): any
+	return commitExpedition(state, planExpedition(state, partyIndex, dungeonId, departAt, master, false))
 end
 
 -- 自動再派遣できない理由（できるなら nil）。派遣費の不足による停止は D-163 で削除
@@ -162,7 +194,8 @@ local function autoRepeatBlocker(state: any): string?
 end
 
 -- 帰還処理：報酬を状態に反映する
-local function collect(state: any, e: any, master: any, events: { any })
+-- restActive：休息ボーナスが効くか（オンライン中の帰還で、帰還時に残りがある：06章 §14）
+local function collect(state: any, e: any, master: any, events: { any }, restActive: boolean)
 	local K = master.K
 	local log = e.log
 	local r = log.rewards
@@ -180,12 +213,15 @@ local function collect(state: any, e: any, master: any, events: { any })
 	end
 
 	-- 経験値（D-041：生存者で等分済み。個人倍率はここで掛ける）。順序を固定するため隊列順に処理
+	-- 休息ボーナス（留守番の探索には使わない）と日替わりの expMult は expBonusCap の外で掛け合わせる（D-161, D-173）
+	local useRest = restActive and not e.offline
+	local outerMult = (if useRest then K.restBonusExpMult else 1) * DailyTrait.expMult(e.dailyTraitId, master)
 	local levelUps = {}
 	for _, uid in e.memberUids do
 		local amount = r.exp[uid]
 		local adv = state.adventurers[uid]
 		if amount and amount > 0 and adv then
-			local levels = Growth.addExp(adv, amount, rng, master, state.equipment)
+			local levels = Growth.addExp(adv, amount, rng, master, state.equipment, outerMult)
 			if #levels > 0 then
 				table.insert(levelUps, { uid = uid, level = adv.level })
 			end
@@ -222,6 +258,9 @@ local function collect(state: any, e: any, master: any, events: { any })
 		items = r.items,
 		itemsSoldGold = itemsSoldGold,
 		guildExp = guildExp,
+		offline = e.offline,
+		dailyTraitId = e.dailyTraitId,
+		restBonus = if useRest then true else nil,
 	})
 	for _, lu in levelUps do
 		table.insert(events, { type = "LevelUp", at = e.returnAt, uid = lu.uid, level = lu.level })
@@ -261,38 +300,50 @@ end
 
 -- 時間経過（05章 §3） ------------------------------------------------------
 
-function Game.advance(state: any, ctx: Ctx): { any }
-	local master = ctx.master
-	local events = {}
-	while true do
-		-- 帰還時刻が最も早い探索（同時刻は uid の数値順）
-		local nextE = nil
-		for _, e in state.expeditions do
-			if e.returnAt <= ctx.now then
-				if
-					nextE == nil
-					or e.returnAt < nextE.returnAt
-					or (
-						e.returnAt == nextE.returnAt
-						and tonumber(string.sub(e.uid, 4)) < tonumber(string.sub(nextE.uid, 4))
-					)
-				then
-					nextE = e
-				end
+-- 帰還時刻が ctx.now 以前で最も早い探索（同時刻は uid の数値順）
+local function nextReturn(state: any, now: number): any?
+	local nextE = nil
+	for _, e in state.expeditions do
+		if e.returnAt <= now then
+			if
+				nextE == nil
+				or e.returnAt < nextE.returnAt
+				or (
+					e.returnAt == nextE.returnAt
+					and tonumber(string.sub(e.uid, 4)) < tonumber(string.sub(nextE.uid, 4))
+				)
+			then
+				nextE = e
 			end
 		end
+	end
+	return nextE
+end
+
+-- 留守の始まり（06章 §13）。lastSavedAt（サーバーが保存のときに書く：M7b-5）を使う。
+-- まだ書かれていない・オンラインの時間より古い場合に留守を重ねて数えないよう、最後の advance の時刻より前にはしない
+function Game.offlineStart(state: any): number
+	return math.max(state.lastSavedAt or state.lastAdvancedAt, state.lastAdvancedAt)
+end
+
+-- オンライン（ctx.online == true）：帰還 → 自動再派遣を ctx.now に追いつくまで。休息ボーナスはオンラインの経過秒だけ減る
+local function advanceOnline(state: any, ctx: Ctx, events: { any })
+	local master = ctx.master
+	local t0 = state.lastAdvancedAt
+	local rest = state.restBonusSeconds or 0
+	while true do
+		local nextE = nextReturn(state, ctx.now)
 		if nextE == nil then
 			break
 		end
-		collect(state, nextE, master, events)
+		-- 帰還時刻での休息ボーナスの残り（06章 §14、D-173）
+		local restLeft = rest - math.max(0, nextE.returnAt - t0)
+		collect(state, nextE, master, events, restLeft > 0)
 
 		local party = state.parties[nextE.partyIndex]
 		if party and party.autoRepeat then
 			local blocker = autoRepeatBlocker(state)
-			if not ctx.online then
-				-- オフライン中は再派遣しない（企画書§16.8 案A）。設定は残す
-				continue
-			elseif blocker then
+			if blocker then
 				party.autoRepeat = nil
 				table.insert(
 					events,
@@ -309,6 +360,72 @@ function Game.advance(state: any, ctx: Ctx): { any }
 				})
 			end
 		end
+	end
+	state.restBonusSeconds = math.max(0, rest - math.max(0, ctx.now - t0))
+end
+
+-- 留守番（ctx.online == false。ログイン時の留守の計算：05章 §3、06章 §13・§14、D-161, D-172）
+local function advanceOffline(state: any, ctx: Ctx, events: { any })
+	local master = ctx.master
+	local K = master.K
+	local start = Game.offlineStart(state)
+	local finish = start + K.offlineMaxSeconds -- 6時間までに最後の探索を帰還させる
+	-- 休息ボーナスを貯める：留守にした時間 × restBonusRate（上限 restBonusMaxSeconds）
+	local away = math.max(0, ctx.now - start)
+	local gained = math.floor(away * K.restBonusRate)
+	state.restBonusSeconds = math.min((state.restBonusSeconds or 0) + gained, K.restBonusMaxSeconds)
+
+	while true do
+		local nextE = nextReturn(state, ctx.now)
+		if nextE == nil then
+			break
+		end
+		collect(state, nextE, master, events, false)
+		-- 自動再派遣のパーティは留守番の探索を続ける。倉庫がいっぱいでも止めない（D-172）
+		local party = state.parties[nextE.partyIndex]
+		if party and party.autoRepeat and state.unlockedDungeons[party.autoRepeat.dungeonId] then
+			local counter = state.rngCounter
+			local plan =
+				planExpedition(state, nextE.partyIndex, party.autoRepeat.dungeonId, nextE.returnAt, master, true)
+			if plan.returnAt <= finish then
+				local e2 = commitExpedition(state, plan)
+				table.insert(events, {
+					type = "AutoDispatched",
+					at = nextE.returnAt,
+					partyIndex = nextE.partyIndex,
+					dungeonId = e2.dungeonId,
+					returnAt = e2.returnAt,
+					offline = true,
+				})
+			else
+				state.rngCounter = counter -- 出さなかった探索の乱数は使わなかったことにする
+			end
+		end
+	end
+
+	-- 6時間より前にログインしたら、帰っていない留守番の探索はログインの時点で帰還させる（D-172）。全員ギルドで待機
+	local pending = {}
+	for _, e in state.expeditions do
+		if e.offline then
+			table.insert(pending, e)
+		end
+	end
+	table.sort(pending, function(x, y)
+		return tonumber(string.sub(x.uid, 4)) < tonumber(string.sub(y.uid, 4))
+	end)
+	for _, e in pending do
+		e.returnAt = ctx.now
+		collect(state, e, master, events, false)
+	end
+	state.stats.offlineSecondsTotal = (state.stats.offlineSecondsTotal or 0) + away
+end
+
+function Game.advance(state: any, ctx: Ctx): { any }
+	local events = {}
+	if ctx.online then
+		advanceOnline(state, ctx, events)
+	else
+		advanceOffline(state, ctx, events)
 	end
 	state.lastAdvancedAt = math.max(state.lastAdvancedAt, ctx.now)
 	return events
@@ -1181,6 +1298,21 @@ end
 -- 未開封の宝箱のランクごとの数。開発・自動プレイ用（プレイヤーに見せない：D-087）
 function Game.query.chestsByRank(state: any, master: any): { number }
 	return Chest.countByRank(state, master)
+end
+
+-- 今日・明日の日替わりの特性（D-156、06章 §16）。帯の順に { band, dungeonId, traitId }
+function Game.query.dailyTraits(now: number, master: any): any
+	local day = Calendar.dayIndex(now)
+	return {
+		today = DailyTrait.forDay(day, master),
+		tomorrow = DailyTrait.forDay(day + 1, master),
+		nextDayAt = Calendar.nextDayStart(now),
+	}
+end
+
+-- 休息ボーナスの残り秒（D-161）
+function Game.query.restBonus(state: any): number
+	return state.restBonusSeconds or 0
 end
 
 function Game.query.trainingQuote(state: any, uid: string, targetLevel: number, master: any)

@@ -313,11 +313,11 @@ return function(t)
 			s.gold = 1000
 			return s
 		end
-		it("D-177 version 6 になる", function()
-			expect(Migration.CURRENT).toBe(6)
-			expect(newState().version).toBe(6)
+		it("D-177 version 5 から今の版まで移行する（v5→v6 の手順を通る）", function()
+			expect(Migration.CURRENT >= 6).toBeTruthy() -- M7b は段階ごとに version を上げる（03章）
+			expect(newState().version).toBe(Migration.CURRENT)
 			local s = Migration.migrate(v5State(), master)
-			expect(s.version).toBe(6)
+			expect(s.version).toBe(Migration.CURRENT)
 		end)
 		it("D-177 自動売却の設定は初期値（オン）にする", function()
 			local s = Migration.migrate(v5State(), master)

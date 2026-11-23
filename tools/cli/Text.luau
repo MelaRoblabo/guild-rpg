@@ -1,6 +1,7 @@
 --!strict
 -- テキスト版の表示（文章化のみ。ルールは持たない：D-066）
 
+local Calendar = require("../../src/core/Calendar")
 local Game = require("../../src/core/Game")
 
 local Text = {}
@@ -86,7 +87,54 @@ local function hms(sec: number): string
 end
 
 function Text.clock(save: any): string
-	return "経過 " .. hms(save.clock - START_CLOCK)
+	-- 日は UTC 0時（日本の朝9時）で区切る（D-168）。仮想時計の開始日を1日目と数える
+	local day = Calendar.dayIndex(save.clock) - Calendar.dayIndex(START_CLOCK) + 1
+	local out = "経過 " .. hms(save.clock - START_CLOCK) .. `（{day}日目）`
+	if save.loggedOut then
+		out ..= "［ログアウト中］"
+	end
+	return out
+end
+
+-- 日替わりの特性の説明（D-156）
+local function traitText(traitId: string?, master: any): string
+	local tr = if traitId then master.dailyTraits[traitId] else nil
+	if tr == nil then
+		return ""
+	end
+	if tr.effect == "chestMult" then
+		return `宝箱×{tr.value}`
+	elseif tr.effect == "expMult" then
+		return `経験値×{tr.value}`
+	elseif tr.effect == "atkPctPhysical" then
+		return `物理攻撃職の攻撃力+{math.floor(tr.value * 100 + 0.5)}%`
+	elseif tr.effect == "atkPctMagic" then
+		return `魔法攻撃職の攻撃力+{math.floor(tr.value * 100 + 0.5)}%`
+	elseif tr.effect == "travelMult" then
+		return `移動時間-{math.floor((1 - tr.value) * 100 + 0.5)}%`
+	end
+	return tr.id
+end
+
+-- 今日・明日の日替わりの特性（D-156）
+function Text.daily(save: any, master: any): string
+	local q = Game.query.dailyTraits(save.clock, master)
+	local lines = {}
+	for _, pair in { { "今日", q.today }, { "明日", q.tomorrow } } do
+		table.insert(lines, `【{pair[1]}の日替わり】`)
+		for _, p in pair[2] do
+			local band = master.K.dailyTraitBands[p.band]
+			table.insert(
+				lines,
+				`  難度{band.min}〜{band.max}：{master.dungeons[p.dungeonId].name}（{p.dungeonId}） {traitText(
+					p.traitId,
+					master
+				)}`
+			)
+		end
+	end
+	table.insert(lines, `次の日の区切りまで {hms(q.nextDayAt - save.clock)}`)
+	return table.concat(lines, "\n")
 end
 
 local function advName(save: any, uid: string): string
@@ -156,6 +204,11 @@ function Text.status(save: any, master: any): string
 	table.insert(
 		lines,
 		`トレーニング場 Lv{s.expansions.trainingLevel}（Lv{fac.levelCap}まで、1回 経験値{fac.expPerSession}）`
+	)
+	-- 休息ボーナスの残り（D-161）
+	table.insert(
+		lines,
+		`休息ボーナス 残り {hms(Game.query.restBonus(s))}（帰還時の経験値×{master.K.restBonusExpMult}）`
 	)
 	return table.concat(lines, "\n")
 end
@@ -380,6 +433,9 @@ function Text.events(events: { any }, save: any, master: any): string
 						) > 0
 						then `（素材を売却 {e.itemsSoldGold}G）`
 						else ""}`
+					.. (if e.offline then " ［留守番］" else "")
+					.. (if e.dailyTraitId then ` ［日替わり：{traitText(e.dailyTraitId, master)}］` else "")
+					.. (if e.restBonus then " ［休息ボーナス］" else "")
 			)
 		elseif e.type == "LevelUp" then
 			table.insert(lines, t .. `{advName(save, e.uid)} が Lv{e.level} に上がった`)
@@ -394,6 +450,7 @@ function Text.events(events: { any }, save: any, master: any): string
 					.. `パーティ{e.partyIndex}を{master.dungeons[e.dungeonId].name}へ自動再派遣（帰還 {hms(
 						e.returnAt - START_CLOCK
 					)}）`
+					.. (if e.offline then " ［留守番］" else "")
 			)
 		elseif e.type == "AutoRepeatStopped" then
 			table.insert(

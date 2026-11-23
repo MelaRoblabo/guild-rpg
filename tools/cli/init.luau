@@ -63,8 +63,8 @@ local function persist()
 	fs.writeFile(savePath, serde.encode("json", save))
 end
 
-local function ctx()
-	return { now = save.clock, master = master, online = true }
+local function ctx(online: boolean?)
+	return { now = save.clock, master = master, online = if online == nil then true else online }
 end
 
 -- 出力 -----------------------------------------------------------------
@@ -92,6 +92,9 @@ local HELP = [[
   hint <dng_id>              攻略ヒント
   watch <n>                  探索の様子（現在位置まで）
   wait <秒>                  仮想時計を進める
+  days <日数>                仮想時計を日単位で進める（D-168）
+  logout / login             ログアウト（最後に保存した時刻を書く）／ログイン（留守番と休息ボーナスを計算：D-161）
+  daily                      今日・明日の日替わりの特性（D-156）
   candidates                 候補と面接の状況を表示
   expansions                 拡張の一覧（次の段階の条件と費用）
   trainquote <adv_uid> <Lv>  そのレベルまでのトレーニング費用の見積もり
@@ -113,7 +116,34 @@ local function handle(tokens: { string }): (boolean, any)
 		return true, events
 	end
 
-	collectAdvance()
+	-- ログアウト中（D-161）：時計を進めるだけ。進めた時間は login のときに留守番として計算する
+	if save.loggedOut then
+		if c == "wait" or c == "days" then
+			local sec = if c == "days"
+				then math.floor((tonumber(tokens[2]) or 0) * 86400)
+				else math.floor(tonumber(tokens[2]) or 0)
+			save.clock += math.max(0, sec)
+			say(`ログアウト中に {sec} 秒経過しました（{Text.clock(save)}）`)
+			return true, events
+		elseif c == "login" then
+			save.loggedOut = nil
+			for _, e in Game.advance(save.state, ctx(false)) do
+				table.insert(events, e)
+			end
+			say(
+				`ログインしました（{Text.clock(save)}）。休息ボーナス 残り {Game.query.restBonus(
+					save.state
+				)} 秒`
+			)
+			return true, events
+		elseif not (c == "status" or c == "daily" or c == "help" or c == nil) then
+			-- 表示（status・daily・help）だけは許す
+			say("ログアウト中です（login でログイン）")
+			return false, events
+		end
+	else
+		collectAdvance()
+	end
 
 	local result: any = nil
 	if c == nil or c == "help" then
@@ -139,6 +169,21 @@ local function handle(tokens: { string }): (boolean, any)
 		save.clock += math.max(0, math.floor(sec))
 		collectAdvance()
 		say(`{sec} 秒経過しました（{Text.clock(save)}）`)
+	elseif c == "days" then
+		-- ツール用の時間の操作（05章 §3b）。ログイン中はオンラインのまま進める
+		local n = tonumber(tokens[2]) or 0
+		save.clock += math.max(0, math.floor(n * 86400))
+		collectAdvance()
+		say(`{n} 日経過しました（{Text.clock(save)}）`)
+	elseif c == "logout" then
+		-- 最後に保存した時刻を書く（本番はサーバーが保存のときに書く：03章、M7b-5）
+		save.state.lastSavedAt = save.clock
+		save.loggedOut = true
+		say(`ログアウトしました（{Text.clock(save)}）`)
+	elseif c == "login" then
+		say("すでにログインしています")
+	elseif c == "daily" then
+		say(Text.daily(save, master))
 	elseif c == "candidates" then
 		say(Text.hiring(save, master))
 	elseif c == "expansions" then

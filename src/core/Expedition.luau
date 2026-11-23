@@ -9,13 +9,16 @@ local Rng = require("./Rng")
 
 local Expedition = {}
 
-Expedition.ENGINE_VERSION = 1
+-- v2：日替わりの特性 chestMult の端数の判定を最後に足した（07章 §3 の 4、D-173）
+Expedition.ENGINE_VERSION = 2
 
 export type Input = {
 	seed: number,
 	departAt: number,
 	dungeonId: string,
 	members: { Formulas.MemberSnapshot }, -- 隊列順。出発時点の実効値（07章 §1）
+	dailyTraitId: string?, -- 出発時刻の日に当たっている日替わりの特性（D-156、06章 §16）
+	timeMult: number?, -- 所要秒の倍率。留守番は offlineTimeMult、それ以外は 1（D-161）
 }
 
 export type FloorLog = {
@@ -47,6 +50,9 @@ export type Log = {
 	floors: { FloorLog },
 	clearChestRanks: { number }?,
 	travelGiftId: string?,
+	dailyTraitId: string?,
+	traitChests: number?, -- 日替わりの特性 chestMult で増えた宝箱の数（rewards.chests に含む）
+	timeMult: number?,
 	rewards: Events.Rewards,
 }
 
@@ -70,12 +76,21 @@ function Expedition.simulate(input: Input, master: any): Log
 	assert(#input.members > 0, "メンバーがいない")
 
 	local rng = Rng.new(input.seed)
+	-- 日替わりの特性（D-156, D-173）：攻撃力は出発時の実効値に掛けて固定する（個体補正の上限の外）
+	local trait = if input.dailyTraitId then master.dailyTraits[input.dailyTraitId] else nil
 	local members: { Combat.MemberState } = {}
 	for _, snap in input.members do
-		table.insert(members, { slot = snap.slot, snap = snap, hp = snap.maxHp }) -- 満タンで出発（D-011）
+		local s = snap
+		local atk = Formulas.traitAttack(snap, trait)
+		if atk ~= snap.atk then
+			s = table.clone(snap)
+			s.atk = atk
+		end
+		table.insert(members, { slot = s.slot, snap = s, hp = s.maxHp }) -- 満タンで出発（D-011）
 	end
 
-	local travel, travelGiftId = Formulas.travelSeconds(input.members, dungeon, K)
+	local travelMult = if trait and trait.effect == "travelMult" then trait.value else 1
+	local travel, travelGiftId = Formulas.travelSeconds(input.members, dungeon, K, travelMult)
 	local rewards: Events.Rewards = { exp = {}, gold = 0, chests = {}, items = {}, floorsCleared = 0, guildExp = 0 }
 	local floors: { FloorLog } = {}
 	local offset = travel
@@ -180,11 +195,39 @@ function Expedition.simulate(input: Input, master: any): Log
 	else
 		rewards.floorsCleared = reached - 1
 	end
+	-- 日替わりの特性 chestMult（D-173、07章 §3 の 4）：宝箱1個ごとに、整数部ぶん増やし、端数は確率で +1
+	local traitChests = nil
+	if trait and trait.effect == "chestMult" then
+		traitChests = 0
+		local whole = math.floor(trait.value - 1)
+		local frac = (trait.value - 1) - whole
+		local base = table.clone(rewards.chests)
+		for _, c in base do
+			local extra = whole
+			if frac > 0 and rng:chance(frac) then
+				extra += 1
+			end
+			for _ = 1, extra do
+				table.insert(rewards.chests, { rank = c.rank })
+			end
+			traitChests += extra
+		end
+	end
 	-- ギルド経験値（Q-017）。初回踏破のボーナスは状態に依存するため M2 で加算する
 	rewards.guildExp = rewards.floorsCleared * K.guildExpPerFloor
 		+ (if result == "clear" then K.guildExpClearBonus else 0)
 
 	local replay = offset - travel
+	-- 留守番（D-161、07章 §4b）：時間だけを倍率で伸ばす（戦闘・イベント・報酬は同じ）
+	local timeMult = input.timeMult or 1
+	if timeMult ~= 1 then
+		travel *= timeMult
+		replay *= timeMult
+		for _, f in floors do
+			f.startOffset *= timeMult
+			f.duration *= timeMult
+		end
+	end
 	return {
 		engineVersion = Expedition.ENGINE_VERSION,
 		seed = input.seed,
@@ -199,6 +242,9 @@ function Expedition.simulate(input: Input, master: any): Log
 		floors = floors,
 		clearChestRanks = clearChestRanks,
 		travelGiftId = travelGiftId,
+		dailyTraitId = input.dailyTraitId,
+		traitChests = traitChests,
+		timeMult = if timeMult ~= 1 then timeMult else nil,
 		rewards = rewards,
 	}
 end

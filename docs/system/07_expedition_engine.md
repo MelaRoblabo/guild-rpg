@@ -60,6 +60,7 @@ for turn = 1 .. maxTurns:
 1. フロアごとに：（戦闘）モンスター抽選 → ターン内の各行動のクリティカル判定 → モンスターの被弾対象抽選
 2. （イベント）イベント種別 → 種別ごとの抽選（宝箱ランク／アイテム／罠の回避判定）→ 幸運判定
 3. 踏破時：確定宝箱ランク → 幸運判定
+4. 日替わりの特性 `chestMult` があるとき（`engineVersion` 2〜。D-173）：報酬の宝箱を得た順に1個ずつ、端数（倍率 − 1 の小数部）が 0 より大きければ +1 の判定（整数部はそのまま増やし、乱数を使わない）。特性がなければ何も引かない
 
 ## 4. 探索ログ（ExpeditionLog）
 
@@ -78,6 +79,9 @@ ExpeditionLog = {
 		guildExp: number,
 	},
 	totalSeconds: number,
+	dailyTraitId: string?,          -- 当てた日替わりの特性（D-156）
+	traitChests: number?,           -- chestMult で増えた宝箱の数（rewards.chests に含む。D-173）
+	timeMult: number?,              -- 留守番の時間の倍率（1 のときは nil。D-161）
 }
 FloorLog = {
 	floor: number, kind: "battle" | "event", startOffset: number, duration: number,

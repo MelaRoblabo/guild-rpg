@@ -58,8 +58,8 @@ export type Expedition = {
 	returnAt: number,
 	log: ExpeditionLog,               -- 07章。出発時に確定し変更しない
 	collected: boolean,
-	offline: boolean?,                -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない。M7b-3 の段階で追加（version はその段階で上げる）
-	dailyTraitId: string?,            -- 出発時に当たっていた日替わりの特性（D-156）。留守番も出発した日の特性
+	offline: boolean?,                -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない。M7b-3（version 7）で追加
+	dailyTraitId: string?,            -- 出発時に当たっていた日替わりの特性（D-156）。留守番も出発した日の特性。M7b-3（version 7）で追加
 	eventSlot: number?,               -- マップイベントへの派遣なら、そのイベントの時間帯の番号（D-152、06章 §12）
 	raidDamage: number?,              -- レイドへの派遣なら、出発時に計算したダメージ（到着時刻に入れる。D-152）
 }
@@ -132,8 +132,8 @@ export type PlayerState = {
 	itemLog: { ItemLogEntry },        -- 有料・無料の入手経路の記録（10章。直近N件）
 
 	-- ここから M7b-3 以降の段階で追加（D-152〜D-168。段階ごとに version を上げる：下の「セーブの移行」）
-	lastSavedAt: number,              -- 最後に保存した時刻＝ログアウト時刻。留守の計算の基準（D-161）。サーバーが保存のときに ctx.now を書く（11章）
-	restBonusSeconds: number,         -- 休息ボーナスの残り秒（D-161。上限 restBonusMaxSeconds）
+	lastSavedAt: number,              -- 最後に保存した時刻＝ログアウト時刻。留守の計算の基準（D-161）。サーバーが保存のときに ctx.now を書く（11章）。version 7
+	restBonusSeconds: number,         -- 休息ボーナスの残り秒（D-161。上限 restBonusMaxSeconds）。version 7
 	quests: {                         -- D-153
 		daily: { dayIndex: number, entries: { QuestEntry }, bonusDone: boolean },
 		weekly: { weekIndex: number, entries: { QuestEntry }, bonusDone: boolean },
@@ -192,15 +192,22 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 | `settings.autoSell` | 初期値（StarterSet の `autoSell`：`enabled = true, maxRarity = 2, keepModified = true`）に合わせる | D-167, D-177 |
 | `items` の売却用アイテム | 売ってゴールドにする（売却価格は今までと同じ `sellPrice × 数`）。`items` から消す | D-167, D-177 |
 
-### version 6 → 7 以降（M7b-3 以降の各段階）
+### version 6 → 7（M7b-3）　`Migration.CURRENT = 7`
+
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `lastSavedAt` | `lastAdvancedAt` を入れる（すでにあれば変えない） | D-161 |
+| `restBonusSeconds` | 0 | D-161 |
+| `expeditions[*]` | `offline`・`dailyTraitId` は nil のまま（旧版の探索は普通の探索で、日替わりの特性なし） | D-161, D-156 |
+
+新規のセーブは `lastSavedAt = 作成時刻`、`restBonusSeconds = 0` を持つ。
+
+### version 7 → 8 以降（M7b-4 以降の各段階）
 
 次の項目は、それを使う段階で version を上げて足す。どの段階かは 12章「M7b の進め方」の内容に合わせ、足した段階でこの表を「version n → n+1」の節に移す。
 
 | 項目 | 旧版からの変換 | 根拠 | 足す段階（予定） |
 | --- | --- | --- | --- |
-| `lastSavedAt` | `lastAdvancedAt` を入れる | D-161 | M7b-3 |
-| `restBonusSeconds` | 0 | D-161 | M7b-3 |
-| `expeditions[*]` | `offline`・`dailyTraitId` は nil（旧版の探索は普通の探索） | D-161, D-156 | M7b-3 |
 | `expeditions[*]` | `eventSlot`・`raidDamage` は nil | D-152 | M7b-4 |
 | `equipment[*]` | `fromMerchant` は nil | D-175 | M7b-4 |
 | `quests` | 空（次の advance で今日・今週の分を作る） | D-153 | M7b-4 |

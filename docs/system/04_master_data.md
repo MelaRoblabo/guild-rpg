@@ -99,8 +99,8 @@
 | `offlineMaxSeconds` | 21600（1回の留守で6時間まで。拡張しない） | D-161 |
 | `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（たまる速さは未決（M7b-6）） | D-161 |
 | `restBonusExpMult` | 2（未決（M7b-6）） | D-161 |
-| `dailyTraitBands` | {1〜4}, {5〜8}, {9〜12}（難度＝ダンジョンの tier の帯） | D-156 |
-| `calendarSeed` | 日替わり・今週の訪問者・マップイベントの共通の乱数の元（全員共通。値は任意の固定値） | D-156, D-158, D-152 |
+| `dailyTraitBands` | `{ min = 1, max = 4 }`, `{ min = 5, max = 8 }`, `{ min = 9, max = 12 }`（難度＝ダンジョンの tier の帯） | D-156 |
+| `calendarSeed` | 20260101（日替わり・今週の訪問者・マップイベントの共通の乱数の元。全員共通。値は任意の固定値） | D-156, D-158, D-152 |
 | `questDailyCount` / `questWeeklyCount` | 3 / 3〜5（ウィークリーの数は未決（M7b-6）） | D-153 |
 | `playtimeDailyCapSeconds` | 7200（1日2時間まで） | D-154 |
 | `friendRewardIntervalSeconds` | 未決（M7b-6。例 600） | D-157 |
@@ -166,11 +166,13 @@
 
 | effect | 内容（例） | value |
 | --- | --- | --- |
-| `chestMult` | 宝箱の数 ×1.5 | 未決（M7b-6） |
-| `expMult` | 経験値 ×2 | 未決（M7b-6） |
-| `atkPctPhysical` | 物理攻撃職の攻撃力 +20% | 未決（M7b-6） |
-| `atkPctMagic` | 魔法攻撃職の攻撃力 +20% | 未決（M7b-6） |
-| `travelMult` | 移動時間 −30% | 未決（M7b-6） |
+| `chestMult` | 宝箱の数 ×1.5 | 1.5（仮。M7b-6） |
+| `expMult` | 経験値 ×2 | 2（仮。M7b-6） |
+| `atkPctPhysical` | 物理攻撃職の攻撃力 +20% | 0.20（仮。M7b-6） |
+| `atkPctMagic` | 魔法攻撃職の攻撃力 +20% | 0.20（仮。M7b-6） |
+| `travelMult` | 移動時間 −30% | 0.70（仮。M7b-6） |
+
+- M7b-3 では上の5行（id `dt_chest`・`dt_exp`・`dt_atk_physical`・`dt_atk_magic`・`dt_travel`）を D-156 の例の値で置く。抽選は5行から等確率。検証：`chestMult`・`expMult` は 1 以上、`travelMult` は 0〜1、どの帯にもダンジョンがあること。
 
 - 候補の行と効果量は未決（M7b-6）。どの日にどのダンジョン・特性が当たるかは 06章 §16。
 - 日ごとの特性なので「ダンジョン補正はない」（D-038・D-047）の例外。効果は個体補正・経験値補正の上限の外で掛ける（D-173）。

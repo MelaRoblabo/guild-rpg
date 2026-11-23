@@ -139,6 +139,23 @@ return {
 	-- 開封演出が入る割合の基準（D-090）：各ダンジョンで chestEffectMinRarity 以上が出る確率をこの範囲に収める
 	chestEffectRate = { min = 0.10, max = 0.15 },
 
+	-- 留守番（D-161, D-172。06章 §13）
+	offlineTimeMult = 10, -- 留守番の探索1回の時間の倍率（効率10%）
+	offlineMaxSeconds = 21600, -- 1回の留守で6時間まで。6時間までに最後の探索を帰還させる（拡張しない）
+
+	-- 休息ボーナス（D-161, D-173。06章 §14）
+	restBonusRate = 0.5, -- 留守にした時間の半分を貯める（仮。M7b-6）
+	restBonusMaxSeconds = 14400, -- 上限4時間
+	restBonusExpMult = 2, -- 帰還時の経験値の倍率（仮。M7b-6）
+
+	-- 日替わりの特性（D-156。06章 §16）
+	dailyTraitBands = { -- 難度（ダンジョンの tier）の帯。帯ごとに毎日1つのダンジョンに特性が当たる
+		{ min = 1, max = 4 },
+		{ min = 5, max = 8 },
+		{ min = 9, max = 12 },
+	},
+	calendarSeed = 20260101, -- 日替わり・今週の訪問者・マップイベントの共通の乱数の元（全員共通。値は任意の固定値）
+
 	-- ギルド（Q-017）
 	guildExpPerFloor = 1,
 	guildExpClearBonus = 5,

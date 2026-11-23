@@ -194,6 +194,21 @@ function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 	}
 end
 
+-- 06章 §3・§16：日替わりの特性 atkPctPhysical / atkPctMagic。攻撃区分が合う者の攻撃力に × (1 + value)
+-- 個体補正の上限（personalBonusCap）の外で掛ける（D-173）。合わなければそのまま
+function Formulas.traitAttack(snap: MemberSnapshot, trait: any?): number
+	if trait == nil then
+		return snap.atk
+	end
+	if
+		(trait.effect == "atkPctPhysical" and snap.attackType == "physical")
+		or (trait.effect == "atkPctMagic" and snap.attackType == "magic")
+	then
+		return math.floor(snap.atk * (1 + trait.value))
+	end
+	return snap.atk
+end
+
 -- 06章 §3：戦闘
 function Formulas.attackAgainst(snap: MemberSnapshot, raceTag: string): number
 	return math.floor(snap.atk * (1 + (snap.tagAtkRates[raceTag] or 0)))
@@ -262,7 +277,8 @@ function Formulas.luckyChance(holders: number, K: any): number
 end
 
 -- 06章 §7：片道秒（D-021, Q-004）。道案内は最も効果の大きい1つだけ
-function Formulas.travelSeconds(snaps: { MemberSnapshot }, dungeon: any, K: any): (number, string?)
+-- traitMult：日替わりの特性 travelMult（§16、D-156）。省略時 1
+function Formulas.travelSeconds(snaps: { MemberSnapshot }, dungeon: any, K: any, traitMult: number?): (number, string?)
 	local n = #snaps
 	local sumAgi = 0
 	for _, s in snaps do
@@ -285,7 +301,7 @@ function Formulas.travelSeconds(snaps: { MemberSnapshot }, dungeon: any, K: any)
 	local speed = if avgAgi > 0
 		then math.clamp(dungeon.refAgi / avgAgi, K.travelSpeedMin, K.travelSpeedMax)
 		else K.travelSpeedMax
-	local seconds = dungeon.distance * K.travelSecondsPerDistance * speed * mult
+	local seconds = dungeon.distance * K.travelSecondsPerDistance * speed * mult * (traitMult or 1)
 	return math.ceil(seconds), giftId
 end
 

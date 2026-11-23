@@ -69,12 +69,20 @@ end
 
 -- 経験値を加え、レベルアップを処理する。上がったレベルの一覧を返す
 -- 上限レベルでは経験値を貯めない（07章）
-function Growth.addExp(adv: any, rawAmount: number, rng: Rng.Rng, master: any, equipment: any?): { number }
+-- outerMult：expBonusCap の外で掛ける倍率（休息ボーナス × 日替わりの expMult。06章 §8・§14、D-173）。省略時 1
+function Growth.addExp(
+	adv: any,
+	rawAmount: number,
+	rng: Rng.Rng,
+	master: any,
+	equipment: any?,
+	outerMult: number?
+): { number }
 	if adv.level >= adv.levelCap then
 		adv.exp = 0
 		return {}
 	end
-	adv.exp += math.floor(rawAmount * Growth.expMultiplier(adv, master, equipment))
+	adv.exp += math.floor(rawAmount * Growth.expMultiplier(adv, master, equipment) * (outerMult or 1))
 	return Growth.levelUpTo(adv, adv.levelCap, rng, master)
 end
 
