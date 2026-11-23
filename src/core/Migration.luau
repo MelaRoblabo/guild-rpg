@@ -8,7 +8,7 @@ local ExclusiveGift = require("./ExclusiveGift")
 
 local Migration = {}
 
-Migration.CURRENT = 10
+Migration.CURRENT = 11
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -137,6 +137,24 @@ local STEPS: { [number]: (any, any) -> () } = {
 		state.raid = nil
 		state.rareDungeonSlots = nil
 		state.version = 10
+	end,
+	-- v10 → v11（M7b-5 の決定 D-195・D-196 の反映）
+	--   stats.rebirths（転生回数の累計。紹介の進み具合：D-195）：今いる冒険者の rebirthCount の合計を下限にする
+	--     （すでに数えている累計のほうが大きければそのまま。解雇した冒険者の分を失わない）
+	--   loginTimes：空（次のログインからサーバーが足す：D-196）
+	--   settings.notifyPrompt：firstReturn = false, loginDay2 = false（通知の許可の画面をまだ出していない：D-196）
+	-- 形は Notify.newPromptState と同じ（循環を避けるためここに書く）
+	[10] = function(state)
+		local sum = 0
+		for _, a in state.adventurers or {} do
+			sum += a.rebirthCount or 0
+		end
+		state.stats = state.stats or {}
+		state.stats.rebirths = math.max(state.stats.rebirths or 0, sum)
+		state.loginTimes = state.loginTimes or {}
+		state.settings = state.settings or {}
+		state.settings.notifyPrompt = state.settings.notifyPrompt or { firstReturn = false, loginDay2 = false }
+		state.version = 11
 	end,
 }
 

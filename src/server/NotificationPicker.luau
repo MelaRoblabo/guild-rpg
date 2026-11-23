@@ -3,16 +3,17 @@
 --
 -- 退出したときの状態から、送る時刻（sendAt）の見込みを作って選ぶ：
 --   状態を写し、core の留守番（Game.advance、online = false）を sendAt まで進めた結果を見る（ログイン時と同じ計算）。
--- 優先順位（D-159 の案）：
+-- 優先順位（D-159、D-196）：
 --   ① loginUnique  ：あと1日でログインボーナスのユニーク（次に受け取るのが7日目で、その周のユニークがいる）
 --   ② offlineDone  ：全パーティ帰還・宝箱 N 個（退出時に出ていた探索があり、sendAt が留守番の終わり以後。N は留守番で増える宝箱の数）
---   ③ dailyTrait   ：今日の日替わりが得意なダンジョン（sendAt の日の特性が、自動再派遣にしているダンジョンに当たる。仮の解釈：Q）
+--   ③ dailyTrait   ：今日の日替わりが得意なダンジョン（sendAt の日の特性が、自動再派遣にしているダンジョンに当たる：D-196 ①）
 --   ④ rebirthReady ：転生できる冒険者 N 人（留守番のあとで上限レベルに届いていて、まだ転生できる人）
 --   ⑤ dailyReset   ：デイリー更新（いつでも当てはまる。最後の候補）
 
 local Calendar = require("@game/ReplicatedStorage/Core/Calendar")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Login = require("@game/ReplicatedStorage/Core/Login")
+local Notify = require("@game/ReplicatedStorage/Core/Notify")
 local Rebirth = require("@game/ReplicatedStorage/Core/Rebirth")
 
 local NotificationPicker = {}
@@ -41,10 +42,14 @@ local function chestTotal(state: any, master: any): number
 	return n
 end
 
--- 送る時刻：その人がいつも遊ぶ時刻（仮：今回ログインした時刻の、UTC の1日の中の位置）のうち、
--- 退出から minAwaySeconds 以上あとの最初のもの
-function NotificationPicker.sendAt(loginAt: number, logoutAt: number, minAwaySeconds: number): number
-	local timeOfDay = loginAt - Calendar.dayStart(loginAt)
+-- その人がいつも遊ぶ時刻（UTC の1日の中の位置・秒）：直近のログイン時刻の中央値（D-196。core の Notify.usualTimeOfDay）。
+-- 記録がなければ（読み込みで必ず1回足すので、ふつうは起きない）今回ログインした時刻の位置で代わりにする
+function NotificationPicker.usualTimeOfDay(state: any, loginAt: number): number
+	return Notify.usualTimeOfDay(state) or (loginAt - Calendar.dayStart(loginAt))
+end
+
+-- 送る時刻：いつも遊ぶ時刻（timeOfDay：1日の中の位置・秒）のうち、退出から minAwaySeconds 以上あとの最初のもの
+function NotificationPicker.sendAt(timeOfDay: number, logoutAt: number, minAwaySeconds: number): number
 	local earliest = logoutAt + minAwaySeconds
 	local t = Calendar.dayStart(earliest) + timeOfDay
 	if t < earliest then

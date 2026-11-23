@@ -24,6 +24,7 @@ local Login = require("./Login")
 local MapEvent = require("./MapEvent")
 local Merchant = require("./Merchant")
 local Migration = require("./Migration")
+local Notify = require("./Notify")
 local Party = require("./Party")
 local Playtime = require("./Playtime")
 local Quest = require("./Quest")
@@ -102,7 +103,8 @@ function Game.newState(master: any, seed: number, now: number): any
 		clearedDungeons = {},
 		hireSession = nil,
 		rebirthSession = nil,
-		settings = { autoSell = table.clone(S.autoSell) }, -- D-167：最初からオン
+		-- D-167：自動売却は最初からオン。notifyPrompt：通知の許可の画面を出した記録（D-196・D-117。version 11）
+		settings = { autoSell = table.clone(S.autoSell), notifyPrompt = Notify.newPromptState() },
 		stats = {},
 		createdAt = now,
 		lastAdvancedAt = now,
@@ -114,6 +116,7 @@ function Game.newState(master: any, seed: number, now: number): any
 		inbox = {}, -- 受け取り箱（D-164）
 		friend = Friend.newState(), -- フレンドボタン（D-157）。version 9
 		referral = Friend.newReferralState(), -- 紹介（D-157, D-180）。version 9
+		loginTimes = {}, -- 直近のログイン時刻（1日の中の位置・秒。D-196）。サーバーがログインのたびに Notify.recordLogin で足す。version 11
 	}
 	for i = 1, state.expansions.partySlots do
 		state.parties[i] = { index = i, slots = Party.newSlots(), autoRepeat = nil }
@@ -1078,7 +1081,7 @@ handlers.RebirthChoose = function(state, cmd, ctx)
 	local adv = state.adventurers[r.adventurerUid]
 	local giftId = Rebirth.apply(adv, r, bonus, takeRng(state), ctx.master)
 	state.rebirthSession = nil
-	bump(state, "rebirths")
+	bump(state, "rebirths") -- 転生回数の累計（解雇で戻らない）。紹介の進み具合もこれで数える（D-195）
 	local events: { any } = {
 		{
 			type = "Reborn",
@@ -1285,6 +1288,15 @@ handlers.SetAutoSell = function(state, cmd, ctx)
 		keepModified = if cmd.keepModified == nil then true else cmd.keepModified == true,
 	}
 	return { ok = true, events = {} }
+end
+
+-- 通知の許可の画面を出した記録（05章 MarkNotifyPrompt、D-196・D-117）。クライアントが出したあとに送る
+handlers.MarkNotifyPrompt = function(state, cmd, ctx)
+	local err = Notify.markPrompted(state, cmd.stage)
+	if err then
+		return fail(err)
+	end
+	return { ok = true, events = { { type = "NotifyPromptMarked", at = ctx.now, stage = cmd.stage } } }
 end
 
 -- マップイベント（05章 DispatchEvent・BuyFromMerchant、06章 §12、D-152, D-179） ---------------------
@@ -1788,6 +1800,11 @@ end
 
 function Game.query.expToNext(level: number, master: any, rebirthCount: number?): number
 	return Formulas.expToNext(level, master.K, rebirthCount)
+end
+
+-- 通知の許可の画面を今出すか（D-196 ③）："firstReturn" / "loginDay2" / nil
+function Game.query.notifyPromptDue(state: any): string?
+	return Notify.promptDue(state)
 end
 
 return Game

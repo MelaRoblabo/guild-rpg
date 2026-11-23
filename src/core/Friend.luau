@@ -1,8 +1,8 @@
 --!strict
--- フレンドボタンと紹介（D-157, D-180, D-190, D-192、docs/system/06_formulas.md §20、05_commands.md ClaimFriendReward・GrantReferral）
+-- フレンドボタンと紹介（D-157, D-180, D-190, D-192, D-195、docs/system/06_formulas.md §20、05_commands.md ClaimFriendReward・GrantReferral）
 --   Friend.claim          フレンドボタン。同じサーバーの友達の数（サーバーが数えて ctx.friendCount で渡す：M7b-5）でゴールドが少し増える。
 --                         一定時間ごとに押せる（押さないとたまらない）・1日の上限あり。受け取り箱には入れず、その場で渡す
---   Friend.referralProgressReached  招待された人が紹介の進み具合（referralProgressCondition）に届いたか（D-192）。
+--   Friend.referralProgressReached  招待された人が紹介の進み具合（referralProgressCondition。転生回数の累計：D-195）に届いたか（D-192）。
 --                         サーバーはこれを見て、招待した人へ届け物を書き（markInviterDelivered）、招待された側に GrantReferral（invitee）を実行する
 --   Friend.grantReferral  紹介の報酬を受け取り箱へ入れる。招待された側は1回だけで、進み具合に届いてから（D-192）。
 --                         招待した側は相手1人ごと・週の上限まで
@@ -92,18 +92,14 @@ function Friend.claim(state: any, now: number, friendCount: number, master: any)
 		nil
 end
 
--- 招待された人（この state の持ち主）が紹介の進み具合に届いたか（D-192。条件は Constants.referralProgressCondition）
---   kind = "rebirthedAdventurers"：転生した冒険者（rebirthCount ≥ 1）が count 人以上
+-- 招待された人（この state の持ち主）が紹介の進み具合に届いたか（D-192, D-195。条件は Constants.referralProgressCondition）
+--   kind = "rebirthsTotal"：これまでに転生した回数の累計（stats.rebirths。RebirthChoose で数える）が count 回以上。
+--   今いる冒険者の rebirthCount では数えない（解雇で戻らない：D-195）
 function Friend.referralProgressReached(state: any, master: any): boolean
 	local cond = master.K.referralProgressCondition
-	if cond.kind == "rebirthedAdventurers" then
-		local n = 0
-		for _, a in state.adventurers do
-			if (a.rebirthCount or 0) >= 1 then
-				n += 1
-			end
-		end
-		return n >= cond.count
+	if cond.kind == "rebirthsTotal" then
+		local stats = state.stats or {}
+		return (stats.rebirths or 0) >= cond.count
 	end
 	return false -- 知らない条件（MasterData の検証で止めるので起きない）
 end

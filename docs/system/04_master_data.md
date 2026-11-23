@@ -110,7 +110,8 @@
 | `friendRewardDailyCap` | 12（1日に押せる回数。仮。M7b-6） | D-157 |
 | `referralWeeklyCap` | 3（招待した側が報酬を受け取れる人数／週。仮。M7b-6） | D-157 |
 | `referralRewards` | `invitee`（招待された側）・`inviter`（招待した側）の報酬（形は §9 の rewards）。中身はステータススロットチケット、量はどちらも2（仮。M7b-6） | D-157, D-180, D-192 |
-| `referralProgressCondition` | 招待された人の進み具合の条件。両者の報酬はこれに届いたときに渡す。`{ kind = "rebirthedAdventurers", count = 1 }`（転生した冒険者が count 人以上＝初転生。仮。M7b-6）。判定は core の `Friend.referralProgressReached`（サーバーがこれを見て届け物を書き、招待された側に GrantReferral（invitee）を実行する）。検証：kind は `rebirthedAdventurers` だけ、count は1以上の整数 | D-157, D-192 |
+| `referralProgressCondition` | 招待された人の進み具合の条件。両者の報酬はこれに届いたときに渡す。`{ kind = "rebirthsTotal", count = 1 }`（これまでに転生した回数の累計 `stats.rebirths` が count 回以上＝初転生。解雇で戻らない。仮。M7b-6）。判定は core の `Friend.referralProgressReached`（サーバーがこれを見て届け物を書き、招待された側に GrantReferral（invitee）を実行する）。検証：kind は `rebirthsTotal` だけ、count は1以上の整数 | D-157, D-192, D-195 |
+| `notifyLoginHistoryCount` | 「いつも遊ぶ時刻」（ゲーム外の通知を送る時刻）に使う直近のログインの回数。7。中央値をとる（06章 §23）。検証：1以上の整数 | D-196 |
 | `weeklyVisitorChance` | 0.03（今週の訪問者の別枠の確率。候補1人ごと。仮。M7b-6） | D-158, D-170 |
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
 | `mapEventKindWeights` | `{ { id = "mev_rare_dungeon", weight }, … }`。M7b-4 は 1 / 1 / 1 の仮（M7b-6） | D-152 |

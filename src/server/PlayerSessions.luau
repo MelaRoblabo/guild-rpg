@@ -13,6 +13,7 @@ local HttpService = game:GetService("HttpService")
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Migration = require("@game/ReplicatedStorage/Core/Migration")
+local Notify = require("@game/ReplicatedStorage/Core/Notify")
 local Config = require("./Config")
 local Deliveries = require("./Deliveries")
 local FriendCounter = require("./FriendCounter")
@@ -35,7 +36,7 @@ export type Session = {
 	busy: boolean, -- コマンド・時間経過の処理中
 	-- 紹介の届け物を書く処理（11章 §3.7、Referral）
 	referralBusy: boolean?, -- 書いている途中
-	referralRetryAt: number?, -- 書けなかったとき、次に試す時刻
+	referralRetryAt: number?, -- 書けなかったとき、次に試す時刻（箱がいっぱいなら math.huge：次のログインまで試さない。D-197）
 }
 
 local MSG_LOCKED =
@@ -211,6 +212,8 @@ local function loadPlayer(self: any, player: Player)
 	-- ここから session を登録するまで待ちを入れない（途中で退出・定期の advance が割り込まないように）
 	local ctx = self:ctx(false)
 	local offlineEvents = Game.advance(state, ctx)
+	-- ログインした時刻を記録する（「いつも遊ぶ時刻」＝直近7回の中央値：D-196、11章 §8.2）。ログイン1回につきここで1回だけ
+	Notify.recordLogin(state, ctx.now, self.master)
 
 	-- 届け物を受け取り箱へ（D-180）。入れたものの id だけを、保存できたあとで消す
 	local granted: { string } = {}

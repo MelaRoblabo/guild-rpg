@@ -302,7 +302,7 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 
 クエスト・ログインボーナス・プレイ時間の宝箱も特別な宝箱（D-171）。
 
-## 20. プレイ時間・ログインボーナス・フレンドボタン・紹介（D-154, D-155, D-157, D-190, D-192）
+## 20. プレイ時間・ログインボーナス・フレンドボタン・紹介（D-154, D-155, D-157, D-190, D-192, D-195）
 
 ```
 プレイ時間  ：playtime.seconds = min(seconds + オンラインの経過秒, playtimeDailyCapSeconds)。PlaytimeRewards の minutes × 60 に届いた段階の報酬を受け取り箱へ
@@ -315,8 +315,9 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
               friendCount はサーバーが数えて ctx.friendCount で渡す（M7b-5）。1 未満なら押せない（NO_FRIEND）
               1日に friendRewardDailyCap 回まで（friend.dayIndex が今日と違えば todayCount を 0 として数える）
 紹介        ：報酬はステータススロットチケット（referralRewards）。招待した側・された側とも、招待された人が進み具合の条件に届いたときに渡す（D-192）
-              進み具合 = Friend.referralProgressReached(state, master)：referralProgressCondition の kind = "rebirthedAdventurers" なら
-                         転生した冒険者（rebirthCount ≥ 1）の人数 ≥ count（仮：count = 1＝初転生）
+              進み具合 = Friend.referralProgressReached(state, master)：referralProgressCondition の kind = "rebirthsTotal" なら
+                         これまでに転生した回数の累計 stats.rebirths ≥ count（仮：count = 1＝初転生）                 -- D-195
+                         stats.rebirths は RebirthChoose（転生の確定）で +1。解雇しても戻らない（今いる冒険者の rebirthCount では数えない）
               招待された側は1回だけ（届く前は PROGRESS_NOT_REACHED）。招待した側は相手（UserId）1人ごと・週に referralWeeklyCap 人まで
               （referral.weekIndex が今週と違えば weekCount を 0 として数える）。週の上限を超えた届け物は翌週まで届け物の箱に残す。どちらも受け取り箱へ
 ```
@@ -349,3 +350,21 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 
 - 報酬のゴールドに固定額は置かない（rewards に `gold` を書くと検証で止める）。`rewardGoldBase` はダンジョンごとに1つ（全ダンジョン必須）。
 - 値（`rewardGoldBase`・各 `goldMult`・`friendRewardGoldMult`）は仮（M7b-6 の自動プレイで決める。D-154 の「1時間の収入の数%」に合わせる）。仮の `rewardGoldBase` は各ダンジョンの `battleReward.gold` に比例させ、古い墓地を 100 にした。
+
+## 23. ゲーム外の通知：いつも遊ぶ時刻・許可の画面（D-159, D-196）
+
+```
+ログインの記録 ：ログイン（サーバーの読み込み）のたびに loginTimes の末尾へ ctx.now − Calendar.dayStart(ctx.now)（UTC 0時からの秒）を足す
+                 notifyLoginHistoryCount（7）回を超えたら先頭（一番古いもの）を捨てる                               -- Notify.recordLogin
+いつも遊ぶ時刻 ：loginTimes を小さい順に並べた中央値。数が偶数なら真ん中の2つのうち小さいほう（平均はとらない）       -- Notify.usualTimeOfDay
+                 記録がなければ、今回ログインした時刻の位置で代わりにする（読み込みで必ず1回足すので、ふつうは起きない）
+送る時刻       ：いつも遊ぶ時刻のうち、退出から notifyMinAwaySeconds 以上あとの最初のもの（サーバーの NotificationPicker.sendAt）
+「得意」（③）  ：送る時刻の日の日替わりの特性が、自動再派遣にしているダンジョンに当たる                              -- D-196 ①
+許可の画面     ：promptDue = "firstReturn"  … stats.firstReturnAt があり（初めての帰還）、settings.notifyPrompt.firstReturn = false
+                             "loginDay2"    … firstReturn = true、loginDay2 = false、ログインボーナスの2日目を受け取り済み（login.cycle > 1 または login.day > 2）
+                             nil            … それ以外                                                               -- Notify.promptDue
+                 出したら MarkNotifyPrompt で記録する。firstReturn を記録したときに2日目をもう受け取っていたら loginDay2 も記録する（続けて2回出さない）
+```
+
+- 1日の中の位置は日の区切り（D-168。UTC 0時）から数える。0時をまたいで遊ぶ人（例：23時と1時）の中央値は、円として扱わずに数の並びで出す（Q 候補）。
+- 許可したかどうかはサーバーからは分からない。2日目に出すかは、クライアントが Roblox の `CanPromptOptInAsync` で確かめる（許可済み・13歳未満・最近出したなら出さずに記録だけ付ける）。

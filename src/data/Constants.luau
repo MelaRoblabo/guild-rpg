@@ -137,9 +137,13 @@ return {
 		invitee = { items = { itm_slot_ticket = 2 } }, -- 量は仮（M7b-6）。招待された側（1回だけ）
 		inviter = { items = { itm_slot_ticket = 2 } }, -- 量は仮（M7b-6）。招待した側（相手1人ごと）
 	},
-	-- 招待された人の進み具合の条件（D-192。Friend.referralProgressReached）。仮（M7b-6）
-	--   kind = "rebirthedAdventurers"：転生した冒険者（rebirthCount ≥ 1）が count 人以上（初転生：D-157 の例）
-	referralProgressCondition = { kind = "rebirthedAdventurers", count = 1 },
+	-- 招待された人の進み具合の条件（D-192, D-195。Friend.referralProgressReached）。仮（M7b-6）
+	--   kind = "rebirthsTotal"：これまでに転生した回数の累計（stats.rebirths。解雇で戻らない：D-195）が count 回以上
+	--   （count = 1 で初転生：D-157 の例）
+	referralProgressCondition = { kind = "rebirthsTotal", count = 1 },
+
+	-- ゲーム外の通知（D-196）：「いつも遊ぶ時刻」は直近 notifyLoginHistoryCount 回のログイン時刻（1日の中の位置）の中央値
+	notifyLoginHistoryCount = 7,
 
 	-- 見た目（D-050）
 	appearanceGenderWeights = {

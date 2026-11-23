@@ -52,7 +52,7 @@ src/（文字列 require のまま）──rojo serve / rojo build──▶ Robl
 - 乱数・探索ログの確定・購入の付与はサーバーのみ。
 - マスターデータはサーバー起動時に1回 `MasterData.load(Data)` する。検証に失敗したら、エラーを出力してプレイヤーを受け付けない（壊れたデータで遊ばせない）。
 - `ctx = { now = os.time(), master = master, online = true }`（08章）。
-- プレイヤーごとにサーバー内のセッションを持つ：`{ state, loadedAt, lastSavedAt, seq, lastView, commandTimes, busy }`。
+- プレイヤーごとにサーバー内のセッションを持つ：`{ state, loadedAt, lastSavedAt, seq, lastView, commandTimes, busy, referralBusy?, referralRetryAt? }`（`referralRetryAt` は紹介の届け物を次に書く時刻。箱がいっぱいなら `math.huge`＝次のログインまで書かない：§3.7、D-197）。
 - **時間経過**：コマンドの前に必ず `Game.advance` を呼ぶ（01章）。加えて、オンラインの全プレイヤーに `advanceIntervalSeconds`（仮：1秒）ごとに `Game.advance` を呼び、帰還・自動再派遣が起きたら状態を通知する（§4）。
 - **コマンドの ctx**：コマンドの処理では `PlayerSessions:ctxFor(session, true)` を使い、同じサーバーにいる友達の数を `ctx.friendCount` に入れる（§2.1。core の `ClaimFriendReward` が読む）。
 - **新規プレイヤーの seed**：`Game.newState(master, seed, now)` の `seed` は、サーバーが Roblox の `Random` で1回だけ作る（1〜2^31−1）。以後の乱数はすべて core の `Rng`（08章）。`Random` を使うのはここだけ。
@@ -94,6 +94,7 @@ DataStore を直接使い、セッションロックを自前で実装する。
 5. **留守番**：`Game.advance(state, { online = false })` を1回だけ呼ぶ（05章 §3、06章 §13・§14、D-161・D-172・D-186）。
    - 留守の始まりは core の `Game.offlineStart(state)`＝`max(lastSavedAt, lastAdvancedAt)`。ログアウト時に出ていた探索は帰還させ、自動再派遣のパーティは留守番の探索（時間×10、最大6時間、全員帰還して終わる）を続ける。6時間より前のログインなら、帰っていない留守番の探索はログインの時点までに進んだフロアの分だけ持ち帰る。休息ボーナスを貯める。
    - advance のあと `lastAdvancedAt = ログイン時刻` になるので、以後のオンラインの advance（§2）が留守を数え直すことはない。
+   - 続けて、ログインした時刻を core の `Notify.recordLogin(state, ログイン時刻, master)` で記録する（1日の中の位置。直近7回まで。ゲーム外の通知の「いつも遊ぶ時刻」：§8.3、D-196）。ログイン1回につき1回だけ。
 6. 受け取った届け物を受け取り箱へ入れる（§3.6）。
 7. セッションを作り、クライアントに状態を通知する（§4、`reason = "load"`。留守番の結果と届け物の events を含む）。5〜7 の間は待ちを入れない（退出や定期の advance が割り込まないように）。
 8. 届け物を受け取り箱へ入れたときは、すぐ保存してから届け物を消す（§3.6）。
@@ -156,19 +157,21 @@ DataStore を直接使い、セッションロックを自前で実装する。
 - 受け取り箱へ入れる処理は core の `Game.grantDelivery`（`GrantReferral`、role = "inviter"）。受け取れなかったもの（週の上限など）は箱に残し、翌週に受け取る（D-192）。前に受け取り済み（同じ id）なら消してよい。
 - 書き込むきっかけは §3.7。
 
-### 3.7 紹介の届け物を書くきっかけ（D-157・D-180・D-192、M7b-5）
+### 3.7 紹介の届け物を書くきっかけ（D-157・D-180・D-192・D-195・D-197、M7b-5）
 
 紹介の報酬は、招待した側・された側とも、**招待された人が一定の進み具合に届いたとき**に渡す（D-192。サブアカウントでの不正対策）。モジュール：`src/server/Referral.luau`。
 
-1. **招待した人の記録**：参加したときの `Player:GetJoinData().ReferredByPlayerId`（招待した人の UserId）。**新規のプレイヤー（初めての参加）のときだけ** `state.referral.referredBy` に入れる（03章。サーバーが入れる）。正の整数でない・自分自身なら入れない。読み込みの中（留守番の前）で行い、待ちを入れない。
-2. **進み具合の判定**：core の `Friend.referralProgressReached(state, master)`（条件はマスターデータの `referralProgressCondition`）。コマンドのあと・時間経過で何か起きたあと・読み込みのあとに `PlayerSessions:checkReferral(session)` で確かめる（待ちを入れない）。`referredBy` があり、まだ「届けた」印がなく、届いていたら、別の処理で次の 3 を行う。
+1. **招待した人の記録**：参加したときの `Player:GetJoinData().ReferredByPlayerId`（招待した人の UserId）。**新規のプレイヤー（初めての参加）のときだけ** `state.referral.referredBy` に入れる（03章。サーバーが入れる：D-195）。既存のプレイヤーが招待のリンクから入っても記録しない。正の整数でない・自分自身なら入れない。読み込みの中（留守番の前）で行い、待ちを入れない。
+2. **進み具合の判定**：core の `Friend.referralProgressReached(state, master)`（条件はマスターデータの `referralProgressCondition`。これまでに転生した回数の累計 `stats.rebirths` で数え、解雇で戻らない：D-195）。コマンドのあと・時間経過で何か起きたあと・読み込みのあとに `PlayerSessions:checkReferral(session)` で確かめる（待ちを入れない）。`referredBy` があり、まだ「届けた」印がなく、届いていたら、別の処理で次の 3 を行う。
 3. **届ける**：
    1. 招待した人の届け物の箱に書く（§3.6 の `push`。`id = "referral:<招待された人の UserId>"`、`kind = "referral"`、`fromUserId = 招待された人`）。招待した人のセーブ（他人のセーブ）には触れない。
    2. `"ok"`・`"duplicate"` なら、そのプレイヤーのコマンドの順番（`busy`）を取ってから、`Friend.markInviterDelivered` で「届けた」印を付け、`GrantReferral`（role = "invitee"、userId = 招待した人）を実行する。結果はクライアントに差分で知らせる（§4.2 の `reason = "server"`）。
-   3. `"error"`・`"full"` なら印を付けず、`referralRetrySeconds`（仮：60秒）たってから次の確認でもう一度書く。書いている間に退出したら印を付けない（次のログインでもう一度書く）。
+   3. `"error"`（書き込みの失敗）なら印を付けず、`referralRetrySeconds`（仮：60秒）たってから次の確認でもう一度書く。
+   4. `"full"`（招待した人の届け物の箱がいっぱい）なら印を付けず、そのセッションでは試し直さない（`referralRetryAt = math.huge`）。招待された人の次のログインでもう一度書く（D-197。60秒ごとに試し続けない）。
+   - 書いている間に退出したら印を付けない（次のログインでもう一度書く）。
 4. **二重にならない理由**：印は次の保存で書かれる。書く前に落ちたら、次のログインでもう一度届け物を書くが、同じ `id` なので、招待した人がまだ受け取っていなければ `"duplicate"`、受け取り済みなら core の `claimedDeliveries` が二重の受け取りを防ぐ。招待された人の報酬は `inviteeRewardDone` で1回だけ。
-- 他のプレイヤーの UserId（`referredBy`・`rewardedInvitees`・`claimedDeliveries`）はクライアントに送る要約から除く（D-192。core の `Protocol.view` で行う。M7b-5 では core を変えないので、まとめるときに確かめる）。
-- まとめるまで：`Friend.referralProgressReached` は担当X が core に作っている。それまでは `Referral.luau` の `progressReached` が常に false を返す（`TODO(merge)`）。
+- 他のプレイヤーの UserId（`referredBy`・`rewardedInvitees`・`claimedDeliveries`）はクライアントに送る要約から除く（D-192。core の `Protocol.view` で行う）。
+- 招待された側の報酬（`GrantReferral`、role = "invitee"）で招待した人がいるかは、サーバー専用のコマンドなのでサーバー（`Referral.luau`）が確かめる。core では確かめない（D-195）。
 
 ## 4. 通信（D-101、D-103）
 
@@ -247,7 +250,8 @@ patch = {
 
 `Protocol.view(state, master, now)` で作る（純粋な関数。Lune でテストする）。
 
-- 送らないもの：`seed`・`rngCounter`・各探索の `seed`（乱数の予測を防ぐ）、`nextUid`、`stats`（集計用）、`lastAdvancedAt`（時間経過のたびに変わるだけで表示に使わない。送ると差分が毎秒出る）。
+- 送らないもの：`seed`・`rngCounter`・各探索の `seed`（乱数の予測を防ぐ）、`nextUid`、`stats`（集計用）、`lastAdvancedAt`（時間経過のたびに変わるだけで表示に使わない。送ると差分が毎秒出る）、`loginTimes`（通知の時刻を決めるのにサーバーが使うだけ：D-196）。
+- 足すもの：`notifyPromptDue`（通知の許可の画面を今出すか。`"firstReturn"` / `"loginDay2"` / nil。core の `Game.query.notifyPromptDue`。初めての帰還は `stats` にあり送らないので、ここで判定して渡す：D-196）。
 - 宝箱（D-087・D-166）：`chests`（ランク別の数）の代わりに、宝箱の山ごとの数 `{ { pileKey, count } }`（特別な宝箱の山を含む。ランクなし）を送る。
 - 他のプレイヤーの UserId（D-192）：`referral` から `referredBy`・`rewardedInvitees`・`claimedDeliveries` を除く。event の `ReferralGranted` の `userId` も除く（`Protocol.redactEvents`）。
 - 探索ログ：宝箱のランクを取り除き、個数だけ残す（`Protocol.redactLog`）。`floors[].detail.ranks` → `detail.chestCount`、`rewards.chests` → `rewards.chestCount`、`clearChestRanks` → `clearChestCount`。
@@ -264,6 +268,7 @@ patch = {
 - 宝箱の一覧は、特別な宝箱を含むすべての山を「山の鍵×数」で出す（§4.5）。
 - `eventgo`・`buy` で時間帯を省いたら、送る前に今の時間帯（`Game.query.mapEvent(今, master).current.eventSlot`）で埋める（テキスト版と同じ）。
 - `notify`：通知の許可の画面を出す（§8.4。設定画面に置くものの仮）。
+- 要約が変わるたびに（表示の更新のたびに）`NotificationPrompt.onView(view, …)` を呼び、`notifyPromptDue` があれば許可の画面を出す（§8.4、D-196）。
 
 ## 6. マルチ表示（D-027、D-108、D-121。M8 で実装）
 
@@ -293,7 +298,7 @@ patch = {
 - Studio：Rojo で同期し、プレイテストで M2〜M5b の全コマンドをデバッグ画面から実行できる。退出→再参加で状態が戻る。参加時に留守番（D-161・D-172・D-186）の結果を受け取り、すぐ入り直しても（同じサーバー・別のサーバー）同じ留守を二重に受け取らない（§3.5）。
 - 二重ログイン：同じプレイヤーのロックが残っている間は、別サーバーで読み込まない（`SessionLock` のテストと、記録を手で書き換えた確認）。
 
-## 8. ゲーム外の通知（D-159・D-181、M7b-5）
+## 8. ゲーム外の通知（D-159・D-181・D-196、M7b-5）
 
 Roblox のエクスペリエンス通知で、遊んでいないプレイヤーを呼び戻す。**1人1日1通まで**、**その日に一番効く1つ**を、**その人がいつも遊ぶ時刻**に送る。届くのは **13歳以上で通知を許可した人だけ**（Roblox 側が判定する。サーバーから許可・年齢を確かめる API はない）。
 
@@ -315,21 +320,28 @@ Roblox のエクスペリエンス通知で、遊んでいないプレイヤー�
 | --- | --- | --- |
 | ① | `loginUnique` | 送る時刻の日に、次に受け取るのが7日目で、その周のユニークがいる（あと1日でログインボーナスのユニーク） |
 | ② | `offlineDone` | 退出時に出ていた探索があり、送る時刻が留守番の終わり（退出 + `offlineMaxSeconds`）以後。`count` は留守番で増える宝箱の数 |
-| ③ | `dailyTrait` | 送る時刻の日の日替わりの特性が、自動再派遣にしているダンジョンに当たる（「得意」の仮の解釈） |
+| ③ | `dailyTrait` | 送る時刻の日の日替わりの特性が、自動再派遣にしているダンジョンに当たる（「得意」：D-196 ①） |
 | ④ | `rebirthReady` | 留守番のあとで転生できる冒険者がいる。`count` はその人数 |
 | ⑤ | `dailyReset` | いつも（デイリー更新） |
 
 ### 8.3 いつ送るか（`src/server/Notifications.luau`）
 
 1. **予約**：退出したとき、送る時刻と種類を決めて MemoryStore の SortedMap（`notifyQueueName`）に置く。鍵 = UserId、並びの鍵 = 送る時刻、値 = `{ userId, kind, count?, sendAt }`。1人1つで、退出のたびに置き換える。寿命は送る時刻 + `notifyQueueExpirationSeconds`（仮：3日。上限45日）。
-   - 送る時刻：その人がいつも遊ぶ時刻（仮：今回ログインした時刻の、UTC の1日の中の位置）のうち、退出から `notifyMinAwaySeconds`（仮：6時間）以上あとの最初のもの。
+   - 送る時刻：その人がいつも遊ぶ時刻のうち、退出から `notifyMinAwaySeconds`（仮：6時間）以上あとの最初のもの（`NotificationPicker.sendAt`）。
+   - いつも遊ぶ時刻：セーブの `loginTimes`（直近 `notifyLoginHistoryCount`＝7回のログイン時刻の、UTC の1日の中の位置。読み込みのたびに記録：§3.2 の5）の中央値（core の `Notify.usualTimeOfDay`。06章 §23、D-196 ②）。記録がなければ今回ログインした時刻の位置で代わりにする（読み込みで必ず1回足すので、ふつうは起きない）。
 2. **取り消し**：参加したとき、予約を消す（遊んでいる人には送らない）。
 3. **送信**：どのサーバーも `notifyPollSeconds`（仮：30秒）ごとに、送る時刻が来た予約を `notifyBatch`（仮：20件）まで取り出す。送る前に MemoryStore の HashMap（`notifySentMapName`）の「最後に送った日」（Calendar の日の番号、D-168）を `UpdateAsync` で今日に書き換え、書き換えられた1台だけが送る（1人1日1通。2台が同時に取り出しても1通）。送れなかったときも今日の1通は使ったことにする。取り出した予約は消す。このサーバーで遊んでいる人には送らない。
 - 退出1回につき予約は1つなので、続けて何日も来ない人に毎日は送らない。
-- 同じプレイヤーがすぐ入り直したとき、退出時の予約が参加時の取り消しより後に書かれることがある（別サーバーで遊んでいる間に送られうる）。気になるようなら、送る前に予約の時刻とその人の最後の参加時刻を比べる（今はしていない）。
+- 同じプレイヤーがすぐ入り直したとき、退出時の予約が参加時の取り消しより後に書かれることがある（別サーバーで遊んでいる間に送られうる）。まれなので受け入れる（D-196 ⑤）。
+- 送る時刻に Roblox のサーバーが1台も動いていなければ送られない。今は受け入れる（D-196 ④。外部の定期実行は M9 で検討）。
 - 公開していないプレイス（`game.GameId == 0`）では送らない。`notifyEnabled = false` なら予約も送信もしない。
 
-### 8.4 許可を求める画面（D-159・D-181）
+### 8.4 許可を求める画面（D-159・D-181・D-196）
 
 - `ExperienceNotificationService:CanPromptOptInAsync()`・`PromptOptIn()`・`OptInPromptClosed` は**クライアント専用**なので、クライアントの `src/client/NotificationPrompt.luau` から出す（サーバーを通さない）。`canPrompt()` が false（13歳未満・出したばかりなど）なら出さない。
-- 設定画面（S-61、D-181）と「嬉しい瞬間」（D-159）の両方から `NotificationPrompt.prompt()` を呼ぶ。M8 の画面はまだないので、今はデバッグ画面の `notify` コマンドから呼ぶ。
+- 出すとき（D-196 ③）：**初めての帰還**。そこで許可しなかったら**ログインボーナス2日目**にもう一度。
+  - サーバーは状態の要約の `notifyPromptDue`（§4.5。core の `Notify.promptDue`）で知らせる：`"firstReturn"`＝初めての帰還（`stats.firstReturnAt`）のあとでまだ出していない、`"loginDay2"`＝firstReturn で出したあと、ログインボーナスの2日目を受け取っていてまだ出していない（06章 §23）。
+  - クライアントは `NotificationPrompt.onView` で、出す機会なら `prompt()` を呼び、出したあと（出せなかったときも）`MarkNotifyPrompt`（stage）を送って記録を `settings.notifyPrompt` に保存する（設定と一緒にサーバーへ：D-117）。送れなかったら次の要約の変化でもう一度試す。同じ機会で2回出さないよう、記録が要約に届くまで処理中の機会を覚えておく。
+  - 許可したかどうかはサーバーからは分からないので、2日目は `canPrompt()`（許可済み・13歳未満・最近出したなら false）で確かめ、false なら出さずに記録だけ付ける。
+  - 初めての帰還のときに2日目をもう受け取っていたら（帰還より前に2日ログインした）、2日目の機会は過ぎたものとして一緒に記録する（続けて2回出さない）。
+- 設定画面（S-61、D-181）からも `NotificationPrompt.prompt()` を呼ぶ。M8 の画面はまだないので、今はデバッグ画面の `notify` コマンドから呼ぶ。

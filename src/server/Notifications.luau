@@ -61,7 +61,9 @@ function Notifications.schedule(self: any, session: any)
 		return
 	end
 	local now = os.time()
-	local sendAt = NotificationPicker.sendAt(session.loadedAt, now, Config.notifyMinAwaySeconds)
+	-- いつも遊ぶ時刻＝直近のログイン時刻の中央値（D-196。ログインのたびに PlayerSessions が記録する）
+	local timeOfDay = NotificationPicker.usualTimeOfDay(session.state, session.loadedAt)
+	local sendAt = NotificationPicker.sendAt(timeOfDay, now, Config.notifyMinAwaySeconds)
 	local okPick, pickOrErr = pcall(NotificationPicker.pick, session.state, self.master, now, sendAt, enabled)
 	if not okPick then
 		warn(`[Notifications] 通知の候補を選べなかった（{session.userId}）：{pickOrErr}`)

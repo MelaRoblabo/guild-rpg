@@ -1,13 +1,14 @@
 --!strict
--- 紹介の届け物を書くきっかけ（D-157・D-180・D-192、11章 §3.7）
+-- 紹介の届け物を書くきっかけ（D-157・D-180・D-192・D-195・D-197、11章 §3.7）
 --
 -- 1. 招待した人：参加したときの Player:GetJoinData().ReferredByPlayerId。新規のプレイヤー（初めての参加）のときだけ
---    state.referral.referredBy に入れる（03章。サーバーが入れる）。
--- 2. 招待された人が一定の進み具合に届いたら（Friend.referralProgressReached。core が判定する）、
+--    state.referral.referredBy に入れる（03章。サーバーが入れる：D-195）。既存のプレイヤーが招待のリンクから入っても記録しない。
+-- 2. 招待された人が一定の進み具合（転生回数の累計：D-195）に届いたら（Friend.referralProgressReached。core が判定する）、
 --    a. 招待した人の届け物の箱に書く（Deliveries.push。id = "referral:<招待された人の UserId>"）。
 --    b. 書けたら（"ok"・"duplicate"）、招待された人のセーブに「届けた」印（Friend.markInviterDelivered）を付け、
 --       招待された人の報酬 GrantReferral（role = "invitee"）を実行する。
---    書けなかったら（"error"・"full"）印を付けず、Config.referralRetrySeconds 後にもう一度試す。
+--    書けなかったら印を付けない。"error" なら Config.referralRetrySeconds 後にもう一度試す。
+--    "full"（招待した人の箱がいっぱい）なら、そのセッションでは試し直さず、招待された人の次のログインで試す（D-197）。
 -- 3. 印は次の保存で書かれる。書く前に落ちたら、次のログインでもう一度届け物を書く。同じ id なので、
 --    招待した人がまだ受け取っていなければ "duplicate"、受け取り済みなら core の claimedDeliveries が二重の受け取りを防ぐ。
 --    招待された人の報酬は inviteeRewardDone で1回だけ。
@@ -86,7 +87,13 @@ function Referral.deliver(session: any, hooks: Hooks)
 	local status = hooks.deliveries:push(inviter, id, "referral", session.userId)
 	if status ~= "ok" and status ~= "duplicate" then
 		warn(`[Referral] 届け物を書けなかった（{session.userId} → {inviter}、{status}）`)
-		session.referralRetryAt = os.time() + Config.referralRetrySeconds
+		if status == "full" then
+			-- 招待した人の箱がいっぱい：このセッションでは試し直さず、次のログインでもう一度試す（D-197）
+			session.referralRetryAt = math.huge
+		else
+			-- 書き込みの失敗（error）：少し待って試し直す
+			session.referralRetryAt = os.time() + Config.referralRetrySeconds
+		end
 		session.referralBusy = false
 		return
 	end

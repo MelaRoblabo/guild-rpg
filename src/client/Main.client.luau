@@ -116,9 +116,27 @@ local function now(): number
 	return math.floor(workspace:GetServerTimeNow())
 end
 
+-- 通知の許可の画面を出した記録を送る（D-196。NotificationPrompt.onView から呼ぶ）
+local function sendCommand(command: any): any?
+	local ok, r = pcall(function()
+		return commandRemote:InvokeServer(command)
+	end)
+	return if ok then r else nil
+end
+
+local function onPromptResult(stage: string, shown: boolean)
+	log(
+		`通知の許可の画面（{stage}）：{if shown
+			then "出した"
+			else "出せない（許可済み・13歳未満・出したばかりなど）"}`
+	)
+end
+
 local function render()
 	if view then
 		stateLabel.Text = DebugView.render(view, master, now())
+		-- 初めての帰還・ログインボーナス2日目に通知の許可の画面を出す（D-196 ③）
+		NotificationPrompt.onView(view, sendCommand, onPromptResult)
 	else
 		stateLabel.Text = "読み込み中…"
 	end

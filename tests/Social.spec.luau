@@ -534,15 +534,9 @@ return function(t)
 		)
 	end)
 
-	-- 招待された人を進み具合（referralProgressCondition：転生した冒険者が count 人以上）に届かせる（D-192）
+	-- 招待された人を進み具合（referralProgressCondition：転生回数の累計が count 回以上）に届かせる（D-192, D-195）
 	local function reachProgress(s: any)
-		local n = 0
-		for _, uid in s.parties[1].slots do
-			if n < K.referralProgressCondition.count then
-				s.adventurers[uid].rebirthCount = 1
-				n += 1
-			end
-		end
+		s.stats.rebirths = K.referralProgressCondition.count
 	end
 
 	describe("紹介（D-157, D-180）", function()
@@ -608,23 +602,25 @@ return function(t)
 			end
 		)
 		it(
-			"D-192 Friend.referralProgressReached：転生した冒険者が referralProgressCondition.count 人以上で届く",
+			"D-192 D-195 Friend.referralProgressReached：転生回数の累計が referralProgressCondition.count 回以上で届く",
 			function()
-				expect(K.referralProgressCondition.kind).toBe("rebirthedAdventurers")
+				expect(K.referralProgressCondition.kind).toBe("rebirthsTotal")
 				local s = newState()
 				expect(Friend.referralProgressReached(s, master)).toBe(false)
 				s.adventurers[s.parties[1].slots[1]].level = 20 -- レベルだけでは届かない
 				expect(Friend.referralProgressReached(s, master)).toBe(false)
 				reachProgress(s)
 				expect(Friend.referralProgressReached(s, master)).toBe(true)
-				-- 人数の条件はマスターデータで変えられる
+				-- 回数の条件はマスターデータで変えられる。今いる冒険者の rebirthCount では数えない（D-195）
 				local m2 = Fixtures.master(function(d)
-					d.Constants.referralProgressCondition = { kind = "rebirthedAdventurers", count = 2 }
+					d.Constants.referralProgressCondition = { kind = "rebirthsTotal", count = 2 }
 				end)
 				local s2 = newState(1, m2)
 				s2.adventurers[s2.parties[1].slots[1]].rebirthCount = 3
 				expect(Friend.referralProgressReached(s2, m2)).toBe(false)
-				s2.adventurers[s2.parties[1].slots[2]].rebirthCount = 1
+				s2.stats.rebirths = 1
+				expect(Friend.referralProgressReached(s2, m2)).toBe(false)
+				s2.stats.rebirths = 2
 				expect(Friend.referralProgressReached(s2, m2)).toBe(true)
 				-- 状態は変えない
 				local before = Game._deepClone(s)
@@ -660,7 +656,7 @@ return function(t)
 			)).toBeTruthy()
 			expect(has(
 				errorsOf(function(d)
-					d.Constants.referralProgressCondition = { kind = "rebirthedAdventurers", count = 0 }
+					d.Constants.referralProgressCondition = { kind = "rebirthsTotal", count = 0 }
 				end),
 				"Constants.referralProgressCondition.count"
 			)).toBeTruthy()

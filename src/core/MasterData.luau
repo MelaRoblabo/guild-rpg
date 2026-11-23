@@ -158,8 +158,8 @@ end
 
 -- 各データの検証 ----------------------------------------------------------
 
--- 紹介の進み具合の条件の種類（D-192。Friend.referralProgressReached が判定する）
-local REFERRAL_PROGRESS_KINDS = { rebirthedAdventurers = true }
+-- 紹介の進み具合の条件の種類（D-192, D-195。Friend.referralProgressReached が判定する）
+local REFERRAL_PROGRESS_KINDS = { rebirthsTotal = true }
 
 local function validateConstants(c: Checker, k: any, nRarity: number)
 	local p = "Constants"
@@ -311,6 +311,8 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 		end
 		c:integer(p .. ".referralProgressCondition.count", rpc.count, 1)
 	end
+	-- ゲーム外の通知（D-196）
+	c:integer(p .. ".notifyLoginHistoryCount", k.notifyLoginHistoryCount, 1)
 
 	-- 見た目
 	c:weights(p .. ".appearanceGenderWeights", k.appearanceGenderWeights, "weight", true)

@@ -130,10 +130,18 @@ export type PlayerState = {
 	hireSession: HireSession?,
 	rebirthSession: RebirthSession?,
 	appearanceSession: { adventurerUid: string, previousId: string, currentId: string }?, -- 見た目変更ポーションの選択中
-	settings: { autoSell: { enabled: boolean, maxRarity: number, keepModified: boolean } },
-	                                  -- 新規の初期値は enabled = true・maxRarity = 2（コモン・アンコモン）・keepModified = true（D-167）
-	                                  -- 商人で買った装備は自動売却しない（D-152。自動売却は開封時だけに働くので当たらない）
-	stats: { [string]: number },      -- 集計用カウンタ（指標・実績）
+	settings: {
+		autoSell: { enabled: boolean, maxRarity: number, keepModified: boolean },
+		                              -- 新規の初期値は enabled = true・maxRarity = 2（コモン・アンコモン）・keepModified = true（D-167）
+		                              -- 商人で買った装備は自動売却しない（D-152。自動売却は開封時だけに働くので当たらない）
+		notifyPrompt: { firstReturn: boolean, loginDay2: boolean },
+		                              -- 通知の許可の画面を出した記録（D-196 ③。設定と一緒にサーバーへ保存：D-117）。version 11
+		                              -- firstReturn：初めての帰還で出した / loginDay2：ログインボーナス2日目で出した。MarkNotifyPrompt で付ける
+	},
+	stats: { [string]: number },      -- 集計用カウンタ（指標・実績）。クライアントには送らない
+	                                  -- stats.rebirths：これまでに転生した回数の累計（RebirthChoose で +1。解雇で戻らない）。
+	                                  --   紹介の進み具合はこれで数える（D-195）。version 11 で旧版の値を補う（下の移行）
+	                                  -- stats.firstReturnAt：初めて探索が帰還した時刻（通知の許可の画面のきっかけ：D-196）
 	lastAdvancedAt: number,
 	itemLog: { ItemLogEntry },        -- 有料・無料の入手経路の記録（10章。直近N件）
 
@@ -160,8 +168,8 @@ export type PlayerState = {
 		dayIndex: number, todayCount: number,  -- 1日の上限の数え方
 	},
 	referral: {                       -- 紹介（D-157, D-192）。version 9。他のプレイヤーの UserId を含む referredBy・rewardedInvitees・claimedDeliveries は Protocol.view で除く（D-192）
-		referredBy: number?,          -- 招待した人の UserId（ReferredByPlayerId。サーバーが入れる）
-		inviteeRewardDone: boolean,   -- 招待された側の報酬を渡したか（1回だけ。Friend.referralProgressReached に届いてから：D-192）
+		referredBy: number?,          -- 招待した人の UserId（ReferredByPlayerId。新規のプレイヤー（初めての参加）のときだけサーバーが入れる：D-195）
+		inviteeRewardDone: boolean,   -- 招待された側の報酬を渡したか（1回だけ。Friend.referralProgressReached（転生回数の累計：D-195）に届いてから：D-192）
 		inviterDelivered: boolean,    -- 招待された側：招待した人へ届け物を書いたか（同じ招待で2回届けない。読み書きは Friend.inviterDelivered / markInviterDelivered。
 		                              --   書くきっかけ：サーバーが Friend.referralProgressReached を見て判定する（D-192））
 		rewardedInvitees: { [string]: boolean },  -- 招待した側：報酬を渡した相手の UserId（文字列キー）
@@ -174,6 +182,8 @@ export type PlayerState = {
 	                                  -- hp は最初に出発したときに決める。parties は出発したパーティ（1パーティ1回まで）、arrived は到着した数（宝箱の数に使う：D-179）
 	rareDungeonSlots: { [string]: number }?,  -- レアダンジョンに出発したパーティ（partyIndex → eventSlot。1パーティ1回まで：D-152）。version 10
 	inbox: { InboxEntry },            -- 受け取り箱（D-164）。version 8
+	loginTimes: { number },           -- 直近のログイン時刻（1日の中の位置・秒。UTC 0時から）。古い順に notifyLoginHistoryCount（7）回まで（D-196）。version 11
+	                                  -- サーバーがログイン（読み込み）のたびに Notify.recordLogin で足す。中央値が「いつも遊ぶ時刻」（06章 §23）。クライアントには送らない
 }
 ```
 
@@ -245,8 +255,18 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 | `equipment[*]` | `fromMerchant` は nil | D-175 |
 | `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 |
 
-### version 10 → 11 以降（M7b-5 以降の各段階）
+### version 10 → 11（M7b-5 の決定 D-195・D-196 の反映）　`Migration.CURRENT = 11`
 
-M7b-4 までに予定していた項目（フレンド・紹介・専用ギフト、マップイベント・旅の商人）はすべて足した（上の v8 → 9・v9 → 10）。まだ足していない項目は今はない。次の段階で状態を足すときは、ここに表（項目・旧版からの変換・根拠・足す段階）を作ってから version を上げ、足した段階でこの表を「version n → n+1」の節に移す。
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `stats.rebirths` | 今いる冒険者の `rebirthCount` の合計を下限にする（`max(今の stats.rebirths, 合計)`。すでに数えている累計のほうが大きければそのまま＝解雇した冒険者の分を失わない） | D-195 |
+| `loginTimes` | 空（次のログインからサーバーが足す） | D-196 |
+| `settings.notifyPrompt` | `firstReturn = false, loginDay2 = false`（まだ出していない） | D-196, D-117 |
+
+新規のセーブも同じ初期値を持つ（`Game.newState`。`stats.rebirths` は最初の転生で 1 になる）。
+
+### version 11 → 12 以降
+
+まだ足していない項目は今はない。次の段階で状態を足すときは、ここに表（項目・旧版からの変換・根拠・足す段階）を作ってから version を上げ、足した段階でこの表を「version n → n+1」の節に移す。
 
 新規のセーブ（`Game.newState`）は、その時点の version で足した項目を初期値で持ち、`settings.autoSell` は StarterSet の D-167 の初期値（オン）にする。

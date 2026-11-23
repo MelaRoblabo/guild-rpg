@@ -64,6 +64,7 @@ Protocol.CLIENT_COMMANDS = {
 	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）
 	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
 	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179
+	MarkNotifyPrompt = { stage = enum({ "firstReturn", "loginDay2" }) }, -- D-196。通知の許可の画面を出した記録
 } :: { [string]: { [string]: Field } }
 
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）
@@ -188,7 +189,9 @@ Protocol.deepEqual = deepEqual
 -- 隠す情報（11章 §4.5、D-087） -----------------------------------------------
 
 -- lastAdvancedAt は時間経過のたびに変わるだけで表示に使わないので送らない（差分が毎秒出るのを防ぐ）
-local HIDDEN_STATE_KEYS = { seed = true, rngCounter = true, nextUid = true, stats = true, lastAdvancedAt = true }
+-- loginTimes（直近のログイン時刻：D-196）はサーバーが通知の時刻を決めるのに使うだけなので送らない
+local HIDDEN_STATE_KEYS =
+	{ seed = true, rngCounter = true, nextUid = true, stats = true, lastAdvancedAt = true, loginTimes = true }
 
 -- 探索ログから宝箱のランクを除き、個数だけ残す
 function Protocol.redactLog(log: any): any
@@ -260,6 +263,8 @@ function Protocol.view(state: any, master: any): any
 	v.chests = Game.query.chestsByPile(state, master)
 	-- 受け取り箱の宝箱はランクを隠し、山ごとの数だけにする（D-087, D-164）
 	v.inbox = Game.query.inbox(state)
+	-- 通知の許可の画面を今出すか（D-196。"firstReturn" / "loginDay2" / nil）。初めての帰還は stats にあり送らないので、ここで判定して渡す
+	v.notifyPromptDue = Game.query.notifyPromptDue(state)
 	for _, e in v.expeditions or {} do
 		e.seed = nil
 		e.log = Protocol.redactLog(e.log)
