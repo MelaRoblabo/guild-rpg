@@ -564,6 +564,48 @@ return function(t)
 				end
 			end
 		)
+		it(
+			"D-202 品は踏破した一番深いダンジョンとその1つ浅いダンジョンから引く（踏破が1つならそれ、未踏破なら古い墓地）",
+			function()
+				local list = master.dungeonList
+				local slot = MapEvent.slotOf(T0, K)
+				-- 未踏破：古い墓地だけ
+				local s0 = newState(3)
+				expect(Merchant.currentDungeonIds(s0, master)).toEqual({ list[1].id })
+				-- 踏破が1つ：そのダンジョンだけ
+				local s1 = newState(3)
+				clearUpTo(s1, 1)
+				expect(Merchant.currentDungeonIds(s1, master)).toEqual({ list[1].id })
+				-- 6つ踏破：5番目と6番目だけ（並び順）
+				local s6 = newState(3)
+				clearUpTo(s6, 6)
+				expect(K.merchantDungeonCount).toBe(2)
+				expect(Merchant.currentDungeonIds(s6, master)).toEqual({ list[5].id, list[6].id })
+				local seen = {}
+				for i = 0, 80 do
+					for _, g in Merchant.goods(s6, slot + i, master) do
+						seen[g.dungeonId] = true
+						expect(g.dungeonId == list[5].id or g.dungeonId == list[6].id).toBe(true)
+						expect(g.item.rarity > 1).toBe(true) -- コモンは出ない（D-189）
+					end
+				end
+				expect(seen[list[5].id] and seen[list[6].id]).toBe(true) -- どちらからも出る
+				-- 飛び飛びに踏破していても、踏破済みの深い方から2つ
+				local sg = newState(3)
+				sg.clearedDungeons[list[1].id] = true
+				sg.clearedDungeons[list[3].id] = true
+				sg.clearedDungeons[list[7].id] = true
+				expect(Merchant.currentDungeonIds(sg, master)).toEqual({ list[3].id, list[7].id })
+			end
+		)
+		it("D-202 merchantDungeonCount は1以上の整数（検証）", function()
+			local ok = pcall(function()
+				Fixtures.master(function(d)
+					d.Constants.merchantDungeonCount = 0
+				end)
+			end)
+			expect(ok).toBe(false)
+		end)
 		it("D-152 価格は売却額 × merchantPriceMult、グレード・修飾語で上がる", function()
 			local item = { baseId = "eq_wpn_sword", rarity = 2, grade = 2, itemLevel = 3 }
 			local sell = Inventory.equipmentSellPrice(item, master)

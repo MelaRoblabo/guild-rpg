@@ -2,7 +2,8 @@
 -- 旅の商人（D-152, D-167, D-179, D-187, D-189、docs/system/06_formulas.md §12）
 --   品ぞろえはプレイヤーごと：Rng.new(Rng.derive(state.seed, eventSlot)) から作る（rngCounter は進めない。保存しない）
 --   品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで：
---     品ごとに、候補のダンジョン（踏破済み。まだどこも踏破していなければ古い墓地：D-187）から等確率で1つ選び、
+--     品ごとに、候補のダンジョン（踏破済みのうち深い方から merchantDungeonCount 個＝一番深いダンジョンとその1つ浅いダンジョン：D-202。
+--     まだどこも踏破していなければ古い墓地：D-187）から等確率で1つ選び、
 --     そのダンジョンの宝箱のレアリティの表からコモンを除いた表（Merchant.rarityTable。コモンしかない表ならコモン：D-189）で
 --     レアリティを引き、宝箱の中身と同じ抽選で装備を作る（Chest.rollEquipment）
 --   候補のダンジョンは、その時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに
@@ -15,16 +16,34 @@ local Rng = require("./Rng")
 
 local Merchant = {}
 
--- 今の踏破済みのダンジョン（並び順）。なければ並びの先頭（古い墓地：D-187）だけ
+-- 今の候補のダンジョン（D-202）：踏破済みのうち深い方から merchantDungeonCount 個（tier の大きい順。同じ tier は並びの先）。
+-- 返す順は並び順。踏破がその数より少なければ踏破済みの全部、なければ並びの先頭（古い墓地：D-187）だけ
 function Merchant.currentDungeonIds(state: any, master: any): { string }
-	local ids = {}
-	for _, d in master.dungeonList do
+	local cleared = {}
+	for i, d in master.dungeonList do
 		if state.clearedDungeons[d.id] then
-			table.insert(ids, d.id)
+			table.insert(cleared, { d = d, i = i })
 		end
 	end
-	if #ids == 0 then
-		table.insert(ids, master.dungeonList[1].id)
+	if #cleared == 0 then
+		return { master.dungeonList[1].id }
+	end
+	table.sort(cleared, function(a, b)
+		if a.d.tier ~= b.d.tier then
+			return a.d.tier > b.d.tier
+		end
+		return a.i < b.i
+	end)
+	local picked = {}
+	for k = 1, math.min(master.K.merchantDungeonCount, #cleared) do
+		table.insert(picked, cleared[k])
+	end
+	table.sort(picked, function(a, b)
+		return a.i < b.i
+	end)
+	local ids = {}
+	for _, e in picked do
+		table.insert(ids, e.d.id)
 	end
 	return ids
 end

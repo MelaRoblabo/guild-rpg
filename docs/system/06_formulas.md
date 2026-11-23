@@ -142,7 +142,7 @@ weekIndex(now) = floor((dayIndex(now) + 3) / 7)      -- 週の始まり＝月曜
 次の日の区切りの時刻 = (dayIndex(now) + 1) × 86400   -- 画面の残り時間・「明日の日替わり」の表示用
 ```
 
-## 12. マップイベントの時間帯・旅の商人（D-152, D-187, D-189）
+## 12. マップイベントの時間帯・旅の商人（D-152, D-187, D-189, D-202）
 
 ```
 eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごとに1つ
@@ -150,7 +150,10 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
 予告         ：次の時間帯の始まりの mapEventNoticeSeconds 前から
 種類・場所   ：Rng.new(Rng.derive(calendarSeed, eventSlot)) で mapEventKindWeights → 場所の一覧（等確率）の順に抽選   -- 全員共通
 中身         ：Rng.new(Rng.derive(state.seed, eventSlot)) で抽選（ボスのHP・商人の品）              -- プレイヤーごと。rngCounter は進めない
-商人の品     ：品の数 = rng:int(merchantItemCount.min, max)。品ごとに 候補のダンジョン（踏破済み。まだどこも踏破していなければ古い墓地：D-187）から等確率で1つ
+商人の品     ：品の数 = rng:int(merchantItemCount.min, max)。品ごとに 候補のダンジョンから等確率で1つ                        -- D-202
+              候補のダンジョン = 踏破済みのダンジョンのうち深い方から2つ（tier の大きい順。同じ tier は並びの先）
+                                 ＝踏破した一番深いダンジョンとその1つ浅いダンジョン
+                                 踏破が1つならそのダンジョンだけ、まだどこも踏破していなければ古い墓地だけ（D-187）
               → そのダンジョンの chestRarityWeights からコモン（rank 1）を除いた表でレアリティ（コモンしかない表ならコモン：D-189）
               → 宝箱の中身と同じ装備の抽選（アイテムレベル＝そのダンジョンの tier。宝箱で出る範囲は超えない）
               候補のダンジョンはその時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに踏破が進んでも品ぞろえを変えない）
