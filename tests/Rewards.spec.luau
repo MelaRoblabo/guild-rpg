@@ -630,7 +630,10 @@ return function(t)
 				local entry = s.inbox[#s.inbox]
 				expect(entry.rewards.uniqueId).toBe(nil)
 				expect(entry.rewards.items).toEqual(master.loginBonus.fallback.items)
-				expect(entry.rewards.chests).toEqual({ { pileKey = "special:login", rank = 3, count = 1 } })
+				local fb = master.loginBonus.fallback.chests[1]
+				expect(fb.pileKey).toBe("special:login")
+				expect(fb.rank).toBe(3) -- レアな宝箱（D-155）
+				expect(entry.rewards.chests).toEqual({ { pileKey = "special:login", rank = 3, count = fb.count } })
 				-- ログイン用のユニークが2人いれば、1周目は1人目、2周目は2人目、3周目は一巡した後なので fallback
 				local m = masterWithLoginUniques(2)
 				local s2 = newState(1, m)
