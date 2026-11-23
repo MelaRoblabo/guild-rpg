@@ -742,25 +742,17 @@ handlers.OpenChests = function(state, cmd, ctx)
 	return { ok = true, events = events }
 end
 
--- 一括売却（05章 BulkSell、06章 §17、D-167, D-175）：開封結果に出た装備のうち「今の装備より弱い」ものを全部売る
+-- 一括売却（05章 BulkSell、06章 §17、D-167, D-175, D-207）：開封結果に出た装備のうち「今の装備より弱い」ものを全部売る
+-- 修飾語つきも弱ければ売る（D-207）。確認は出さない（数と合計額は Game.query.bulkSellPreview）
+-- 倉庫からの一括売却（D-120、確認あり）はこのコマンドではなく Sell で売る
 -- もう無い品（売った・自動売却された）は飛ばす
 handlers.BulkSell = function(state, cmd, ctx)
 	local master = ctx.master
-	local targets = {}
-	local seen = {}
-	for _, uid in cmd.equipmentUids or {} do
-		local e = state.equipment[uid]
-		if e and not seen[uid] and Inventory.isWeakForBulkSell(state, e, master) then
-			seen[uid] = true
-			table.insert(targets, uid)
-		end
-	end
+	local targets, total = Inventory.bulkSellTargets(state, cmd.equipmentUids or {}, master)
 	if #targets == 0 then
 		return fail("NOTHING_TO_SELL")
 	end
-	local total = 0
 	for _, uid in targets do
-		total += Inventory.equipmentSellPrice(state.equipment[uid], master)
 		state.equipment[uid] = nil
 	end
 	state.gold += total
@@ -1591,6 +1583,12 @@ end
 
 function Game.query.sellPrice(item: any, master: any): number
 	return Inventory.equipmentSellPrice(item, master)
+end
+
+-- 開封結果からの一括売却のボタンに出す、売る数と合計額（06章 §17、D-207）。BulkSell と同じ判定
+function Game.query.bulkSellPreview(state: any, equipmentUids: { string }, master: any): any
+	local targets, gold = Inventory.bulkSellTargets(state, equipmentUids, master)
+	return { count = #targets, gold = gold, equipmentUids = targets }
 end
 
 -- 未開封の宝箱：普通のダンジョンの山ごとの数（プレイヤーに見せてよいのはこれだけ：D-087）

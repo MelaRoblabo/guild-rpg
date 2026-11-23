@@ -30,7 +30,7 @@ lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   
 | `days <日数>` | 仮想時計を日単位で進める（ツール用。D-168） |
 | `logout` / `login` | ログアウト（lastSavedAt を書く）／ログイン（留守番と休息ボーナスの計算：D-161） |
 | `open <山> [個数]` | OpenChests（まとめ開き：D-089。山は dungeonId か `special:<種類>`：D-166） |
-| `sellweak [eq_uid...]` | BulkSell（直前の開封結果から「今の装備より弱い」を一括売却：D-167。uid を書けばその装備が対象。直前の開封結果はテキスト版のセーブに覚える） |
+| `sellweak [eq_uid...]` | BulkSell（直前の開封結果から「今の装備より弱い」を一括売却：D-167。修飾語つきも弱ければ売る：D-207。uid を書けばその装備が対象。直前の開封結果はテキスト版のセーブに覚える） |
 | `inbox` / `claim` | 受け取り箱の中身／ClaimInbox（D-164） |
 | `quests` | 今日・今週のクエストと進み具合（D-153） |
 | `calendar` | ログインボーナスのカレンダー・今日のプレイ時間・休息ボーナスの残り（D-154, D-155, D-161） |

@@ -101,11 +101,12 @@ function Inventory.unequip(state: any, adv: any, slot: string): string?
 	return nil
 end
 
--- 06章 §17：一括売却で売る装備か（D-167, D-175）
+-- 06章 §17：開封結果からの一括売却で売る装備か（D-167, D-175, D-207）
 -- 「弱い」＝その枠（武器・防具）で付けられる冒険者が1人以上いて、全員がその枠に装備していて、
--- 全員の今の装備より比べる値が低い。修飾語つき・保護中・装備中・商人で買ったもの・補助は売らない
+-- 全員の今の装備より比べる値が低い。修飾語つきも弱ければ売る（D-207）。
+-- 保護中・装備中・商人で買ったもの・補助は売らない
 function Inventory.isWeakForBulkSell(state: any, item: any, master: any): boolean
-	if item.modifierId ~= nil or item.locked or item.equippedBy ~= nil or item.fromMerchant then
+	if item.locked or item.equippedBy ~= nil or item.fromMerchant then
 		return false
 	end
 	local value = Formulas.bulkSellValue(item, master)
@@ -129,6 +130,23 @@ function Inventory.isWeakForBulkSell(state: any, item: any, master: any): boolea
 		end
 	end
 	return wearers > 0
+end
+
+-- 06章 §17：開封結果の uid のうち一括売却で売るもの（D-207）。BulkSell と bulkSellPreview が同じ判定を使う
+-- もう無い品（売った・自動売却された）と重複は飛ばす。並びは渡された順
+function Inventory.bulkSellTargets(state: any, equipmentUids: { string }, master: any): ({ string }, number)
+	local targets = {}
+	local seen = {}
+	local gold = 0
+	for _, uid in equipmentUids do
+		local e = state.equipment[uid]
+		if e and not seen[uid] and Inventory.isWeakForBulkSell(state, e, master) then
+			seen[uid] = true
+			table.insert(targets, uid)
+			gold += Inventory.equipmentSellPrice(e, master)
+		end
+	end
+	return targets, gold
 end
 
 -- 06章 §6：売却価格

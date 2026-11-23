@@ -101,7 +101,7 @@ end
 Policy.itemScore = itemScore
 
 -- 開けられる宝箱の山を、まとめ開き（D-089）で開けられるだけ開ける
--- 1回のまとめ開きのあとに、出た装備のうち「今の装備より弱い」ものを一括売却する（D-167, D-175）
+-- 1回のまとめ開きのあとに、出た装備のうち「今の装備より弱い」ものを一括売却する（D-167, D-175。修飾語つきも：D-207）
 local function openAll(state: any, ctx: Ctx)
 	for _, c in Game.query.chestsByPile(state, ctx.master) do
 		for _ = 1, 1000 do

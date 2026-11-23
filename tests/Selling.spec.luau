@@ -1,5 +1,5 @@
 --!strict
--- 自動売却の初期値・売却用アイテムの自動売却・一括売却（D-167, D-175、06章 §17）
+-- 自動売却の初期値・売却用アイテムの自動売却・一括売却（D-167, D-175, D-207、06章 §17）
 local Chest = require("../src/core/Chest")
 local Formulas = require("../src/core/Formulas")
 local Game = require("../src/core/Game")
@@ -129,7 +129,7 @@ return function(t)
 		end)
 	end)
 
-	describe("一括売却（D-167, D-175、06章 §17）", function()
+	describe("一括売却（D-167, D-175, D-207、06章 §17）", function()
 		-- 戦士の今の剣をレア（3）にして、コモンの剣が「弱い」になる状態
 		local function withStrongSword()
 			local s = newState()
@@ -238,23 +238,131 @@ return function(t)
 			expect(Formulas.bulkSellValue(weakShield, master)).toBe(nil)
 			expect(exec(s, { type = "BulkSell", equipmentUids = { weakShield.uid } }).error).toBe("NOTHING_TO_SELL")
 		end)
-		it("D-167 修飾語つき・保護中・装備中・商人で買ったものは売らない", function()
+		it("D-207 D-167 保護中・装備中・商人で買ったものは売らない", function()
 			local s, warrior = withStrongSword()
-			local modified = newItem(s, "eq_wpn_sword", 1)
-			modified.modifierId = master.raw.Modifiers[1].id
-			modified.modifierValue = 1
 			local locked = newItem(s, "eq_wpn_sword", 1)
 			locked.locked = true
 			local merchant = newItem(s, "eq_wpn_sword", 1)
 			merchant.fromMerchant = true
 			local equipped = s.equipment[warrior.equipment.weapon]
+			-- 修飾語つきでも、保護中・商人で買ったものは売らない
+			local lockedModified = newItem(s, "eq_wpn_sword", 1)
+			lockedModified.modifierId = master.raw.Modifiers[1].id
+			lockedModified.modifierValue = 1
+			lockedModified.locked = true
+			local merchantModified = newItem(s, "eq_wpn_sword", 1)
+			merchantModified.modifierId = master.raw.Modifiers[1].id
+			merchantModified.modifierValue = 1
+			merchantModified.fromMerchant = true
 			local before = Game._deepClone(s)
 			local r = exec(s, {
 				type = "BulkSell",
-				equipmentUids = { modified.uid, locked.uid, merchant.uid, equipped.uid },
+				equipmentUids = { locked.uid, merchant.uid, equipped.uid, lockedModified.uid, merchantModified.uid },
 			})
 			expect(r.error).toBe("NOTHING_TO_SELL")
 			expect(s).toEqual(before) -- 失敗したら状態は変わらない
+		end)
+		it("D-207 修飾語つきも「弱い」なら売る", function()
+			local s = withStrongSword()
+			local modified = newItem(s, "eq_wpn_sword", 1)
+			modified.modifierId = master.raw.Modifiers[1].id
+			modified.modifierValue = 1
+			local price = Inventory.equipmentSellPrice(modified, master)
+			local gold0 = s.gold
+			local r = exec(s, { type = "BulkSell", equipmentUids = { modified.uid } })
+			expect(r.ok).toBeTruthy()
+			expect(r.events[1].equipmentUids).toEqual({ modified.uid })
+			expect(s.equipment[modified.uid]).toBe(nil)
+			expect(s.gold).toBe(gold0 + price)
+		end)
+		it(
+			"D-207 修飾語つきでも「弱い」でなければ売らない（判定は D-175 のまま）",
+			function()
+				local s = newState() -- 戦士の剣はコモン+0
+				local same = newItem(s, "eq_wpn_sword", 1)
+				same.modifierId = master.raw.Modifiers[1].id
+				same.modifierValue = 1
+				local better = newItem(s, "eq_wpn_sword", 2)
+				better.modifierId = master.raw.Modifiers[1].id
+				better.modifierValue = 1
+				local r = exec(s, { type = "BulkSell", equipmentUids = { same.uid, better.uid } })
+				expect(r.error).toBe("NOTHING_TO_SELL")
+			end
+		)
+		it(
+			"D-207 自動売却は修飾語つきを残し、残った修飾語つきは開封結果からの一括売却で売れる",
+			function()
+				local s = withStrongSword()
+				s.expansions.warehouseSize = 100000
+				expect(s.settings.autoSell.keepModified).toBe(true) -- 初期値のまま
+				Chest.add(s, "dng_graveyard", 1, 60)
+				local r = exec(s, { type = "OpenChests", pileKey = "dng_graveyard", count = 60 })
+				local uids = {}
+				for _, list in { r.events[1].normal, r.events[1].special } do
+					for _, res in list do
+						for _, uid in res.equipmentUids do
+							local e = s.equipment[uid]
+							if e.rarity <= s.settings.autoSell.maxRarity then
+								expect(e.modifierId ~= nil).toBeTruthy() -- 自動売却が残すのは修飾語つきだけ
+							end
+							table.insert(uids, uid)
+						end
+					end
+				end
+				local preview = Game.query.bulkSellPreview(s, uids, master)
+				local modifiedCount = 0
+				for _, uid in preview.equipmentUids do
+					if s.equipment[uid].modifierId ~= nil then
+						modifiedCount += 1
+					end
+				end
+				expect(modifiedCount > 0).toBeTruthy() -- 固定シードで修飾語つきのコモンの剣が出る
+				local r2 = exec(s, { type = "BulkSell", equipmentUids = uids })
+				expect(r2.ok).toBeTruthy()
+				expect(r2.events[1].equipmentUids).toEqual(preview.equipmentUids)
+			end
+		)
+		it("D-207 bulkSellPreview は BulkSell と同じ数・合計額を出し、状態を変えない", function()
+			local s = withStrongSword()
+			local weak = newItem(s, "eq_wpn_sword", 1)
+			local weakModified = newItem(s, "eq_wpn_sword", 1, 1)
+			weakModified.modifierId = master.raw.Modifiers[1].id
+			weakModified.modifierValue = 1
+			local keep = newItem(s, "eq_wpn_sword", 4)
+			local locked = newItem(s, "eq_wpn_sword", 1)
+			locked.locked = true
+			local uids = { "eq_gone", weak.uid, keep.uid, weakModified.uid, locked.uid, weak.uid }
+			local before = Game._deepClone(s)
+			local preview = Game.query.bulkSellPreview(s, uids, master)
+			expect(s).toEqual(before)
+			expect(preview.count).toBe(2)
+			expect(preview.equipmentUids).toEqual({ weak.uid, weakModified.uid })
+			expect(preview.gold).toBe(
+				Inventory.equipmentSellPrice(weak, master) + Inventory.equipmentSellPrice(weakModified, master)
+			)
+			local gold0 = s.gold
+			local r = exec(s, { type = "BulkSell", equipmentUids = uids })
+			expect(r.events[1].equipmentUids).toEqual(preview.equipmentUids)
+			expect(r.events[1].gold).toBe(preview.gold)
+			expect(s.gold).toBe(gold0 + preview.gold)
+		end)
+		it("D-207 売るものがなければ bulkSellPreview は 0 件・0 ゴールド", function()
+			local s = newState()
+			local same = newItem(s, "eq_wpn_sword", 1)
+			expect(Game.query.bulkSellPreview(s, { same.uid, "eq_gone" }, master)).toEqual({
+				count = 0,
+				gold = 0,
+				equipmentUids = {},
+			})
+			expect(Game.query.bulkSellPreview(s, {}, master).count).toBe(0)
+		end)
+		it("D-207 D-120 倉庫からの売却（Sell）は「弱い」を見ない別の扱い", function()
+			local s = newState() -- 戦士の剣はコモン+0
+			local better = newItem(s, "eq_wpn_sword", 4)
+			expect(exec(s, { type = "BulkSell", equipmentUids = { better.uid } }).error).toBe("NOTHING_TO_SELL")
+			local r = exec(s, { type = "Sell", equipmentUids = { better.uid } })
+			expect(r.ok).toBeTruthy()
+			expect(s.equipment[better.uid]).toBe(nil)
 		end)
 		it("D-167 対象の中から弱いものだけを売り、もう無い品は飛ばす", function()
 			local s = withStrongSword()
