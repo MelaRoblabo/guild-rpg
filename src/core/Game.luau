@@ -15,10 +15,14 @@ local Growth = require("./Growth")
 local Guild = require("./Guild")
 local Appearance = require("./Appearance")
 local Hiring = require("./Hiring")
+local Inbox = require("./Inbox")
 local JobChange = require("./JobChange")
 local Inventory = require("./Inventory")
+local Login = require("./Login")
 local Migration = require("./Migration")
 local Party = require("./Party")
+local Playtime = require("./Playtime")
+local Quest = require("./Quest")
 local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
 local Training = require("./Training")
@@ -53,6 +57,13 @@ local function takeRng(state: any): (Rng.Rng, number)
 	local seed = Rng.derive(state.seed, state.rngCounter)
 	state.rngCounter += 1
 	return Rng.new(seed), seed
+end
+
+-- 乱数が要るときだけ1本払い出す関数（受け取り箱の宝箱のランク：D-166）
+local function rngTaker(state: any): () -> Rng.Rng
+	return function()
+		return (takeRng(state))
+	end
 end
 
 local function bump(state: any, key: string, n: number?)
@@ -91,6 +102,10 @@ function Game.newState(master: any, seed: number, now: number): any
 		lastAdvancedAt = now,
 		lastSavedAt = now, -- 最後に保存した時刻（留守の始まり：D-161）。サーバーが保存のときに書く（M7b-5）
 		restBonusSeconds = 0, -- 休息ボーナスの残り秒（D-161）
+		quests = Quest.newState(), -- D-153。次のオンラインの advance で今日・今週の分を作る
+		login = Login.newState(), -- D-155。次のオンラインの advance で1日目
+		playtime = Playtime.newState(), -- D-154
+		inbox = {}, -- 受け取り箱（D-164）
 	}
 	for i = 1, state.expansions.partySlots do
 		state.parties[i] = { index = i, slots = Party.newSlots(), autoRepeat = nil }
@@ -328,10 +343,12 @@ function Game.offlineStart(state: any): number
 end
 
 -- オンライン（ctx.online == true）：帰還 → 自動再派遣を ctx.now に追いつくまで。休息ボーナスはオンラインの経過秒だけ減る
+-- 帰還・自動再派遣のあとで、日・週の切り替え（クエストの入れ替え・ログインボーナスの前進）とプレイ時間（05章 §3-4）
 local function advanceOnline(state: any, ctx: Ctx, events: { any })
 	local master = ctx.master
 	local t0 = state.lastAdvancedAt
 	local rest = state.restBonusSeconds or 0
+	local take = rngTaker(state)
 	while true do
 		local nextE = nextReturn(state, ctx.now)
 		if nextE == nil then
@@ -340,6 +357,10 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 		-- 帰還時刻での休息ボーナスの残り（06章 §14、D-173）
 		local restLeft = rest - math.max(0, nextE.returnAt - t0)
 		collect(state, nextE, master, events, restLeft > 0)
+		-- クエストの「踏破」はオンライン中の帰還で数える（留守番の探索は数えない：D-153, D-161）
+		if nextE.log.result == "clear" and not nextE.offline then
+			Quest.count(state, "clears", 1, nextE.returnAt, master, take, events)
+		end
 
 		local party = state.parties[nextE.partyIndex]
 		if party and party.autoRepeat then
@@ -359,10 +380,16 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 					dungeonId = e2.dungeonId,
 					returnAt = e2.returnAt,
 				})
+				-- オンライン中の自動再派遣も「探索の回数」に数える（D-179）
+				Quest.count(state, "expeditions", 1, nextE.returnAt, master, take, events)
 			end
 		end
 	end
 	state.restBonusSeconds = math.max(0, rest - math.max(0, ctx.now - t0))
+	Quest.refresh(state, ctx.now, master) -- D-153：日・週が変わったら入れ替える（引き直しなし）
+	Login.advance(state, ctx.now, master, take, events) -- D-155：その日の最初のオンラインの advance で1日分
+	-- プレイ時間：前回の advance からのオンラインの経過秒を足す（D-154。留守番の時間は数えない）
+	Playtime.advance(state, t0, ctx.now, master, take, events)
 end
 
 -- 留守番（ctx.online == false。ログイン時の留守の計算：05章 §3、06章 §13・§14、D-161, D-172）
@@ -535,18 +562,17 @@ handlers.Dispatch = function(state, cmd, ctx)
 		return fail("PARTY_EMPTY")
 	end
 	local e = dispatch(state, cmd.partyIndex, cmd.dungeonId, ctx.now, ctx.master)
-	return {
-		ok = true,
-		events = {
-			{
-				type = "Dispatched",
-				at = ctx.now,
-				partyIndex = cmd.partyIndex,
-				dungeonId = cmd.dungeonId,
-				returnAt = e.returnAt,
-			},
+	local events: { any } = {
+		{
+			type = "Dispatched",
+			at = ctx.now,
+			partyIndex = cmd.partyIndex,
+			dungeonId = cmd.dungeonId,
+			returnAt = e.returnAt,
 		},
 	}
+	Quest.count(state, "expeditions", 1, ctx.now, ctx.master, rngTaker(state), events) -- D-179：オンライン中の出発
+	return { ok = true, events = events }
 end
 
 handlers.SetAutoRepeat = function(state, cmd, ctx)
@@ -573,9 +599,9 @@ handlers.OpenChests = function(state, cmd, ctx)
 	-- D-089, D-166：まとめ開き。指定した宝箱の山から最大 count 個（省略時 chestBatchOpen）を、残り数で重み付けして1つずつ引く
 	local master = ctx.master
 	local pileKey = cmd.pileKey
-	-- 特別な宝箱（special:...）の中身の表は M7b-4 で足す。それまでは開けられる山として扱わない
-	local d = if type(pileKey) == "string" then Chest.pileDungeon(pileKey, master) else nil
-	if not d then
+	-- 中身の表と演出ライン（普通の山・特別な宝箱・レアダンジョンの山：D-166, D-171）
+	local source = if type(pileKey) == "string" then Chest.pileSource(pileKey, state, master) else nil
+	if not source then
 		return fail("PILE_NOT_FOUND")
 	end
 	if cmd.count ~= nil and (type(cmd.count) ~= "number" or cmd.count < 1 or cmd.count ~= math.floor(cmd.count)) then
@@ -621,7 +647,7 @@ handlers.OpenChests = function(state, cmd, ctx)
 			res.equipmentUids = kept
 		end
 		-- D-089：宝箱の山ごとの発生ライン以上のレアリティなら演出あり（派手さはレアリティで決まる）
-		res.effect = rank >= d.chestEffectMinRarity
+		res.effect = rank >= source.effectMinRarity
 		opened += 1
 		res.order = opened
 		table.insert(if res.effect then special else normal, res)
@@ -640,21 +666,20 @@ handlers.OpenChests = function(state, cmd, ctx)
 		end
 		return x.order < y.order
 	end)
-	return {
-		ok = true,
-		events = {
-			{
-				type = "ChestsOpened",
-				at = ctx.now,
-				pileKey = pileKey,
-				opened = opened,
-				normal = normal,
-				special = special,
-				remaining = Chest.pileTotal(state, pileKey),
-				stoppedBy = stoppedBy,
-			},
+	local events: { any } = {
+		{
+			type = "ChestsOpened",
+			at = ctx.now,
+			pileKey = pileKey,
+			opened = opened,
+			normal = normal,
+			special = special,
+			remaining = Chest.pileTotal(state, pileKey),
+			stoppedBy = stoppedBy,
 		},
 	}
+	Quest.count(state, "chestsOpened", opened, ctx.now, master, rngTaker(state), events) -- D-153
+	return { ok = true, events = events }
 end
 
 -- 一括売却（05章 BulkSell、06章 §17、D-167, D-175）：開封結果に出た装備のうち「今の装備より弱い」ものを全部売る
@@ -841,7 +866,9 @@ handlers.HireChoose = function(state, cmd, ctx)
 	state.adventurers[uid] = adv
 	state.hireSession = nil
 	bump(state, "hired")
-	return { ok = true, events = { { type = "Hired", at = ctx.now, uid = uid } } }
+	local events: { any } = { { type = "Hired", at = ctx.now, uid = uid } }
+	Quest.count(state, "hires", 1, ctx.now, ctx.master, rngTaker(state), events) -- D-153
+	return { ok = true, events = events }
 end
 
 handlers.HireCancel = function(state, _cmd, ctx)
@@ -995,19 +1022,18 @@ handlers.RebirthChoose = function(state, cmd, ctx)
 	local giftId = Rebirth.apply(adv, r, bonus, takeRng(state), ctx.master)
 	state.rebirthSession = nil
 	bump(state, "rebirths")
-	return {
-		ok = true,
-		events = {
-			{
-				type = "Reborn",
-				at = ctx.now,
-				uid = adv.uid,
-				rebirthCount = adv.rebirthCount,
-				levelCap = adv.levelCap,
-				giftAdded = giftId,
-			},
+	local events: { any } = {
+		{
+			type = "Reborn",
+			at = ctx.now,
+			uid = adv.uid,
+			rebirthCount = adv.rebirthCount,
+			levelCap = adv.levelCap,
+			giftAdded = giftId,
 		},
 	}
+	Quest.count(state, "rebirths", 1, ctx.now, ctx.master, rngTaker(state), events) -- D-153（ウィークリーだけ）
+	return { ok = true, events = events }
 end
 
 -- 転職（03章 §4） --------------------------------------------------------
@@ -1125,20 +1151,20 @@ handlers.Train = function(state, cmd, ctx)
 	local r = Training.run(state, adv, n, takeRng(state), master)
 	bump(state, "goldSpentOnTraining", r.gold)
 	bump(state, "trainingSessions", r.sessions)
-	return {
-		ok = true,
-		events = {
-			{
-				type = "Trained",
-				at = ctx.now,
-				uid = adv.uid,
-				sessions = r.sessions,
-				gold = r.gold,
-				level = adv.level,
-				levelsGained = #r.levels,
-			},
+	local events: { any } = {
+		{
+			type = "Trained",
+			at = ctx.now,
+			uid = adv.uid,
+			sessions = r.sessions,
+			gold = r.gold,
+			level = adv.level,
+			levelsGained = #r.levels,
 		},
 	}
+	-- D-153：トレーニングは行った回数で数える（1コマンドで何回でも1回分とするかは要確認）
+	Quest.count(state, "trainings", r.sessions, ctx.now, master, rngTaker(state), events)
+	return { ok = true, events = events }
 end
 
 -- 拡張・設定（08章 §4、06章 §6） --------------------------------------------
@@ -1202,6 +1228,29 @@ handlers.SetAutoSell = function(state, cmd, ctx)
 		keepModified = if cmd.keepModified == nil then true else cmd.keepModified == true,
 	}
 	return { ok = true, events = {} }
+end
+
+-- 受け取り箱（05章 ClaimInbox、D-164, D-176）：受け取れるものだけ受け取り、残りは受け取り箱に残す（期限なし）
+handlers.ClaimInbox = function(state, _cmd, ctx)
+	if #state.inbox == 0 then
+		return fail("INBOX_EMPTY")
+	end
+	local r = Inbox.claim(state, ctx.now, ctx.master)
+	local events: { any } = {
+		{
+			type = "InboxClaimed",
+			at = ctx.now,
+			gold = r.gold,
+			items = r.items,
+			chests = r.chests, -- 宝箱の山ごとの数（ランクは出さない：D-087）
+			remaining = r.remaining,
+			blocked = r.blocked,
+		},
+	}
+	for _, j in r.joined do
+		table.insert(events, { type = "UniqueJoined", at = ctx.now, uid = j.uid, uniqueId = j.uniqueId })
+	end
+	return { ok = true, events = events }
 end
 
 Game.COMMANDS = {}
@@ -1317,6 +1366,56 @@ function Game.query.dailyTraits(now: number, master: any): any
 		today = DailyTrait.forDay(day, master),
 		tomorrow = DailyTrait.forDay(day + 1, master),
 		nextDayAt = Calendar.nextDayStart(now),
+	}
+end
+
+-- 受け取り箱の中身（D-164）。宝箱は山ごとの数だけ（ランクは返さない：D-087）
+function Game.query.inbox(state: any): { any }
+	return Inbox.summary(state)
+end
+
+-- 今日・今週のクエスト（D-153）。{ daily = { entries, bonusDone }, weekly = ... }。entries の行に kind を添える
+function Game.query.quests(state: any, master: any): any
+	local out = {}
+	for _, period in { "daily", "weekly" } do
+		local book = state.quests[period]
+		local entries = {}
+		for _, e in book.entries do
+			local row = master.quests[e.questId]
+			table.insert(entries, {
+				questId = e.questId,
+				kind = if row then row.kind else nil,
+				target = e.target,
+				progress = e.progress,
+				done = e.done,
+			})
+		end
+		out[period] = { entries = entries, bonusDone = book.bonusDone }
+	end
+	return out
+end
+
+-- ログインボーナスのカレンダー（D-155）。day は次に受け取る位置、uniqueId はこの周の7日目のユニーク（いなければ nil）
+function Game.query.loginCalendar(state: any, now: number, master: any): any
+	local L = state.login
+	local u = Login.uniqueFor(state, L.cycle, master)
+	return {
+		day = L.day,
+		cycle = L.cycle,
+		receivedToday = L.lastDayIndex >= Calendar.dayIndex(now),
+		uniqueId = if u then u.id else nil,
+	}
+end
+
+-- 今日のプレイ時間（D-154）
+function Game.query.playtime(state: any, master: any): any
+	local P = state.playtime
+	local nextStep = Playtime.nextStep(state, master)
+	return {
+		seconds = P.seconds,
+		capSeconds = master.K.playtimeDailyCapSeconds,
+		claimedSteps = P.claimedSteps,
+		nextMinutes = if nextStep then nextStep.minutes else nil,
 	}
 end
 

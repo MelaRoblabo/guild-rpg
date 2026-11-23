@@ -69,12 +69,67 @@ local ERRORS = {
 	INVALID_RARITY = "レアリティは1〜5です",
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
+	INBOX_EMPTY = "受け取り箱は空です",
 }
 
--- 宝箱の山の名前（普通の山はダンジョン名、特別な宝箱は鍵のまま：D-166）
+-- 宝箱の山の名前（普通の山はダンジョン名、特別な宝箱は種類の名前：D-166, D-171）
+local SPECIAL_PILE_NAME = {
+	["special:quest"] = "クエストの宝箱",
+	["special:login"] = "ログインボーナスの宝箱",
+	["special:playtime"] = "プレイ時間の宝箱",
+	["special:raid"] = "レイドの宝箱",
+}
 local function pileName(pileKey: string, master: any): string
 	local d = master.dungeons[pileKey]
-	return if d then d.name else pileKey
+	if d then
+		return d.name
+	end
+	local rare = string.match(pileKey, "^special:rare:(.+)$")
+	if rare and master.dungeons[rare] then
+		return `レアダンジョンの宝箱（{master.dungeons[rare].name}）`
+	end
+	return SPECIAL_PILE_NAME[pileKey] or pileKey
+end
+
+local SOURCE_NAME = {
+	quest = "クエスト",
+	playtime = "プレイ時間",
+	login = "ログインボーナス",
+	raid = "レイド",
+	referral = "紹介",
+}
+local QUEST_KIND_NAME = {
+	expeditions = "探索に出発する",
+	chestsOpened = "宝箱を開ける",
+	hires = "冒険者を雇う",
+	trainings = "トレーニングする",
+	clears = "ダンジョンを踏破する",
+	rebirths = "転生する",
+}
+
+-- 報酬の中身の文章（ゴールド・アイテム・宝箱の山ごとの数・ユニーク）
+local function rewardText(r: any, master: any): string
+	local parts = {}
+	if r.gold and r.gold > 0 then
+		table.insert(parts, `{r.gold}G`)
+	end
+	local ids = {}
+	for id in r.items or {} do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		local it = master.items[id]
+		table.insert(parts, `{if it then it.name else id}×{r.items[id]}`)
+	end
+	for _, c in r.chests or {} do
+		table.insert(parts, `{pileName(c.pileKey, master)}×{c.count}`)
+	end
+	if r.uniqueId then
+		local u = master.uniques[r.uniqueId]
+		table.insert(parts, `★{if u then u.name else r.uniqueId}（仲間）`)
+	end
+	return if #parts > 0 then table.concat(parts, "、") else "なし"
 end
 
 function Text.errorText(code: string?): string
@@ -134,6 +189,74 @@ function Text.daily(save: any, master: any): string
 		end
 	end
 	table.insert(lines, `次の日の区切りまで {hms(q.nextDayAt - save.clock)}`)
+	return table.concat(lines, "\n")
+end
+
+-- 受け取り箱（D-164）
+function Text.inbox(save: any, master: any): string
+	local list = Game.query.inbox(save.state)
+	if #list == 0 then
+		return "受け取り箱は空です"
+	end
+	local lines =
+		{ `【受け取り箱】{#list}件（claim でまとめて受け取る。受け取れないものは残る）` }
+	for _, e in list do
+		table.insert(lines, `  {SOURCE_NAME[e.source] or e.source}：{rewardText(e, master)}`)
+	end
+	return table.concat(lines, "\n")
+end
+
+-- 今日・今週のクエスト（D-153）
+function Text.quests(save: any, master: any): string
+	local q = Game.query.quests(save.state, master)
+	local lines = {}
+	for _, pair in { { "daily", "今日のクエスト" }, { "weekly", "今週のクエスト" } } do
+		local book = q[pair[1]]
+		table.insert(
+			lines,
+			`【{pair[2]}】{if book.bonusDone then "（全部達成のボーナス受け取り済み）" else ""}`
+		)
+		if #book.entries == 0 then
+			table.insert(lines, "  （まだありません）")
+		end
+		for _, e in book.entries do
+			local row = master.quests[e.questId]
+			table.insert(
+				lines,
+				`  {if e.done then "✓" else "・"} {QUEST_KIND_NAME[e.kind] or e.questId} {e.progress}/{e.target}  報酬：{rewardText(
+					row.rewards,
+					master
+				)}`
+			)
+		end
+	end
+	return table.concat(lines, "\n")
+end
+
+-- ログインボーナスのカレンダー・今日のプレイ時間・休息ボーナス（D-154, D-155, D-161）
+function Text.calendar(save: any, master: any): string
+	local s = save.state
+	local L = Game.query.loginCalendar(s, save.clock, master)
+	local lines = { `【ログインボーナス】{L.cycle}周目` }
+	for day = 1, 7 do
+		local mark = if day < L.day then "済" elseif day == L.day then "次" else "  "
+		local reward = if day < 7
+			then rewardText(master.loginBonus.days[day], master)
+			elseif L.uniqueId then `★{master.uniques[L.uniqueId].name}（仲間）`
+			else rewardText(master.loginBonus.fallback, master)
+		table.insert(lines, `  {mark} {day}日目：{reward}`)
+	end
+	if L.receivedToday then
+		table.insert(lines, "  今日の分は受け取り済み（次の日の区切りで進む）")
+	end
+	local P = Game.query.playtime(s, master)
+	table.insert(
+		lines,
+		`【今日のプレイ時間】{hms(P.seconds)} / {hms(P.capSeconds)}{if P.nextMinutes
+			then ` ／ 次の報酬は {P.nextMinutes}分`
+			else " ／ 今日の報酬はすべて受け取り済み"}`
+	)
+	table.insert(lines, `【休息ボーナス】残り {hms(Game.query.restBonus(s))}`)
 	return table.concat(lines, "\n")
 end
 
@@ -565,6 +688,37 @@ function Text.events(events: { any }, save: any, master: any): string
 			table.insert(lines, t .. `★ {master.uniques[e.uniqueId].name} が仲間に加わった！`)
 		elseif e.type == "Sold" then
 			table.insert(lines, t .. `売却して {e.gold}G を得た`)
+		elseif e.type == "QuestCompleted" then
+			local row = master.quests[e.questId]
+			table.insert(
+				lines,
+				t
+					.. `クエスト達成：{QUEST_KIND_NAME[row and row.kind or ""] or e.questId}（報酬は受け取り箱へ）`
+			)
+		elseif e.type == "QuestBonus" then
+			table.insert(
+				lines,
+				t
+					.. `{if e.period == "daily" then "今日" else "今週"}のクエストを全部達成！ボーナスは受け取り箱へ`
+			)
+		elseif e.type == "LoginBonus" then
+			table.insert(
+				lines,
+				t
+					.. `ログインボーナス {e.day}日目（{e.cycle}周目）{if e.uniqueId
+						then "：★仲間が受け取り箱に届いた"
+						else ""}（受け取り箱へ）`
+			)
+		elseif e.type == "PlaytimeReward" then
+			table.insert(lines, t .. `プレイ時間 {e.minutes}分の報酬（受け取り箱へ）`)
+		elseif e.type == "InboxClaimed" then
+			table.insert(
+				lines,
+				t
+					.. `受け取り箱から受け取った：{rewardText(e, master)}{if e.remaining > 0
+						then `（{e.remaining}件は残った：{Text.errorText(e.blocked)}）`
+						else ""}`
+			)
 		end
 	end
 	return table.concat(lines, "\n")
@@ -721,6 +875,7 @@ function Text.view(save: any, master: any): any
 		guildExp = s.guild.exp,
 		parties = parties,
 		unopenedChests = Game.query.chestsByPile(s, master),
+		inboxCount = #Game.query.inbox(s), -- 受け取り箱の件数（D-164）
 		warehouse = wh,
 		unlockedDungeons = unlocked,
 	}

@@ -100,8 +100,9 @@
 | `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（たまる速さは未決（M7b-6）） | D-161 |
 | `restBonusExpMult` | 2（未決（M7b-6）） | D-161 |
 | `dailyTraitBands` | `{ min = 1, max = 4 }`, `{ min = 5, max = 8 }`, `{ min = 9, max = 12 }`（難度＝ダンジョンの tier の帯） | D-156 |
-| `calendarSeed` | 20260101（日替わり・今週の訪問者・マップイベントの共通の乱数の元。全員共通。値は任意の固定値） | D-156, D-158, D-152 |
-| `questDailyCount` / `questWeeklyCount` | 3 / 3〜5（ウィークリーの数は未決（M7b-6）） | D-153 |
+| `calendarSeed` | 20260101（日替わり・今週の訪問者・マップイベント・クエストのお題の共通の乱数の元。値は任意の固定値） | D-156, D-158, D-152, D-153 |
+| `questDailyCount` / `questWeeklyCount` | 3 / 4（ウィークリーは 3〜5 のうち仮。M7b-6） | D-153 |
+| `questDailyBonus` / `questWeeklyBonus` | 全部達成のボーナス（報酬の形は §9）。デイリー：クエストの宝箱2・チケット1、ウィークリー：クエストの宝箱5・チケット3・見た目維持ポーション1（仮。M7b-6） | D-153 |
 | `playtimeDailyCapSeconds` | 7200（1日2時間まで） | D-154 |
 | `friendRewardIntervalSeconds` | 未決（M7b-6。例 600） | D-157 |
 | `friendRewardMaxFriends` | 3（報酬が増えるのは3人分まで） | D-157 |
@@ -111,7 +112,7 @@
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
 | `mapEventKindWeights` | レアダンジョン / レイドボス / 旅の商人：未決（M7b-6） | D-152 |
 | `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6） | D-152 |
-| `rareDungeonEffectRate` | 0.20〜0.30（レアダンジョンの山の演出率の基準） | D-171 |
+| `rareDungeonEffectRate` | `{ min = 0.20, max = 0.30 }`（レアダンジョンの山の演出率の基準） | D-171 |
 | `raidHp` | 未決（M7b-6。HP とダメージの式も M7b-6） | D-152, D-179 |
 | `merchantItemCount` | 3〜5 | D-152 |
 | `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 約10 / 未決 / 未決（M7b-6） | D-152 |
@@ -195,6 +196,18 @@
 
 各行：`id, period（daily / weekly）, kind, amountPerParty, rewards`。
 
+**報酬の形（rewards）**：クエスト・ログインボーナス・プレイ時間・全部達成のボーナスで共通。受け取り箱に入る（D-164）。
+
+```lua
+rewards = {
+	gold = 500,                                    -- 省略可
+	items = { itm_slot_ticket = 1 },               -- 省略可。売却用アイテムは置かない（検証）
+	chests = { { pileKey = "special:quest", count = 1, rank = nil } },  -- 省略可。表を持つ特別な宝箱の山だけ（検証）
+}                                                  -- rank を省くと届いたときに SpecialChests の表で引く。書けばそのランク
+```
+
+M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（探索10・開封10・雇用1・トレーニング5・踏破5、×パーティ数）、ウィークリーは6種類（探索50・開封50・雇用3・トレーニング25・踏破25・転生1、×パーティ数）。報酬はゴールド・クエストの宝箱・チケット・見た目変更ポーション。
+
 | kind | 数えるもの | period |
 | --- | --- | --- |
 | `expeditions` | 探索の回数（オンライン中に出発したもの） | daily / weekly |
@@ -209,8 +222,9 @@
 
 ## 10. ログインボーナス・プレイ時間（LoginBonus.luau・PlaytimeRewards.luau）
 
-- `LoginBonus`：1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク。そのユニークを持っている、またはユニークが一巡した後は `fallback`（レアな宝箱＋チケット）。量は未決（M7b-6）。（D-155）
-- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`）。報酬はゴールド（1時間の収入の数%）と宝箱。量は未決（M7b-6）。（D-154）
+- `LoginBonus`：`{ days = { 1〜6日目の rewards（6行） }, fallback = rewards }`。1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク（`cycle` 周目は loginOrder の順で `cycle` 番目）。ログイン用のユニークがいない・そのユニークを持っている（受け取り箱に届いている）・ユニークが一巡した後は `fallback`（レアな宝箱＋チケット。M7b-4 では `special:login` のランク3（レア）1個＋チケット1）。量は未決（M7b-6、M7b-4 は仮の値）。（D-155）
+- ログイン用のユニークの中身（誰か・人数）は未決（Q-025）。M7b-4 では仕組みだけを作り、Uniques に `acquire = "login"` の行は置かない（いないので7日目は毎周 fallback）。
+- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%）と宝箱（`special:playtime`）。量は未決（M7b-6。M7b-4 は固定額の仮の値）。（D-154）
 
 ## 11. 特別な宝箱（SpecialChests.luau、D-166）
 
@@ -225,6 +239,16 @@
 | `spc_playtime` | `special:playtime` | プレイ時間報酬（D-154） | 未決（M7b-6） |
 
 - 出現率（`rarityWeights`）と演出率は未決（M7b-6）。検証は行ごとに `effectRateMin`〜`effectRateMax` に収まるかを見る（D-090 の検査は普通のダンジョンだけ）。
+- M7b-4 で置いた仮の値（M7b-6 で決める）：
+
+| id | rarityWeights（%） | effectMinRarity | 演出率 | 基準 |
+| --- | --- | --- | --- | --- |
+| `spc_raid` | 0 / 0 / 70 / 22 / 7 / 1 | エピック | 30% | 20〜40% |
+| `spc_quest` | 50 / 30 / 15 / 5 | レア | 20% | 15〜25% |
+| `spc_login` | 50 / 30 / 15 / 5 | レア | 20% | 15〜25% |
+| `spc_playtime` | 70 / 20 / 8 / 2 | レア | 10% | 8〜15% |
+
+- `spc_rare` の行は `pileKey = "special:rare"` だけを持ち、表・演出の値を持たない（相当するダンジョンの `chestRarityWeights` と `rareChestEffectMinRarity`、基準は `rareDungeonEffectRate`）。`rareChestEffectMinRarity` は M7b-4 前半では任意の項目（あれば検証する）。持たないダンジョンのレアダンジョンの山は開けられない（PILE_NOT_FOUND）。今の `chestRarityWeights` では 20〜30% に収まる演出ラインがないダンジョンがある（要確認）。
 - クエスト・ログインボーナス・プレイ時間の宝箱は特別な宝箱（D-171）。D-154 の「進み具合に合った」は中身のアイテムレベルのこと。
 - 中身のアイテムレベルは「開けたときに踏破している一番深いダンジョン」（06章 §19、D-171）。
 

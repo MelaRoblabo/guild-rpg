@@ -92,12 +92,51 @@ function Chest.isSpecialPile(pileKey: string): boolean
 	return string.sub(pileKey, 1, #Chest.SPECIAL_PREFIX) == Chest.SPECIAL_PREFIX
 end
 
--- 普通の宝箱の山なら、そのダンジョン（中身の表・演出ライン）。特別な宝箱の表は M7b-4 で足すので、今は nil
-function Chest.pileDungeon(pileKey: string, master: any): any?
-	if Chest.isSpecialPile(pileKey) then
+Chest.RARE_PREFIX = "special:rare:"
+
+-- 踏破している一番深いダンジョン（tier が最大。同じ tier はダンジョンの並び順で先のもの）。なければ nil
+function Chest.deepestCleared(state: any, master: any): any?
+	local best = nil
+	for _, d in master.dungeonList do
+		if state.clearedDungeons[d.id] and (best == nil or d.tier > best.tier) then
+			best = d
+		end
+	end
+	return best
+end
+
+-- 宝箱の山を開けるときの中身の表と演出ライン（D-089, D-166, D-171, D-185。06章 §19）。開けられない山なら nil
+--   普通の山（dungeonId）           → そのダンジョン、演出ラインは chestEffectMinRarity
+--   special:rare:<相当するダンジョン> → そのダンジョンの表、演出ラインは rareChestEffectMinRarity（無いダンジョンは開けられない）
+--   special:<種類>（SpecialChests）  → 中身は開けたときに踏破している一番深いダンジョン（D-171）、演出ラインは行の effectMinRarity
+--                                      まだどこも踏破していなければ、ダンジョンの並びの先頭（要確認：報告の Q 候補）
+function Chest.pileSource(pileKey: string, state: any, master: any): { dungeon: any, effectMinRarity: number }?
+	if not Chest.isSpecialPile(pileKey) then
+		local d = master.dungeons[pileKey]
+		return if d then { dungeon = d, effectMinRarity = d.chestEffectMinRarity } else nil
+	end
+	if string.sub(pileKey, 1, #Chest.RARE_PREFIX) == Chest.RARE_PREFIX then
+		local d = master.dungeons[string.sub(pileKey, #Chest.RARE_PREFIX + 1)]
+		if d and d.rareChestEffectMinRarity then
+			return { dungeon = d, effectMinRarity = d.rareChestEffectMinRarity }
+		end
 		return nil
 	end
-	return master.dungeons[pileKey]
+	local row = master.specialChests[pileKey]
+	if row == nil or row.rarityTable == nil then
+		return nil
+	end
+	return {
+		dungeon = Chest.deepestCleared(state, master) or master.dungeonList[1],
+		effectMinRarity = row.effectMinRarity,
+	}
+end
+
+-- 特別な宝箱のランクを表から1つ抽選する（D-166。受け取り箱へ入れるときに決める）
+function Chest.rollSpecialRank(pileKey: string, rng: Rng.Rng, master: any): number
+	local row = master.specialChests[pileKey]
+	assert(row and row.rarityTable, `表を持たない特別な宝箱の山: {pileKey}`)
+	return rng:pickWeighted(row.rarityTable, weightOf).rank
 end
 
 function Chest.add(state: any, pileKey: string, rank: number, n: number)
@@ -161,11 +200,12 @@ function Chest.draw(state: any, pileKey: string, rng: Rng.Rng): number
 end
 
 -- 宝箱を1つ開封して状態に反映する（数を減らすのと倉庫の空き確認は呼び出し側）
--- chest = { pileKey, rank }。中身の表は普通の山ならそのダンジョン（特別な宝箱は M7b-4）
+-- chest = { pileKey, rank }。中身の表は Chest.pileSource（特別な宝箱は開けたときの一番深い踏破ダンジョン：D-171）
 -- 売却用アイテム（素材）は常にその場で売る（D-167）。items には残したものだけ、売った素材は soldItems に入れる
 function Chest.open(state: any, chest: any, rng: Rng.Rng, master: any): any
-	local dungeon = Chest.pileDungeon(chest.pileKey, master)
-	assert(dungeon, `中身の表がない宝箱の山: {chest.pileKey}`)
+	local source = Chest.pileSource(chest.pileKey, state, master)
+	assert(source, `中身の表がない宝箱の山: {chest.pileKey}`)
+	local dungeon = source.dungeon
 	local contents = Chest.rollContents(chest.rank, dungeon, rng, master)
 	local created = {}
 	for _, e in contents.equipment do

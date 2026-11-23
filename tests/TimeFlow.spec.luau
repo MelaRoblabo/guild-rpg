@@ -655,8 +655,7 @@ return function(t)
 				s.lastAdvancedAt = T0 + 77
 				local before = Fixtures.clone(s.expeditions)
 				Migration.migrate(s, master)
-				expect(s.version).toBe(7)
-				expect(Migration.CURRENT).toBe(7)
+				expect(s.version).toBe(Migration.CURRENT) -- 6 → 7 → 8（v7 → 8 は Rewards.spec）
 				expect(s.lastSavedAt).toBe(T0 + 77)
 				expect(s.restBonusSeconds).toBe(0)
 				expect(s.expeditions).toEqual(before)

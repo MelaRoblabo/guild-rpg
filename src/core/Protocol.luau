@@ -60,6 +60,7 @@ Protocol.CLIENT_COMMANDS = {
 	BuyExpansion = { expansionId = str(ID) },
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
+	ClaimInbox = {}, -- D-164
 } :: { [string]: { [string]: Field } }
 
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）
@@ -239,6 +240,8 @@ function Protocol.view(state: any, master: any): any
 		end
 	end
 	v.chests = Game.query.chestsByDungeon(state, master)
+	-- 受け取り箱の宝箱はランクを隠し、山ごとの数だけにする（D-087, D-164）
+	v.inbox = Game.query.inbox(state)
 	for _, e in v.expeditions or {} do
 		e.seed = nil
 		e.log = Protocol.redactLog(e.log)

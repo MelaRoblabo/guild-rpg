@@ -95,6 +95,9 @@ local HELP = [[
   days <日数>                仮想時計を日単位で進める（D-168）
   logout / login             ログアウト（最後に保存した時刻を書く）／ログイン（留守番と休息ボーナスを計算：D-161）
   daily                      今日・明日の日替わりの特性（D-156）
+  inbox                      受け取り箱の中身（D-164。受け取りは claim）
+  quests                     今日・今週のクエストと進み具合（D-153）
+  calendar                   ログインボーナスのカレンダー・今日のプレイ時間・休息ボーナス（D-154, D-155）
   candidates                 候補と面接の状況を表示
   expansions                 拡張の一覧（次の段階の条件と費用）
   trainquote <adv_uid> <Lv>  そのレベルまでのトレーニング費用の見積もり
@@ -184,6 +187,12 @@ local function handle(tokens: { string }): (boolean, any)
 		say("すでにログインしています")
 	elseif c == "daily" then
 		say(Text.daily(save, master))
+	elseif c == "inbox" then
+		say(Text.inbox(save, master))
+	elseif c == "quests" then
+		say(Text.quests(save, master))
+	elseif c == "calendar" then
+		say(Text.calendar(save, master))
 	elseif c == "candidates" then
 		say(Text.hiring(save, master))
 	elseif c == "expansions" then

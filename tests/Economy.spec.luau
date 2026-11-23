@@ -274,14 +274,17 @@ return function(t)
 			expect(exec(s, { type = "OpenChests", pileKey = "dng_ruins" }).error).toBe("NO_CHEST")
 		end)
 		it(
-			"D-166 特別な山（special:...）があっても壊れない（中身の表は M7b-4。今は開けずに残す）",
+			"D-166 表のない特別な山（special:...）があっても壊れない（開けずに残す）",
 			function()
+				-- M7b-4 で SpecialChests の表を持つ山（special:raid など）は開けられるようになった（Rewards.spec）。
+				-- 表のない種類と、演出ライン（rareChestEffectMinRarity）のないダンジョンのレアダンジョンの山は開けられない
 				local s = newState()
+				Chest.add(s, "special:unknown", 3, 2)
 				Chest.add(s, "special:raid", 3, 2)
 				Chest.add(s, "special:rare:dng_castle", 1, 1)
 				Chest.add(s, "dng_graveyard", 1, 1)
 				local before = Game._deepClone(s)
-				expect(exec(s, { type = "OpenChests", pileKey = "special:raid" }).error).toBe("PILE_NOT_FOUND")
+				expect(exec(s, { type = "OpenChests", pileKey = "special:unknown" }).error).toBe("PILE_NOT_FOUND")
 				expect(exec(s, { type = "OpenChests", pileKey = "special:rare:dng_castle" }).error).toBe(
 					"PILE_NOT_FOUND"
 				)

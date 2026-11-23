@@ -334,6 +334,15 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	end
 	c:integer(p .. ".calendarSeed", k.calendarSeed)
 
+	-- 特別な宝箱・クエスト・プレイ時間（D-153, D-154, D-171）
+	if c:range(p .. ".rareDungeonEffectRate", k.rareDungeonEffectRate) then
+		c:probability(p .. ".rareDungeonEffectRate.min", k.rareDungeonEffectRate.min)
+		c:probability(p .. ".rareDungeonEffectRate.max", k.rareDungeonEffectRate.max)
+	end
+	c:integer(p .. ".questDailyCount", k.questDailyCount, 1)
+	c:integer(p .. ".questWeeklyCount", k.questWeeklyCount, 1)
+	c:integer(p .. ".playtimeDailyCapSeconds", k.playtimeDailyCapSeconds, 1)
+
 	-- ギルド
 	c:integer(p .. ".guildExpPerFloor", k.guildExpPerFloor, 0)
 	c:integer(p .. ".guildExpClearBonus", k.guildExpClearBonus, 0)
@@ -373,6 +382,29 @@ end
 
 local function rarityCount(d: any): number
 	return if type(d.Rarities) == "table" then #d.Rarities else 0
+end
+
+-- 演出が入る割合（minRarity 以上が出る割合）が lo〜hi に収まるか（D-090, D-166, D-171）
+local function checkEffectRate(c: Checker, path: string, weights: any, minRarity: number, lo: number, hi: number)
+	local sum, tail = 0, 0
+	for r, w in weights do
+		if type(w) == "number" then
+			sum += w
+			if r >= minRarity then
+				tail += w
+			end
+		end
+	end
+	if sum <= 0 then
+		return
+	end
+	local rate = tail / sum
+	if rate < lo - 1e-9 or rate > hi + 1e-9 then
+		c:error(
+			path,
+			string.format("演出が入る割合 %.1f%% が基準 %.0f〜%.0f%% の外", rate * 100, lo * 100, hi * 100)
+		)
+	end
 end
 
 local function validateContent(c: Checker, d: any)
@@ -565,6 +597,25 @@ local function validateContent(c: Checker, d: any)
 					end
 				end
 			end
+			-- レアダンジョンの山の演出ライン（D-171, D-185）。あれば、その割合を rareDungeonEffectRate に収める
+			if g.rareChestEffectMinRarity ~= nil then
+				local q = p .. ".rareChestEffectMinRarity"
+				if
+					c:integer(q, g.rareChestEffectMinRarity, 1, rarityCount(d))
+					and type(g.chestRarityWeights) == "table"
+					and type(d.Constants) == "table"
+					and type(d.Constants.rareDungeonEffectRate) == "table"
+				then
+					checkEffectRate(
+						c,
+						q,
+						g.chestRarityWeights,
+						g.rareChestEffectMinRarity,
+						d.Constants.rareDungeonEffectRate.min,
+						d.Constants.rareDungeonEffectRate.max
+					)
+				end
+			end
 			if g.dispatchFee ~= nil then
 				c:error(p .. ".dispatchFee", "派遣費は廃止（D-163）")
 			end
@@ -709,6 +760,7 @@ local function validateHiringData(c: Checker, d: any)
 	-- ユニーク（D-055）
 	local jobIds, giftIds = idSet(d.Jobs), idSet(d.Gifts)
 	c:uniqueIds("Uniques", d.Uniques, "uni_")
+	local loginOrders: { [number]: boolean } = {}
 	if type(d.Uniques) == "table" then
 		for i, u in d.Uniques do
 			local p = `Uniques[{i}]`
@@ -721,8 +773,21 @@ local function validateHiringData(c: Checker, d: any)
 				c:ref(`{p}.giftIds[{k}]`, g, giftIds)
 			end
 			oneOf(c, p .. ".jobChange", u.jobChange, { line = true, none = true })
+			-- 入手経路は visitor・firstClear:<dungeonId>・login の3つだけ（D-155, D-169）
 			if type(u.acquire) ~= "string" then
 				c:error(p .. ".acquire", "文字列が必要")
+			elseif string.sub(u.acquire, 1, 11) == "firstClear:" then
+				c:ref(p .. ".acquire", string.sub(u.acquire, 12), idSet(d.Dungeons))
+			elseif u.acquire == "login" then
+				-- ログインボーナス7日目のユニーク（D-155）。配る順 loginOrder は重ならない
+				if c:integer(p .. ".loginOrder", u.loginOrder, 1) then
+					if loginOrders[u.loginOrder] then
+						c:error(p .. ".loginOrder", `loginOrder が重複: {u.loginOrder}`)
+					end
+					loginOrders[u.loginOrder] = true
+				end
+			elseif u.acquire ~= "visitor" then
+				c:error(p .. ".acquire", `許可されていない値: {u.acquire}`)
 			end
 		end
 	end
@@ -841,6 +906,209 @@ local function validateDailyTraits(c: Checker, d: any)
 	end
 end
 
+-- 特別な宝箱（D-166, D-171、04章 §11）
+local RARE_PILE = "special:rare"
+
+local function validateSpecialChests(c: Checker, d: any)
+	local rows = d.SpecialChests
+	if not c:array("SpecialChests", rows) then
+		return
+	end
+	c:uniqueIds("SpecialChests", rows, "spc_")
+	local piles: { [string]: boolean } = {}
+	local nRarity = rarityCount(d)
+	for i, r in rows do
+		local p = `SpecialChests[{i}]`
+		if type(r.pileKey) ~= "string" or string.sub(r.pileKey, 1, 8) ~= "special:" then
+			c:error(p .. ".pileKey", "special: で始まる宝箱の山の鍵が必要")
+		elseif piles[r.pileKey] then
+			c:error(p .. ".pileKey", `pileKey が重複: {r.pileKey}`)
+		else
+			piles[r.pileKey] = true
+		end
+		if r.pileKey == RARE_PILE then
+			-- レアダンジョンは相当するダンジョンの表を使う（行に表を持たない：D-171）
+			if r.rarityWeights ~= nil then
+				c:error(
+					p .. ".rarityWeights",
+					"レアダンジョンの行は表を持たない（相当するダンジョンの表を使う）"
+				)
+			end
+		else
+			local okWeights = false
+			if c:array(p .. ".rarityWeights", r.rarityWeights) then
+				if #r.rarityWeights > nRarity then
+					c:error(p .. ".rarityWeights", `レアリティの数（{nRarity}）以下が必要`)
+				end
+				local sum = 0
+				for k, w in r.rarityWeights do
+					if c:number(`{p}.rarityWeights[{k}]`, w, 0) then
+						sum += w
+					end
+				end
+				if sum <= 0 then
+					c:error(p .. ".rarityWeights", "合計が0より大きいことが必要")
+				else
+					okWeights = true
+				end
+			end
+			local okLine = c:integer(p .. ".effectMinRarity", r.effectMinRarity, 1, nRarity)
+			local okLo = c:probability(p .. ".effectRateMin", r.effectRateMin)
+			local okHi = c:probability(p .. ".effectRateMax", r.effectRateMax)
+			if okLo and okHi and r.effectRateMin > r.effectRateMax then
+				c:error(p, "effectRateMin > effectRateMax")
+			elseif okWeights and okLine and okLo and okHi then
+				-- 行ごとの基準で演出率を検査する（D-090 の 10〜15% は普通のダンジョンだけ：D-166）
+				checkEffectRate(
+					c,
+					p .. ".effectMinRarity",
+					r.rarityWeights,
+					r.effectMinRarity,
+					r.effectRateMin,
+					r.effectRateMax
+				)
+			end
+		end
+	end
+end
+
+-- 報酬の形（クエスト・ログインボーナス・プレイ時間で共通。受け取り箱に入る：D-164）
+--   { gold?, items? = { [itemId] = 数 }, chests? = { { pileKey, count, rank? } } }
+-- 宝箱の山は表を持つ特別な宝箱（D-171）。rank を省けばその表で抽選する
+local function validateRewards(c: Checker, path: string, r: any, d: any)
+	if type(r) ~= "table" then
+		c:error(path, "報酬のテーブルが必要")
+		return
+	end
+	for k in r do
+		if k ~= "gold" and k ~= "items" and k ~= "chests" then
+			c:error(path, `知らない報酬の種類: {tostring(k)}`)
+		end
+	end
+	if r.gold ~= nil then
+		c:integer(path .. ".gold", r.gold, 0)
+	end
+	if r.items ~= nil then
+		if type(r.items) ~= "table" then
+			c:error(path .. ".items", "テーブルが必要")
+		else
+			local known = idSet(d.Items)
+			for itemId, n in r.items do
+				c:ref(path .. ".items", itemId, known)
+				for _, it in d.Items or {} do
+					if it.id == itemId and it.kind == "sellable" then
+						c:error(path .. ".items", `売却用アイテムは報酬にしない: {itemId}`)
+					end
+				end
+				c:integer(`{path}.items.{itemId}`, n, 1)
+			end
+		end
+	end
+	if r.chests ~= nil and c:array(path .. ".chests", r.chests) then
+		local piles: { [string]: boolean } = {}
+		for _, row in d.SpecialChests or {} do
+			if row.pileKey ~= RARE_PILE and row.rarityWeights ~= nil then
+				piles[row.pileKey] = true
+			end
+		end
+		for i, ch in r.chests do
+			local q = `{path}.chests[{i}]`
+			if type(ch) ~= "table" then
+				c:error(q, "テーブルが必要")
+			else
+				if type(ch.pileKey) ~= "string" or not piles[ch.pileKey] then
+					c:error(
+						q .. ".pileKey",
+						`表を持つ特別な宝箱の山が必要（値: {tostring(ch.pileKey)}）`
+					)
+				end
+				c:integer(q .. ".count", ch.count, 1)
+				if ch.rank ~= nil then
+					c:integer(q .. ".rank", ch.rank, 1, rarityCount(d))
+				end
+			end
+		end
+	end
+end
+
+local QUEST_KINDS = {
+	expeditions = true,
+	chestsOpened = true,
+	hires = true,
+	trainings = true,
+	clears = true,
+	rebirths = true,
+}
+
+-- クエスト・ログインボーナス・プレイ時間（D-153, D-154, D-155）
+local function validateRewardSources(c: Checker, d: any)
+	local K = if type(d.Constants) == "table" then d.Constants else {}
+	local rows = d.Quests
+	if c:array("Quests", rows) then
+		c:uniqueIds("Quests", rows, "qst_")
+		local counts = { daily = 0, weekly = 0 }
+		for i, q in rows do
+			local p = `Quests[{i}]`
+			oneOf(c, p .. ".period", q.period, { daily = true, weekly = true })
+			oneOf(c, p .. ".kind", q.kind, QUEST_KINDS)
+			if q.kind == "rebirths" and q.period ~= "weekly" then
+				c:error(p .. ".kind", "転生のお題はウィークリーだけ（D-153）")
+			end
+			c:integer(p .. ".amountPerParty", q.amountPerParty, 1)
+			validateRewards(c, p .. ".rewards", q.rewards, d)
+			if counts[q.period] then
+				counts[q.period] += 1
+			end
+		end
+		if type(K.questDailyCount) == "number" and counts.daily < K.questDailyCount then
+			c:error("Quests", `デイリーの候補が questDailyCount（{K.questDailyCount}）より少ない`)
+		end
+		if type(K.questWeeklyCount) == "number" and counts.weekly < K.questWeeklyCount then
+			c:error(
+				"Quests",
+				`ウィークリーの候補が questWeeklyCount（{K.questWeeklyCount}）より少ない`
+			)
+		end
+	end
+	validateRewards(c, "Constants.questDailyBonus", K.questDailyBonus, d)
+	validateRewards(c, "Constants.questWeeklyBonus", K.questWeeklyBonus, d)
+
+	-- ログインボーナス：1〜6日目と fallback（7日目はユニーク）
+	local L = d.LoginBonus
+	if type(L) ~= "table" then
+		c:error("LoginBonus", "テーブルが必要")
+	else
+		if c:array("LoginBonus.days", L.days, 6) then
+			for i, r in L.days do
+				validateRewards(c, `LoginBonus.days[{i}]`, r, d)
+			end
+		end
+		validateRewards(c, "LoginBonus.fallback", L.fallback, d)
+	end
+
+	-- プレイ時間：段階は昇順、1日の上限まで
+	local P = d.PlaytimeRewards
+	if c:array("PlaytimeRewards", P) then
+		if #P == 0 then
+			c:error("PlaytimeRewards", "1行以上が必要")
+		end
+		local prev = 0
+		for i, row in P do
+			local p = `PlaytimeRewards[{i}]`
+			if c:integer(p .. ".minutes", row.minutes, 1) then
+				if row.minutes <= prev then
+					c:error(p .. ".minutes", "昇順が必要")
+				end
+				if type(K.playtimeDailyCapSeconds) == "number" and row.minutes * 60 > K.playtimeDailyCapSeconds then
+					c:error(p .. ".minutes", "playtimeDailyCapSeconds を超える段階は届かない")
+				end
+				prev = row.minutes
+			end
+			validateRewards(c, p .. ".rewards", row.rewards, d)
+		end
+	end
+end
+
 local function byId(rows: any): { [string]: any }
 	local m = {}
 	if type(rows) == "table" then
@@ -867,6 +1135,8 @@ function MasterData.validate(data: any): { Issue }
 	validateGuildLevels(c, data)
 	validateExpansions(c, data)
 	validateDailyTraits(c, data)
+	validateSpecialChests(c, data)
+	validateRewardSources(c, data)
 	return c.issues
 end
 
@@ -900,6 +1170,30 @@ function MasterData.load(data: any): any
 		end
 		dg.chestRarityTable = t
 	end
+	-- 特別な宝箱（D-166）：pileKey → 行。表を持つ行には 0 を除いた { rank, weight } を付ける
+	local specialChests = {}
+	for _, row in data.SpecialChests do
+		if row.rarityWeights then
+			local t = {}
+			for rank, w in row.rarityWeights do
+				if w > 0 then
+					table.insert(t, { rank = rank, weight = w })
+				end
+			end
+			row.rarityTable = t
+		end
+		specialChests[row.pileKey] = row
+	end
+	-- ログインボーナス7日目のユニーク（D-155）：loginOrder の順
+	local loginUniques = {}
+	for _, u in data.Uniques do
+		if u.acquire == "login" then
+			table.insert(loginUniques, u)
+		end
+	end
+	table.sort(loginUniques, function(a, b)
+		return a.loginOrder < b.loginOrder
+	end)
 	-- core が使う形にまとめる（読み取り専用）
 	return table.freeze({
 		rarityCount = #data.Rarities,
@@ -920,6 +1214,12 @@ function MasterData.load(data: any): any
 		expansions = byId(data.Expansions),
 		dailyTraits = byId(data.DailyTraits),
 		dailyTraitList = data.DailyTraits,
+		specialChests = specialChests,
+		quests = byId(data.Quests),
+		questList = data.Quests,
+		loginBonus = data.LoginBonus,
+		loginUniques = loginUniques,
+		playtimeRewards = data.PlaytimeRewards,
 	})
 end
 

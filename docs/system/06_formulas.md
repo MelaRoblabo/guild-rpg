@@ -201,11 +201,20 @@ restBonusSeconds = min(restBonusSeconds + たまる量, restBonusMaxSeconds)   -
 ## 15. クエストの量（D-153）
 
 ```
-量 = Quests の amountPerParty × 解放済みのパーティ数        -- 引き直しなし
+量 = Quests の amountPerParty × 解放済みのパーティ数（expansions.partySlots。入れ替えたときの値で固定）   -- 引き直しなし
 入れ替え = dayIndex / weekIndex が変わった最初のオンラインの advance で、候補から daily は questDailyCount、weekly は questWeeklyCount 個を抽選
+抽選の乱数 = Rng.new(Rng.derive(Rng.derive(Rng.derive(calendarSeed, 日または週の番号), state.seed), 期間の番号))
+             期間の番号：daily = 1、weekly = 2。rngCounter は進めない（同じ日・同じプレイヤーなら何度計算しても同じ）
+抽選の仕方 = 候補（Quests のその期間の行、データの順）から等確率で1つずつ、重複なしで引く
+数え方     = オンライン中のコマンド・オンラインの advance の結果で数える（留守番の探索・留守中の帰還は数えない：D-161）
+             探索の回数：Dispatch・オンラインの自動再派遣（DispatchEvent は M7b-4 後半）の出発ごとに1（D-179）
+             宝箱を開けた数：OpenChests で開けた個数　雇用：HireChoose ごとに1　トレーニング：Train で行った回数
+             踏破：オンラインの advance で帰還した探索（offline でない）の result = clear ごとに1　転生：RebirthChoose ごとに1
+達成       = progress が target に届いたら done、その行の rewards を受け取り箱へ（progress は target を超えない）
+             その期間のお題が全部 done になったら、questDailyBonus / questWeeklyBonus を受け取り箱へ（bonusDone）
 ```
 
-量の式・候補は未決（M7b-6）。
+量の式・候補は未決（M7b-6）。advance の中では帰還・自動再派遣を先に処理し、そのあとで日・週の切り替えを行う（05章 §3 の順）。
 
 ## 16. 日替わりの特性（D-156, D-173）
 
@@ -263,6 +272,10 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
                    （レアダンジョンの山は、そのダンジョンの rareChestEffectMinRarity 以上が出る割合を rareDungeonEffectRate（20〜30%）で検査：D-171）
 演出の選び方の順位 = 「その宝箱の表での順位」（D-142 の「そのダンジョンでの順位」を読み替える）
 中身のアイテムレベル = 開けたときに踏破している一番深いダンジョンの tier（山は数だけを保存するため：D-171）
+                   中身のそのほか（修飾語の候補・売却用アイテム・ゴールド・転職ポーションの職業）も同じダンジョンの表
+                   （まだどこも踏破していなければダンジョンの並びの先頭。要確認）
+                   レアダンジョンの山は鍵の相当するダンジョンの表（アイテムレベルもその tier。要確認）
+ランクを決める時 = 受け取り箱に届いたとき（InboxEntry.rewards.chests の rank）。報酬の rank を書いた宝箱はそのランク
 ```
 
 クエスト・ログインボーナス・プレイ時間の宝箱も特別な宝箱（D-171）。
@@ -271,7 +284,10 @@ rng = Rng.new(Rng.derive(calendarSeed, weekIndex))           -- 全員共通。�
 
 ```
 プレイ時間  ：playtime.seconds = min(seconds + オンラインの経過秒, playtimeDailyCapSeconds)。PlaytimeRewards の minutes × 60 に届いた段階の報酬を受け取り箱へ
-ログイン    ：login.lastDayIndex < dayIndex なら1日進める（途切れても戻らない）。day = 7 の次は day = 1・cycle + 1
+ログイン    ：login.lastDayIndex < dayIndex なら、day の報酬を受け取り箱へ入れてから1日進める（途切れても戻らない）。day = 7 の次は day = 1・cycle + 1
+              7日目：master の loginOrder 順のログイン用ユニークの cycle 番目。いない・持っている（受け取り箱に届いている）なら fallback
+プレイ時間の足し方：オンラインの advance ごとに 経過秒 = ctx.now − 前回の advance の時刻（ログイン時の留守の計算で前回の時刻は ctx.now になるので、ログイン直後の最初の advance は 0）
+              日が変わっていたら seconds・claimedSteps を 0 に戻し、足すのは今日の区切り（Calendar.dayStart）より後の分だけ
 フレンド    ：ctx.now ≥ friend.nextAt のとき押せる。報酬は人数 min(friendCount, friendRewardMaxFriends) で少し増える。押したら nextAt = ctx.now + friendRewardIntervalSeconds（押さないとたまらない）
 ```
 

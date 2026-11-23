@@ -65,6 +65,7 @@ return function(t)
 		end)
 		it("D-026 帰還時刻の前は何も起きず、過ぎたら報酬が反映される", function()
 			local s = newState()
+			Game.advance(s, ctx(T0)) -- その日の最初の advance（ログインボーナス・クエストの入れ替え：D-153, D-155）を済ませておく
 			Game.execute(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, ctx(T0))
 			local e = firstExpedition(s)
 			local gold0 = s.gold

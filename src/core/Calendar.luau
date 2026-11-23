@@ -20,6 +20,11 @@ function Calendar.weekIndex(now: number): number
 	return math.floor((Calendar.dayIndex(now) + EPOCH_TO_MONDAY) / DAYS_PER_WEEK)
 end
 
+-- その日の区切りの時刻（プレイ時間を日の区切りで分けるのに使う：06章 §20）
+function Calendar.dayStart(now: number): number
+	return Calendar.dayIndex(now) * SECONDS_PER_DAY
+end
+
 -- 次の日の区切りの時刻（画面の残り時間・「明日の日替わり」の表示用）
 function Calendar.nextDayStart(now: number): number
 	return (Calendar.dayIndex(now) + 1) * SECONDS_PER_DAY

@@ -34,7 +34,8 @@ CommandText.HELP = [[
   looks-choose <prev|cur>    見た目を選ぶ（prev＝今の姿、cur＝新しい姿）
   expand <exp_id>            拡張を買う（トレーニング場もここ）
   train <adv_uid> [回数|max] トレーニング（ゴールドで経験値。既定1回）
-  autosell <on|off> [最大レアリティ] [keep|all]  自動売却（keep＝修飾語つきは残す）]]
+  autosell <on|off> [最大レアリティ] [keep|all]  自動売却（keep＝修飾語つきは残す）
+  claim                      受け取り箱の中身をまとめて受け取る（受け取れないものは残る）]]
 
 function CommandText.tokens(line: string): { string }
 	local t = {}
@@ -119,6 +120,8 @@ function CommandText.fromTokens(tokens: { string }): any?
 	elseif c == "train" then
 		local n = if tokens[3] == "max" then CommandText.TRAIN_MAX else tonumber(tokens[3]) or 1
 		return { type = "Train", adventurerUid = tokens[2], sessions = n }
+	elseif c == "claim" then
+		return { type = "ClaimInbox" }
 	elseif c == "autosell" then
 		return {
 			type = "SetAutoSell",

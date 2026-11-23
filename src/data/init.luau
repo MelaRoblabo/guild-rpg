@@ -20,4 +20,8 @@ return {
 	GuildLevels = require("@self/GuildLevels"),
 	Expansions = require("@self/Expansions"),
 	DailyTraits = require("@self/DailyTraits"),
+	SpecialChests = require("@self/SpecialChests"),
+	Quests = require("@self/Quests"),
+	LoginBonus = require("@self/LoginBonus"),
+	PlaytimeRewards = require("@self/PlaytimeRewards"),
 }

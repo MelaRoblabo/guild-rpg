@@ -6,7 +6,7 @@
 
 local Migration = {}
 
-Migration.CURRENT = 7
+Migration.CURRENT = 8
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -81,6 +81,23 @@ local STEPS: { [number]: (any, any) -> () } = {
 		end
 		state.restBonusSeconds = state.restBonusSeconds or 0
 		state.version = 7
+	end,
+	-- v7 → v8（M7b-4 前半。受け取り箱・クエスト・ログインボーナス・プレイ時間：D-164, D-153, D-155, D-154）
+	--   quests：空（次のオンラインの advance で今日・今週の分を作る）
+	--   login：lastDayIndex = -1, day = 1, cycle = 1（次のオンラインの advance で1日目）
+	--   playtime：dayIndex = -1, seconds = 0, claimedSteps = 0
+	--   inbox：空
+	-- 形は Quest.newState・Login.newState・Playtime.newState と同じ（循環を避けるためここに書く）
+	[7] = function(state)
+		state.quests = state.quests
+			or {
+				daily = { dayIndex = -1, entries = {}, bonusDone = false },
+				weekly = { weekIndex = -1, entries = {}, bonusDone = false },
+			}
+		state.login = state.login or { lastDayIndex = -1, day = 1, cycle = 1 }
+		state.playtime = state.playtime or { dayIndex = -1, seconds = 0, claimedSteps = 0 }
+		state.inbox = state.inbox or {}
+		state.version = 8
 	end,
 }
 

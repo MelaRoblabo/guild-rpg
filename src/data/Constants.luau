@@ -156,6 +156,25 @@ return {
 	},
 	calendarSeed = 20260101, -- 日替わり・今週の訪問者・マップイベントの共通の乱数の元（全員共通。値は任意の固定値）
 
+	-- 特別な宝箱（D-166, D-171。06章 §19）
+	rareDungeonEffectRate = { min = 0.20, max = 0.30 }, -- レアダンジョンの山の演出率の基準（D-171）
+
+	-- クエスト（D-153。06章 §15）。お題の候補と報酬は src/data/Quests.luau
+	questDailyCount = 3,
+	questWeeklyCount = 4, -- 3〜5 のうち仮（M7b-6）
+	-- 全部達成のボーナス（rewards の形は Quests と同じ）。量は仮（M7b-6）
+	questDailyBonus = {
+		chests = { { pileKey = "special:quest", count = 2 } },
+		items = { itm_slot_ticket = 1 },
+	},
+	questWeeklyBonus = {
+		chests = { { pileKey = "special:quest", count = 5 } },
+		items = { itm_slot_ticket = 3, itm_potion_appearance_keep = 1 },
+	},
+
+	-- プレイ時間（D-154。06章 §20）。段階と報酬は src/data/PlaytimeRewards.luau
+	playtimeDailyCapSeconds = 7200, -- 1日2時間まで
+
 	-- ギルド（Q-017）
 	guildExpPerFloor = 1,
 	guildExpClearBonus = 5,

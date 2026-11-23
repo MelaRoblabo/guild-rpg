@@ -66,19 +66,22 @@ export type Expedition = {
 
 -- 受け取り箱（D-164）：クエスト・プレイ時間・ログインボーナス・レイドなどの報酬の受け取り口。フレンドボタンの報酬は入れない（D-157）
 -- 受け取れない報酬（所属枠・倉庫がいっぱいなど）は受け取り箱に残す。期限はない（D-176）
-export type InboxEntry = {
+export type InboxEntry = {           -- version 8（M7b-4）
 	uid: string,                      -- "inb_<連番>"（nextUid から）
 	source: "quest" | "playtime" | "login" | "raid" | "referral",  -- referral は紹介の届け物（D-180）
-	at: number,                       -- 届いた時刻（ctx.now）
+	at: number,                       -- 届いた時刻（ctx.now。クエストは達成した行動の時刻）
 	rewards: {
 		gold: number?,
-		items: { [string]: number }?,  -- チケット・ポーション
-		chests: { { pileKey: string, rank: number, count: number } }?,
+		items: { [string]: number }?,  -- チケット・ポーション（売却用アイテムは報酬にしない）
+		chests: { { pileKey: string, rank: number, count: number } }?,  -- ランクは届いたときに SpecialChests の表で決める（D-166）。山×ランクでまとめ、ランクの低い順
 		uniqueId: string?,             -- ログインボーナス7日目のユニーク（D-155）
 	},
 }
+-- まとめて受け取る（ClaimInbox）とき：ゴールド・アイテム・宝箱はいつでも受け取る（宝箱は宝箱の山へ）。
+-- ユニークは所属枠に空きがあるときだけ加入し、なければその件に uniqueId だけを残す（D-176）。
+-- 受け取り箱の宝箱のランクはクライアントに送らない（Protocol.view は山ごとの数に直す：D-087）
 
-export type QuestEntry = {           -- D-153
+export type QuestEntry = {           -- D-153。version 8（M7b-4）
 	questId: string,                  -- マスターデータ Quests の id
 	target: number,                   -- 量（パーティ数から決めた値。06章 §15）
 	progress: number,
@@ -134,16 +137,16 @@ export type PlayerState = {
 	-- ここから M7b-3 以降の段階で追加（D-152〜D-168。段階ごとに version を上げる：下の「セーブの移行」）
 	lastSavedAt: number,              -- 最後に保存した時刻＝ログアウト時刻。留守の計算の基準（D-161）。サーバーが保存のときに ctx.now を書く（11章）。version 7
 	restBonusSeconds: number,         -- 休息ボーナスの残り秒（D-161。上限 restBonusMaxSeconds）。version 7
-	quests: {                         -- D-153
+	quests: {                         -- D-153。version 8
 		daily: { dayIndex: number, entries: { QuestEntry }, bonusDone: boolean },
 		weekly: { weekIndex: number, entries: { QuestEntry }, bonusDone: boolean },
-	},
-	login: {                          -- ログインボーナス（D-155）
+	},                                -- 入れ替えるまでは dayIndex / weekIndex = -1、entries = 空
+	login: {                          -- ログインボーナス（D-155）。version 8
 		lastDayIndex: number,         -- 最後に進めた日の番号（同じ日に二度進めない）
-		day: number,                  -- カレンダーの位置 1〜7（途切れても戻らない）
-		cycle: number,                -- 何周目か（1〜）。7日目のユニークを選ぶのに使う
+		day: number,                  -- 次に受け取るカレンダーの位置 1〜7（受け取ったら1つ進める。途切れても戻らない）
+		cycle: number,                -- 何周目か（1〜）。7日目のユニークを選ぶのに使う（7日目を受け取ったら +1）
 	},
-	playtime: {                       -- 今日のプレイ時間（D-154）
+	playtime: {                       -- 今日のプレイ時間（D-154）。version 8
 		dayIndex: number,             -- 日の区切りで 0 に戻す（ログアウトでは戻さない）
 		seconds: number,              -- 今日のオンラインの合計秒（上限 playtimeDailyCapSeconds）
 		claimedSteps: number,         -- 受け取り箱へ送った段階の数
@@ -161,7 +164,7 @@ export type PlayerState = {
 	merchant: { eventSlot: number, bought: { boolean } }?,  -- 今の旅の商人の品のうち買ったもの（D-152）。品ぞろえは eventSlot と seed から決まるので保存しない
 	raid: { eventSlot: number, damage: number, defeated: boolean }?,  -- 今のレイドボスの進み具合（D-152。自分専用）
 	rareDungeonSlots: { [string]: number }?,  -- レアダンジョンに出発したパーティ（partyIndex → eventSlot。1パーティ1回まで：D-152）
-	inbox: { InboxEntry },            -- 受け取り箱（D-164）
+	inbox: { InboxEntry },            -- 受け取り箱（D-164）。version 8
 }
 ```
 
@@ -202,21 +205,28 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 
 新規のセーブは `lastSavedAt = 作成時刻`、`restBonusSeconds = 0` を持つ。
 
-### version 7 → 8 以降（M7b-4 以降の各段階）
+### version 7 → 8（M7b-4 前半）　`Migration.CURRENT = 8`
+
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `quests` | `daily = { dayIndex = -1, entries = {}, bonusDone = false }`, `weekly = { weekIndex = -1, entries = {}, bonusDone = false }`（次のオンラインの advance で今日・今週の分を作る） | D-153 |
+| `login` | `lastDayIndex = -1, day = 1, cycle = 1`（次のオンラインの advance で1日目） | D-155 |
+| `playtime` | `dayIndex = -1, seconds = 0, claimedSteps = 0` | D-154 |
+| `inbox` | 空 | D-164 |
+
+新規のセーブも同じ初期値を持つ（`Game.newState`）。
+
+### version 8 → 9 以降（M7b-4 後半以降の各段階）
 
 次の項目は、それを使う段階で version を上げて足す。どの段階かは 12章「M7b の進め方」の内容に合わせ、足した段階でこの表を「version n → n+1」の節に移す。
 
 | 項目 | 旧版からの変換 | 根拠 | 足す段階（予定） |
 | --- | --- | --- | --- |
-| `expeditions[*]` | `eventSlot`・`raidDamage` は nil | D-152 | M7b-4 |
-| `equipment[*]` | `fromMerchant` は nil | D-175 | M7b-4 |
-| `quests` | 空（次の advance で今日・今週の分を作る） | D-153 | M7b-4 |
-| `login` | `lastDayIndex = -1, day = 1, cycle = 1`（次のオンラインの advance で1日目） | D-155 | M7b-4 |
-| `playtime` | `dayIndex = -1, seconds = 0, claimedSteps = 0` | D-154 | M7b-4 |
+| `expeditions[*]` | `eventSlot`・`raidDamage` は nil | D-152 | M7b-4 後半 |
+| `equipment[*]` | `fromMerchant` は nil | D-175 | M7b-4 後半 |
 | `friend` | `nextAt = 0, dayIndex = -1, todayCount = 0` | D-157 | M7b-4〜5（未定） |
 | `referral` | `inviteeRewardDone = false, rewardedInvitees = {}, weekIndex = -1, weekCount = 0` | D-157 | M7b-4〜5（未定） |
-| `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 | M7b-4 |
-| `inbox` | 空 | D-164 | M7b-4 |
-| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177, D-185 | M7b-4 |
+| `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 | M7b-4 後半 |
+| ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177, D-185 | M7b-4 後半 |
 
 新規のセーブ（`Game.newState`）は、その時点の version で足した項目を初期値で持ち、`settings.autoSell` は StarterSet の D-167 の初期値（オン）にする。
