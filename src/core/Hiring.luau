@@ -3,8 +3,10 @@
 -- 候補の抽選・ステータスの抽選・冒険者の作成。コマンドの検証は Game が行う。
 
 local Appearance = require("./Appearance")
+local ExclusiveGift = require("./ExclusiveGift")
 local Rng = require("./Rng")
 local Types = require("./Types")
+local Visitor = require("./Visitor")
 
 local Hiring = {}
 
@@ -16,38 +18,17 @@ local function hireWeightOf(j: any): number
 	return j.hireWeight
 end
 
--- 所持していないユニークのうち「特別な訪問者」で出るもの
-local function availableVisitors(state: any, master: any): { any }
-	local owned = {}
-	for _, a in state.adventurers do
-		if a.uniqueId then
-			owned[a.uniqueId] = true
-		end
-	end
-	local out = {}
-	for _, u in master.raw.Uniques do
-		if u.acquire == "visitor" and not owned[u.id] then
-			table.insert(out, u)
-		end
-	end
-	return out
-end
-
 -- 候補1人を抽選する
--- 乱数の消費順：特別な訪問者の判定 →（一般）職業 → 見た目 → 名前 → ギフト
-local function rollCandidate(state: any, rng: Rng.Rng, master: any, takenUniques: { [string]: boolean }): any
-	local K = master.K
-	local visitors = {}
-	for _, u in availableVisitors(state, master) do
-		if not takenUniques[u.id] then
-			table.insert(visitors, u)
-		end
-	end
-	if rng:chance(K.specialVisitorChance) and #visitors > 0 then
-		local u = rng:pickWeighted(visitors, function(_x)
-			return 1
-		end)
-		takenUniques[u.id] = true
+-- 乱数の消費順：今週の訪問者の判定 → 特別な訪問者の判定（Visitor.roll：D-170）→（一般）職業 → 見た目 → 名前 → ギフト
+local function rollCandidate(
+	state: any,
+	rng: Rng.Rng,
+	master: any,
+	now: number,
+	takenUniques: { [string]: boolean }
+): any
+	local u = Visitor.roll(state, rng, master, now, takenUniques)
+	if u then
 		return {
 			kind = "unique",
 			uniqueId = u.id,
@@ -55,7 +36,7 @@ local function rollCandidate(state: any, rng: Rng.Rng, master: any, takenUniques
 			gender = u.gender,
 			appearanceId = u.appearanceId,
 			jobId = u.jobId,
-			giftIds = table.clone(u.giftIds),
+			giftIds = ExclusiveGift.uniqueGiftIds(u), -- 専用ギフトを含む（D-165）
 		}
 	end
 	local job = rng:pickWeighted(master.raw.Jobs, hireWeightOf)
@@ -72,11 +53,12 @@ local function rollCandidate(state: any, rng: Rng.Rng, master: any, takenUniques
 	}
 end
 
-function Hiring.rollCandidates(state: any, rng: Rng.Rng, master: any): { any }
+-- now は今週の訪問者を決めるのに使う（D-158）
+function Hiring.rollCandidates(state: any, rng: Rng.Rng, master: any, now: number): { any }
 	local out = {}
 	local taken = {}
 	for _ = 1, state.expansions.candidateSlots do
-		table.insert(out, rollCandidate(state, rng, master, taken))
+		table.insert(out, rollCandidate(state, rng, master, now, taken))
 	end
 	return out
 end
@@ -103,8 +85,9 @@ function Hiring.uniqueStats(uniqueId: string, master: any): Types.StatBlock
 end
 
 -- 冒険者を作る（uid は呼び出し側で払い出す）
+-- ユニークなら専用ギフトを必ず持たせる（雇用・初回踏破・受け取り箱のどれで加入しても：D-165）
 function Hiring.newAdventurer(uid: string, candidate: any, stats: Types.StatBlock, now: number, master: any): any
-	return {
+	local adv = {
 		uid = uid,
 		uniqueId = candidate.uniqueId,
 		name = candidate.name,
@@ -121,6 +104,8 @@ function Hiring.newAdventurer(uid: string, candidate: any, stats: Types.StatBloc
 		locked = false,
 		hiredAt = now,
 	}
+	ExclusiveGift.grant(adv, master)
+	return adv
 end
 
 return Hiring

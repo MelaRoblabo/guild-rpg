@@ -104,11 +104,14 @@
 | `questDailyCount` / `questWeeklyCount` | 3 / 4（ウィークリーは 3〜5 のうち仮。M7b-6） | D-153 |
 | `questDailyBonus` / `questWeeklyBonus` | 全部達成のボーナス（報酬の形は §9）。デイリー：クエストの宝箱2・チケット1、ウィークリー：クエストの宝箱5・チケット3・見た目維持ポーション1（仮。M7b-6） | D-153 |
 | `playtimeDailyCapSeconds` | 7200（1日2時間まで） | D-154 |
-| `friendRewardIntervalSeconds` | 未決（M7b-6。例 600） | D-157 |
+| `friendRewardIntervalSeconds` | 600（仮。M7b-6） | D-157 |
 | `friendRewardMaxFriends` | 3（報酬が増えるのは3人分まで） | D-157 |
-| `friendRewardDailyCap` | 未決（M7b-6） | D-157 |
-| `referralWeeklyCap` / `referralProgressCondition` | 未決（M7b-6。例 週3人 / 初転生） | D-157 |
-| `weeklyVisitorChance` | 今週の訪問者の別枠の確率（候補1人ごと）。未決（M7b-6。例 0.03） | D-158, D-170 |
+| `friendRewardGold` / `friendRewardBonusPerFriend` | 100 / 0.25（仮。M7b-6）。ゴールド = floor(friendRewardGold × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))（06章 §20） | D-157 |
+| `friendRewardDailyCap` | 12（1日に押せる回数。仮。M7b-6） | D-157 |
+| `referralWeeklyCap` | 3（招待した側が報酬を受け取れる人数／週。仮。M7b-6） | D-157 |
+| `referralRewards` | `invitee`（招待された側）・`inviter`（招待した側）の報酬（形は §9 の rewards）。どちらもチケット2（仮。M7b-6） | D-157, D-180 |
+| `referralProgressCondition` | 招待した側へ届ける進み具合。サーバー側で判定する（M7b-5・M7b-6。例 初転生）。core には置かない | D-157 |
+| `weeklyVisitorChance` | 0.03（今週の訪問者の別枠の確率。候補1人ごと。仮。M7b-6） | D-158, D-170 |
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
 | `mapEventKindWeights` | レアダンジョン / レイドボス / 旅の商人：未決（M7b-6） | D-152 |
 | `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6） | D-152 |
@@ -184,13 +187,14 @@
 | --- | --- | --- | --- |
 | Uniques | `acquire` | `visitor`（雇用の特別な訪問者）・`firstClear:<dungeonId>`（初回踏破）・`login`（ログインボーナス7日目）の3つだけ。ギルドレベル報酬の経路は廃止。`login` のユニークは雇用に出さない | D-055, D-155, D-169 |
 | Uniques | `loginOrder` | `login` のユニークを配る順（1周ごとに別のユニーク）。人数は未決（Q-025） | D-155 |
-| Uniques | `exclusiveGiftId` | そのユニークの専用ギフト。中身は未決 | D-165 |
-| Gifts | `exclusive` | 専用ギフトの印。true なら一般の抽選（雇用の初期ギフト・転生で増えるギフト）に出さない。最大4つの枠（D-024）には数える | D-165 |
-| Gifts | `partyEffect` | 専用ギフトに限り、パーティ全体に効く効果（例：全員の移動が少し速い・宝箱が少し増える）を持てる。同じ効果はパーティ内で重ねない（道案内と同じ）。ゲーム仕様書04章の「補正の発生源は個体のみ」の例外 | D-174 |
+| Uniques | `exclusiveGiftId` | そのユニークの専用ギフト（`exclusive = true` のギフト）。中身は未決なので、本番データにはまだ置かない。`giftIds` と合わせて giftMax まで。加入したとき `giftIds` の最後に足す | D-165 |
+| Gifts | `exclusive` | 専用ギフトの印。true なら一般の抽選（雇用の初期ギフト・転生で増えるギフト）に出さない（`master.giftList` から除く）。最大4つの枠（D-024）には数える。`weight` は要らない。一般の冒険者・ユニークの `giftIds` には書かない | D-165 |
+| Gifts | `partyEffect` | 専用ギフトに限り、パーティ全体に効く効果を持てる。種類は決定の例の範囲の `{ kind = "travelMult", value }`（片道秒に掛ける。0 < value ≤ 1）と `{ kind = "chestMult", value }`（宝箱の数に掛ける。value ≥ 1）だけ。同じ効果はパーティ内で重ねない（一番効果の大きい1つ。道案内と同じ）。partyEffect を持つ専用ギフトは `effect` を省ける。ゲーム仕様書04章の「補正の発生源は個体のみ」の例外 | D-174 |
 
 - ユニークの強さの基準は「雇用の新人の平均より上、当たりよりは下」（D-165）。`baseStats` はこの基準で決め直す（数値は未決、シミュレーションで確認）。
 - 専用ギフトの効果の種類は、中身が決まってから必要な分だけ足す（D-165）。
 - ユニークの入手経路は上の3つ（初回踏破・ログインボーナス・雇用の特別な訪問者）。今週の訪問者は雇用の特別な訪問者の中で出やすくするもの（D-169, D-170）。
+- 検証：専用ギフトを2人のユニークが参照したらエラー、持ち主のいない専用ギフトは警告。一般の抽選に出るギフトが1つもなければエラー。
 
 ## 9. クエストのお題（Quests.luau、D-153）
 

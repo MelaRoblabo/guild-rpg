@@ -4,9 +4,11 @@
 -- M7b は段階ごとに version を上げる（v5→v6 は M7b-2、以降の段階は v6→v7 …）。
 -- マスターデータが要る手順（売却価格・初期値）があるので、migrate には master を渡す。
 
+local ExclusiveGift = require("./ExclusiveGift")
+
 local Migration = {}
 
-Migration.CURRENT = 8
+Migration.CURRENT = 9
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -98,6 +100,33 @@ local STEPS: { [number]: (any, any) -> () } = {
 		state.playtime = state.playtime or { dayIndex = -1, seconds = 0, claimedSteps = 0 }
 		state.inbox = state.inbox or {}
 		state.version = 8
+	end,
+	-- v8 → v9（M7b-4 後半の担当A。フレンドボタン・紹介・専用ギフト：D-157, D-180, D-165, D-177, D-185）
+	--   friend：nextAt = 0, dayIndex = -1, todayCount = 0
+	--   referral：まだ何も受け取っていない形（届け物の id の記録・招待した人へ届けた印を含む）
+	--   ユニークの冒険者：専用ギフトを足す。枠がいっぱいなら giftIds の先頭（一番古いギフト）と入れ替える
+	-- 形は Friend.newState・Friend.newReferralState と同じ（循環を避けるためここに書く）
+	[8] = function(state, master)
+		assert(master, "version 8 → 9 の移行には master が要る")
+		state.friend = state.friend or { nextAt = 0, dayIndex = -1, todayCount = 0 }
+		state.referral = state.referral
+			or {
+				inviteeRewardDone = false,
+				inviterDelivered = false,
+				rewardedInvitees = {},
+				claimedDeliveries = {},
+				weekIndex = -1,
+				weekCount = 0,
+			}
+		local uids = {}
+		for uid in state.adventurers or {} do
+			table.insert(uids, uid)
+		end
+		table.sort(uids)
+		for _, uid in uids do
+			ExclusiveGift.grant(state.adventurers[uid], master)
+		end
+		state.version = 9
 	end,
 }
 

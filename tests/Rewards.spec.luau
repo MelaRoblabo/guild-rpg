@@ -655,7 +655,7 @@ return function(t)
 			end)
 			local s = newState(1, m)
 			for seed = 1, 20 do
-				for _, c in Hiring.rollCandidates(s, Rng.new(seed), m) do
+				for _, c in Hiring.rollCandidates(s, Rng.new(seed), m, T0) do
 					expect(c.kind).toBe("general")
 				end
 			end
@@ -758,8 +758,7 @@ return function(t)
 				s.version = 7
 				s.quests, s.login, s.playtime, s.inbox = nil, nil, nil, nil
 				Migration.migrate(s, master)
-				expect(s.version).toBe(8)
-				expect(Migration.CURRENT).toBe(8)
+				expect(s.version).toBe(Migration.CURRENT) -- 7 → 8 → 9 …（v8 → 9 は Social.spec）
 				expect(s.quests).toEqual(Quest.newState())
 				expect(s.login).toEqual({ lastDayIndex = -1, day = 1, cycle = 1 })
 				expect(s.playtime).toEqual({ dayIndex = -1, seconds = 0, claimedSteps = 0 })

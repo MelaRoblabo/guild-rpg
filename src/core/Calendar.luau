@@ -30,4 +30,9 @@ function Calendar.nextDayStart(now: number): number
 	return (Calendar.dayIndex(now) + 1) * SECONDS_PER_DAY
 end
 
+-- 次の週の区切り（月曜 UTC 0時）の時刻（今週の訪問者の残り日数の表示用：D-158）
+function Calendar.nextWeekStart(now: number): number
+	return ((Calendar.weekIndex(now) + 1) * DAYS_PER_WEEK - EPOCH_TO_MONDAY) * SECONDS_PER_DAY
+end
+
 return Calendar

@@ -70,6 +70,12 @@ local ERRORS = {
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
 	INBOX_EMPTY = "受け取り箱は空です",
+	NO_FRIEND = "同じサーバーに友達がいません（友達を誘いましょう）",
+	FRIEND_NOT_READY = "まだ押せません（一定時間ごとに押せます）",
+	DAILY_LIMIT = "今日はもう押せません（1日の上限）",
+	ALREADY_REWARDED = "その紹介の報酬はもう受け取っています",
+	ALREADY_CLAIMED = "その届け物はもう受け取っています",
+	WEEKLY_LIMIT = "今週の紹介の報酬は上限です",
 }
 
 -- 宝箱の山の名前（普通の山はダンジョン名、特別な宝箱は種類の名前：D-166, D-171）
@@ -709,6 +715,14 @@ function Text.events(events: { any }, save: any, master: any): string
 						then "：★仲間が受け取り箱に届いた"
 						else ""}（受け取り箱へ）`
 			)
+		elseif e.type == "FriendReward" then
+			table.insert(
+				lines,
+				t
+					.. `フレンドボタン：友達{e.friendCount}人で {e.gold}G を得た（今日{e.todayCount}回目）`
+			)
+		elseif e.type == "ReferralGranted" then
+			table.insert(lines, t .. `紹介の報酬（受け取り箱へ）`)
 		elseif e.type == "PlaytimeReward" then
 			table.insert(lines, t .. `プレイ時間 {e.minutes}分の報酬（受け取り箱へ）`)
 		elseif e.type == "InboxClaimed" then
@@ -753,6 +767,38 @@ local function statLine(stats: any): string
 	end
 	local total = stats.str + stats.mag + stats.agi + stats.dex
 	return `{table.concat(parts, " ")} ／ 合計 {total} ／ HP {stats.hp}`
+end
+
+-- 今週の訪問者（D-158, D-170）
+function Text.visitor(save: any, master: any): string
+	local q = Game.query.weeklyVisitor(save.state, save.clock, master)
+	if q.uniqueId == nil then
+		return "今週の訪問者はいません"
+	end
+	local u = master.uniques[q.uniqueId]
+	local job = master.jobs[u.jobId]
+	local gifts = {}
+	for _, id in u.giftIds do
+		table.insert(gifts, master.gifts[id].name)
+	end
+	if u.exclusiveGiftId then
+		table.insert(gifts, `★{master.gifts[u.exclusiveGiftId].name}`)
+	end
+	local lines = {
+		`【今週の訪問者】{u.name}（{if job then job.name else u.jobId}）ギフト：{table.concat(
+			gifts,
+			"・"
+		)}`,
+		if q.owned
+			then "  仲間済み（雇用の候補には出ません）"
+			else string.format(
+				"  出現率：候補1人ごとに %.1f%%（候補 %d 人ぶん判定）",
+				q.chance * 100,
+				q.candidateSlots
+			),
+		`  次の週の区切りまで {hms(q.nextWeekAt - save.clock)}`,
+	}
+	return table.concat(lines, "\n")
 end
 
 function Text.hiring(save: any, master: any): string

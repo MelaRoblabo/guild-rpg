@@ -289,6 +289,15 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	end
 	c:integer(p .. ".hireFreeRerolls", k.hireFreeRerolls, 0)
 	c:probability(p .. ".specialVisitorChance", k.specialVisitorChance)
+	c:probability(p .. ".weeklyVisitorChance", k.weeklyVisitorChance) -- D-158, D-170
+
+	-- フレンドボタン・紹介（D-157）
+	c:integer(p .. ".friendRewardIntervalSeconds", k.friendRewardIntervalSeconds, 1)
+	c:integer(p .. ".friendRewardMaxFriends", k.friendRewardMaxFriends, 1)
+	c:integer(p .. ".friendRewardGold", k.friendRewardGold, 0)
+	c:number(p .. ".friendRewardBonusPerFriend", k.friendRewardBonusPerFriend, 0)
+	c:integer(p .. ".friendRewardDailyCap", k.friendRewardDailyCap, 1)
+	c:integer(p .. ".referralWeeklyCap", k.referralWeeklyCap, 1)
 
 	-- 見た目
 	c:weights(p .. ".appearanceGenderWeights", k.appearanceGenderWeights, "weight", true)
@@ -353,6 +362,8 @@ local STAT_SET = { str = true, mag = true, agi = true, dex = true, hp = true }
 local SLOTS = { weapon = true, armor = true, sub = true }
 local ATTACK_TYPES = { physical = true, magic = true }
 local JOB_LINES = { warrior = true, scout = true, mage = true, support = true }
+-- 専用ギフトのパーティ全体の効果の種類（D-174。決定の例の範囲：移動が少し速い・宝箱が少し増える）
+local PARTY_EFFECT_KINDS = { travelMult = true, chestMult = true }
 
 local function idSet(rows: any): { [string]: boolean }
 	local s = {}
@@ -360,6 +371,19 @@ local function idSet(rows: any): { [string]: boolean }
 		for _, r in rows do
 			if type(r) == "table" and type(r.id) == "string" then
 				s[r.id] = true
+			end
+		end
+	end
+	return s
+end
+
+-- 専用ギフト（exclusive = true）の id の集合（D-165）
+local function exclusiveGiftSet(d: any): { [string]: boolean }
+	local s = {}
+	if type(d.Gifts) == "table" then
+		for _, g in d.Gifts do
+			if type(g) == "table" and type(g.id) == "string" and g.exclusive == true then
+				s[g.id] = true
 			end
 		end
 	end
@@ -438,12 +462,50 @@ local function validateContent(c: Checker, d: any)
 		{ statPct = true, lucky = true, atkVsTagPct = true, travelMult = true, trapDexMult = true, expPct = true }
 	c:uniqueIds("Gifts", d.Gifts, "gift_")
 	if type(d.Gifts) == "table" then
+		local general = 0
 		for i, g in d.Gifts do
 			local p = `Gifts[{i}]`
-			c:number(p .. ".weight", g.weight, 0)
+			-- 専用ギフト（D-165）：一般の抽選に出さないので weight は要らない
+			if g.exclusive ~= nil and type(g.exclusive) ~= "boolean" then
+				c:error(p .. ".exclusive", "真偽値が必要")
+			end
+			local exclusive = g.exclusive == true
+			if exclusive then
+				if g.weight ~= nil then
+					c:number(p .. ".weight", g.weight, 0)
+				end
+			else
+				general += 1
+				c:number(p .. ".weight", g.weight, 0)
+			end
+			-- パーティ全体の効果は専用ギフトだけ（D-174）
+			local pe = g.partyEffect
+			if pe ~= nil then
+				if not exclusive then
+					c:error(
+						p .. ".partyEffect",
+						"partyEffect は専用ギフト（exclusive = true）だけが持てる（D-174）"
+					)
+				elseif type(pe) ~= "table" then
+					c:error(p .. ".partyEffect", "テーブルが必要")
+				else
+					oneOf(c, p .. ".partyEffect.kind", pe.kind, PARTY_EFFECT_KINDS)
+					if pe.kind == "travelMult" then
+						if c:number(p .. ".partyEffect.value", pe.value, 0, 1) and pe.value <= 0 then
+							c:error(p .. ".partyEffect.value", "0 より大きい値が必要")
+						end
+					elseif pe.kind == "chestMult" then
+						c:number(p .. ".partyEffect.value", pe.value, 1)
+					end
+				end
+			end
 			local e = g.effect
+			-- 専用ギフトはパーティ全体の効果だけでもよい（effect を省ける）
+			local effectOptional = exclusive and pe ~= nil
 			if type(e) ~= "table" then
-				c:error(p .. ".effect", "effect が必要")
+				if not (e == nil and effectOptional) then
+					c:error(p .. ".effect", "effect が必要")
+				end
 			else
 				oneOf(c, p .. ".effect.kind", e.kind, giftKinds)
 				if e.kind == "statPct" then
@@ -453,6 +515,9 @@ local function validateContent(c: Checker, d: any)
 					c:number(p .. ".effect.value", e.value, 0)
 				end
 			end
+		end
+		if general == 0 then
+			c:error("Gifts", "一般の抽選に出るギフト（exclusive でないもの）が1つ以上必要")
 		end
 	end
 
@@ -689,6 +754,9 @@ local function validateLootAndStarter(c: Checker, d: any)
 			end
 			for k, g in a.giftIds or {} do
 				c:ref(`{p}.giftIds[{k}]`, g, giftIds)
+				if exclusiveGiftSet(d)[g] then
+					c:error(`{p}.giftIds[{k}]`, `専用ギフトは一般の冒険者に付けない: {g}`)
+				end
 			end
 			for slot, e in a.equipment or {} do
 				c:ref(`{p}.equipment.{slot}`, e, equipIds)
@@ -761,6 +829,8 @@ local function validateHiringData(c: Checker, d: any)
 	local jobIds, giftIds = idSet(d.Jobs), idSet(d.Gifts)
 	c:uniqueIds("Uniques", d.Uniques, "uni_")
 	local loginOrders: { [number]: boolean } = {}
+	local exclusiveIds = exclusiveGiftSet(d)
+	local exclusiveOwner: { [string]: string } = {}
 	if type(d.Uniques) == "table" then
 		for i, u in d.Uniques do
 			local p = `Uniques[{i}]`
@@ -771,6 +841,32 @@ local function validateHiringData(c: Checker, d: any)
 			end
 			for k, g in u.giftIds or {} do
 				c:ref(`{p}.giftIds[{k}]`, g, giftIds)
+				if exclusiveIds[g] then
+					c:error(`{p}.giftIds[{k}]`, `専用ギフトは exclusiveGiftId に書く: {g}`)
+				end
+			end
+			-- 専用ギフト（D-165）：持ち主のユニークは1人だけ。ギフトの枠（giftMax）に数える
+			if u.exclusiveGiftId ~= nil then
+				c:ref(p .. ".exclusiveGiftId", u.exclusiveGiftId, giftIds)
+				if giftIds[u.exclusiveGiftId] and not exclusiveIds[u.exclusiveGiftId] then
+					c:error(p .. ".exclusiveGiftId", `exclusive = true のギフトが必要: {u.exclusiveGiftId}`)
+				elseif exclusiveOwner[u.exclusiveGiftId] then
+					c:error(
+						p .. ".exclusiveGiftId",
+						`専用ギフトを2人のユニークが参照: {u.exclusiveGiftId}（{exclusiveOwner[u.exclusiveGiftId]} と {tostring(
+							u.id
+						)}）`
+					)
+				else
+					exclusiveOwner[u.exclusiveGiftId] = tostring(u.id)
+				end
+				local giftMax = if type(d.Constants) == "table" then d.Constants.giftMax else nil
+				if type(giftMax) == "number" and #(u.giftIds or {}) + 1 > giftMax then
+					c:error(
+						p .. ".exclusiveGiftId",
+						`giftIds と専用ギフトの合計が giftMax（{giftMax}）を超える`
+					)
+				end
 			end
 			oneOf(c, p .. ".jobChange", u.jobChange, { line = true, none = true })
 			-- 入手経路は visitor・firstClear:<dungeonId>・login の3つだけ（D-155, D-169）
@@ -789,6 +885,11 @@ local function validateHiringData(c: Checker, d: any)
 			elseif u.acquire ~= "visitor" then
 				c:error(p .. ".acquire", `許可されていない値: {u.acquire}`)
 			end
+		end
+	end
+	for id in exclusiveIds do
+		if not exclusiveOwner[id] then
+			c:warn("Gifts", `持ち主のユニークがいない専用ギフト: {id}`)
 		end
 	end
 end
@@ -1073,6 +1174,15 @@ local function validateRewardSources(c: Checker, d: any)
 	validateRewards(c, "Constants.questDailyBonus", K.questDailyBonus, d)
 	validateRewards(c, "Constants.questWeeklyBonus", K.questWeeklyBonus, d)
 
+	-- 紹介の報酬（D-157, D-180）：招待された側・招待した側
+	if type(K.referralRewards) ~= "table" then
+		c:error("Constants.referralRewards", "テーブルが必要")
+	else
+		for _, role in { "invitee", "inviter" } do
+			validateRewards(c, `Constants.referralRewards.{role}`, K.referralRewards[role], d)
+		end
+	end
+
 	-- ログインボーナス：1〜6日目と fallback（7日目はユニーク）
 	local L = d.LoginBonus
 	if type(L) ~= "table" then
@@ -1194,6 +1304,19 @@ function MasterData.load(data: any): any
 	table.sort(loginUniques, function(a, b)
 		return a.loginOrder < b.loginOrder
 	end)
+	-- 一般の抽選に出るギフト（D-165）と、今週の訪問者・特別な訪問者の候補（acquire = "visitor"。データの並び順：D-158）
+	local generalGifts = {}
+	for _, g in data.Gifts do
+		if g.exclusive ~= true then
+			table.insert(generalGifts, g)
+		end
+	end
+	local visitorUniques = {}
+	for _, u in data.Uniques do
+		if u.acquire == "visitor" then
+			table.insert(visitorUniques, u)
+		end
+	end
 	-- core が使う形にまとめる（読み取り専用）
 	return table.freeze({
 		rarityCount = #data.Rarities,
@@ -1202,7 +1325,7 @@ function MasterData.load(data: any): any
 		rarities = data.Rarities,
 		jobs = byId(data.Jobs),
 		gifts = byId(data.Gifts),
-		giftList = data.Gifts,
+		giftList = generalGifts, -- 一般の抽選（雇用の初期ギフト・転生で増えるギフト）に出るギフト。専用ギフトは除く（D-165）
 		modifiers = byId(data.Modifiers),
 		equipmentBases = byId(data.EquipmentBases),
 		items = byId(data.Items),
@@ -1219,6 +1342,7 @@ function MasterData.load(data: any): any
 		questList = data.Quests,
 		loginBonus = data.LoginBonus,
 		loginUniques = loginUniques,
+		visitorUniques = visitorUniques,
 		playtimeRewards = data.PlaytimeRewards,
 	})
 end

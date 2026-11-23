@@ -4,13 +4,15 @@
 --   Game.advance(state, ctx) -> events        すべてのコマンドの前に呼ぶ（入口側の責任）
 --   Game.execute(state, command, ctx) -> { ok, events } | { ok = false, error }
 --   Game.query.*                              表示用の読み取り（状態を変えない）
--- ctx = { now: number, master: any, online: boolean }
+-- ctx = { now: number, master: any, online: boolean, friendCount: number? }
+--   friendCount：同じサーバーにいる友達の数（サーバーが数える：M7b-5。ClaimFriendReward だけが使う：D-157）
 
 local Calendar = require("./Calendar")
 local Chest = require("./Chest")
 local DailyTrait = require("./DailyTrait")
 local Expedition = require("./Expedition")
 local Formulas = require("./Formulas")
+local Friend = require("./Friend")
 local Growth = require("./Growth")
 local Guild = require("./Guild")
 local Appearance = require("./Appearance")
@@ -26,10 +28,11 @@ local Quest = require("./Quest")
 local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
 local Training = require("./Training")
+local Visitor = require("./Visitor")
 
 local Game = {}
 
-export type Ctx = { now: number, master: any, online: boolean }
+export type Ctx = { now: number, master: any, online: boolean, friendCount: number? }
 export type Result = { ok: boolean, events: { any }?, error: string? }
 
 -- 補助 -------------------------------------------------------------------
@@ -106,6 +109,8 @@ function Game.newState(master: any, seed: number, now: number): any
 		login = Login.newState(), -- D-155。次のオンラインの advance で1日目
 		playtime = Playtime.newState(), -- D-154
 		inbox = {}, -- 受け取り箱（D-164）
+		friend = Friend.newState(), -- フレンドボタン（D-157）。version 9
+		referral = Friend.newReferralState(), -- 紹介（D-157, D-180）。version 9
 	}
 	for i = 1, state.expansions.partySlots do
 		state.parties[i] = { index = i, slots = Party.newSlots(), autoRepeat = nil }
@@ -780,7 +785,7 @@ handlers.HireStart = function(state, _cmd, ctx)
 	state.gold -= K.hireCost
 	local rng = takeRng(state)
 	state.hireSession = {
-		candidates = Hiring.rollCandidates(state, rng, ctx.master),
+		candidates = Hiring.rollCandidates(state, rng, ctx.master, ctx.now), -- 今週の訪問者は ctx.now の週（D-158）
 		pickedIndex = nil,
 		previousRoll = nil,
 		currentRoll = nil,
@@ -1253,6 +1258,31 @@ handlers.ClaimInbox = function(state, _cmd, ctx)
 	return { ok = true, events = events }
 end
 
+-- フレンドボタン（05章 ClaimFriendReward、D-157）：友達の数はサーバーが数えて ctx.friendCount で渡す（M7b-5）
+-- 受け取り箱には入れず、その場でゴールドを渡す
+handlers.ClaimFriendReward = function(state, _cmd, ctx)
+	local ev, err = Friend.claim(state, ctx.now, ctx.friendCount or 0, ctx.master)
+	if err then
+		return fail(err)
+	end
+	return { ok = true, events = { ev } }
+end
+
+-- 紹介の報酬（05章 GrantReferral、D-157, D-180。サーバー専用）：受け取り箱へ入れる
+--   role = "invitee"：招待された側（1回だけ）
+--   role = "inviter"：招待した側。userId は招待された人、deliveryId は届け物の id（同じ id は二度受け取らない）
+handlers.GrantReferral = function(state, cmd, ctx)
+	if type(cmd.userId) ~= "number" then
+		return fail("INVALID_USER")
+	end
+	local ev, err =
+		Friend.grantReferral(state, cmd.role, cmd.userId, cmd.deliveryId, ctx.now, rngTaker(state), ctx.master)
+	if err then
+		return fail(err)
+	end
+	return { ok = true, events = { ev } }
+end
+
 Game.COMMANDS = {}
 for name in handlers do
 	table.insert(Game.COMMANDS, name)
@@ -1276,6 +1306,25 @@ function Game.execute(state: any, command: any, ctx: Ctx): Result
 		end
 	end
 	return result
+end
+
+-- 届け物（D-180）：別の保存場所（サーバーが M7b-5 で持つ）から届いた物を受け取り箱へ入れる
+-- delivery = { id, kind, fromUserId, at, data? }。kind = "referral" は紹介で招待した側への報酬
+-- 戻り値：(状態を変えたか, events)。同じ id の届け物は二度受け取らない（変えずに false）。
+-- false のとき（受け取り済み・週の上限・知らない種類）も、サーバーは届け物を消してよい
+function Game.grantDelivery(state: any, delivery: any, ctx: Ctx): (boolean, { any })
+	if type(delivery) ~= "table" or type(delivery.id) ~= "string" then
+		return false, {}
+	end
+	if delivery.kind == "referral" then
+		local r = Game.execute(
+			state,
+			{ type = "GrantReferral", role = "inviter", userId = delivery.fromUserId, deliveryId = delivery.id },
+			ctx
+		)
+		return r.ok, r.events or {}
+	end
+	return false, {}
 end
 
 -- 読み取り ---------------------------------------------------------------
@@ -1366,6 +1415,24 @@ function Game.query.dailyTraits(now: number, master: any): any
 		today = DailyTrait.forDay(day, master),
 		tomorrow = DailyTrait.forDay(day + 1, master),
 		nextDayAt = Calendar.nextDayStart(now),
+	}
+end
+
+-- 今週の訪問者（D-158, D-170）：雇用画面のバナー用
+-- { uniqueId, chance（候補1人ごと）, candidateSlots, owned, weekIndex, nextWeekAt }
+function Game.query.weeklyVisitor(state: any, now: number, master: any): any
+	return Visitor.summary(state, now, master)
+end
+
+-- フレンドボタン（D-157）：次に押せる時刻・今日押した回数・1日の上限・今押したときのゴールド
+function Game.query.friend(state: any, now: number, friendCount: number, master: any): any
+	local F = state.friend
+	return {
+		nextAt = F.nextAt,
+		todayCount = if F.dayIndex == Calendar.dayIndex(now) then F.todayCount else 0,
+		dailyCap = master.K.friendRewardDailyCap,
+		gold = Friend.gold(friendCount, master),
+		blocker = Friend.blocker(state, now, friendCount, master),
 	}
 end
 

@@ -63,8 +63,14 @@ local function persist()
 	fs.writeFile(savePath, serde.encode("json", save))
 end
 
-local function ctx(online: boolean?)
-	return { now = save.clock, master = master, online = if online == nil then true else online }
+-- friendCount：同じサーバーの友達の数（本番はサーバーが数える：D-157。テキスト版は friend の引数）
+local function ctx(online: boolean?, friendCount: number?)
+	return {
+		now = save.clock,
+		master = master,
+		online = if online == nil then true else online,
+		friendCount = friendCount,
+	}
 end
 
 -- 出力 -----------------------------------------------------------------
@@ -74,8 +80,8 @@ local function say(s: string)
 end
 
 -- コマンド ---------------------------------------------------------------
-local function run(cmd: any): any
-	local result = Game.execute(save.state, cmd, ctx())
+local function run(cmd: any, friendCount: number?): any
+	local result = Game.execute(save.state, cmd, ctx(nil, friendCount))
 	return result
 end
 
@@ -99,6 +105,7 @@ local HELP = [[
   quests                     今日・今週のクエストと進み具合（D-153）
   calendar                   ログインボーナスのカレンダー・今日のプレイ時間・休息ボーナス（D-154, D-155）
   candidates                 候補と面接の状況を表示
+  visitor                    今週の訪問者と出現率（D-158）
   expansions                 拡張の一覧（次の段階の条件と費用）
   trainquote <adv_uid> <Lv>  そのレベルまでのトレーニング費用の見積もり
 状態を変えるコマンド
@@ -195,6 +202,8 @@ local function handle(tokens: { string }): (boolean, any)
 		say(Text.calendar(save, master))
 	elseif c == "candidates" then
 		say(Text.hiring(save, master))
+	elseif c == "visitor" then
+		say(Text.visitor(save, master))
 	elseif c == "expansions" then
 		say(Text.expansions(save, master))
 	elseif c == "trainquote" then
@@ -210,7 +219,9 @@ local function handle(tokens: { string }): (boolean, any)
 			-- sellweak の対象を省いたら直前の開封結果（09章、D-167）
 			cmd.equipmentUids = save.lastOpenedEquipment or {}
 		end
-		result = run(cmd)
+		-- friend [人数]：友達の数はコマンドではなく ctx で渡す（D-157。既定1）
+		local friendCount = if cmd.type == "ClaimFriendReward" then tonumber(tokens[2]) or 1 else nil
+		result = run(cmd, friendCount)
 		if result.ok and cmd.type == "OpenChests" then
 			-- 開封結果に残った装備を覚えておく（sellweak 用。ゲームの状態ではなくテキスト版のセーブに置く）
 			local uids = {}

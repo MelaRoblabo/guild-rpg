@@ -35,7 +35,8 @@ CommandText.HELP = [[
   expand <exp_id>            拡張を買う（トレーニング場もここ）
   train <adv_uid> [回数|max] トレーニング（ゴールドで経験値。既定1回）
   autosell <on|off> [最大レアリティ] [keep|all]  自動売却（keep＝修飾語つきは残す）
-  claim                      受け取り箱の中身をまとめて受け取る（受け取れないものは残る）]]
+  claim                      受け取り箱の中身をまとめて受け取る（受け取れないものは残る）
+  friend [人数]              フレンドボタン（友達の数はサーバーが数える。テキスト版は引数で与える。既定1：D-157）]]
 
 function CommandText.tokens(line: string): { string }
 	local t = {}
@@ -122,6 +123,9 @@ function CommandText.fromTokens(tokens: { string }): any?
 		return { type = "Train", adventurerUid = tokens[2], sessions = n }
 	elseif c == "claim" then
 		return { type = "ClaimInbox" }
+	elseif c == "friend" then
+		-- 友達の数はコマンドに入れない（サーバーが数えて ctx.friendCount で渡す。テキスト版は呼び出し側が引数を ctx に入れる）
+		return { type = "ClaimFriendReward" }
 	elseif c == "autosell" then
 		return {
 			type = "SetAutoSell",

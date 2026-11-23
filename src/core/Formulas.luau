@@ -134,7 +134,7 @@ function Formulas.memberSnapshot(def: MemberDef, master: any): MemberSnapshot
 	for _, giftId in def.giftIds do
 		local gift = master.gifts[giftId]
 		assert(gift, `未知のギフト: {giftId}`)
-		local e = gift.effect
+		local e = gift.effect or {} -- 専用ギフトはパーティ全体の効果だけのこともある（D-174。ExclusiveGift.partyEffects）
 		if e.kind == "statPct" then
 			rates[e.stat] += e.value
 		elseif e.kind == "atkVsTagPct" then
