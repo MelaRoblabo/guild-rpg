@@ -152,7 +152,7 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
 商人の価格   ：floor( 売却価格（§10） × merchantPriceMult × (1 + merchantGradeCoef × grade) × (修飾語つきなら 1 + merchantModifierCoef) )   -- 係数は未決（M7b-6）
 買える間     ：イベントの出発と同じ3分間（mapEventWindowSeconds）                                 -- D-179
 レアダンジョン：強さは踏破済みの一番深いダンジョンと同じ。宝箱の数 × rareDungeonChestMult（端数は確率で切り上げ：D-173）
-              宝箱の山は special:rare:<相当するダンジョン>（踏破済みの一番深いダンジョンの1段上）。中身はそのダンジョンの表   -- §19、D-171
+              宝箱の山は special:rare:<相当するダンジョン>（踏破済みの一番深いダンジョンの1段上。天空の玉座を踏破した後は天空の玉座のまま：D-185）。中身はそのダンジョンの表   -- §19、D-171
 レイド       ：その時間帯に出発したパーティのダメージ（出発時に計算）の合計 > raidHp なら討伐。宝箱は参加したパーティごとに1つ   -- D-179
               HP とダメージの式は M7b-6 で決める
 ```

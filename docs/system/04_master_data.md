@@ -145,7 +145,7 @@
 
 - **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、必要なら `chestEffectMinRarity` を見直す。検証が長さの食い違いをエラーにする。
 - 派遣費 `dispatchFee` は廃止（D-163。D-079 を廃止）。テンプレート・calibrate・Dungeons から消す。
-- レアダンジョンの山（`special:rare:<dungeonId>`）は、そのダンジョンの `chestRarityWeights` をそのまま使う。演出ラインだけ別に `rareChestEffectMinRarity` をテンプレートに書き、calibrate が写す。この演出ライン以上が出る割合が `rareDungeonEffectRate`（20〜30%）に収まるかを検証する（D-171）。
+- レアダンジョンの山（`special:rare:<dungeonId>`）は、そのダンジョンの `chestRarityWeights` をそのまま使う。演出ラインだけ別に `rareChestEffectMinRarity` をテンプレートに書き、calibrate が写す。この演出ライン以上が出る割合が `rareDungeonEffectRate`（20〜30%）に収まるかを検証する（D-171, D-185）。
 - 経験値は「深いダンジョンほど1秒あたりの経験値が前の1.08倍以上」になるよう calibrate が引き上げる（D-097）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 
