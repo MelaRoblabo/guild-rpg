@@ -101,20 +101,45 @@ return {
 	-- 今週の訪問者（D-158, D-170。06章 §18）：候補1人ごとに、まずこの確率で今週の訪問者を判定する
 	weeklyVisitorChance = 0.03, -- 仮（M7b-6）
 
-	-- フレンドボタン（D-157。06章 §20）。量は仮（M7b-6）
-	--   ゴールド = floor(friendRewardGold × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))
+	-- 報酬のゴールド（D-190。06章 §22）：プレイ時間・クエスト・ログインボーナス・フレンドボタン
+	--   ゴールド = floor(rewardGoldBase[基準のダンジョン] × 報酬ごとの係数)
+	--   基準のダンジョン＝踏破した一番深いダンジョン（まだどこも踏破していなければ古い墓地：D-187）
+	--   報酬ごとの係数は rewards の goldMult（Quests・PlaytimeRewards・LoginBonus）と friendRewardGoldMult
+	--   値はすべて仮（M7b-6）。仮の値は各ダンジョンの battleReward.gold に比例させ、古い墓地を 100 にした
+	rewardGoldBase = {
+		dng_graveyard = 100, -- 仮（M7b-6）
+		dng_ruins = 150, -- 仮（M7b-6）
+		dng_tower = 210, -- 仮（M7b-6）
+		dng_castle = 310, -- 仮（M7b-6）
+		dng_sunken_temple = 440, -- 仮（M7b-6）
+		dng_mist_forest = 640, -- 仮（M7b-6）
+		dng_labyrinth = 930, -- 仮（M7b-6）
+		dng_abbey = 1350, -- 仮（M7b-6）
+		dng_iron_fortress = 1950, -- 仮（M7b-6）
+		dng_dragon_nest = 2830, -- 仮（M7b-6）
+		dng_demon_gate = 4110, -- 仮（M7b-6）
+		dng_sky_throne = 5960, -- 仮（M7b-6）
+	},
+
+	-- フレンドボタン（D-157, D-190。06章 §20）。量は仮（M7b-6）
+	--   ゴールド = floor(rewardGoldBase[基準のダンジョン] × friendRewardGoldMult
+	--                    × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))
 	friendRewardIntervalSeconds = 600, -- 仮（M7b-6）。押したら次に押せるまでの秒（押さないとたまらない）
 	friendRewardMaxFriends = 3, -- 報酬が増えるのは3人分まで
-	friendRewardGold = 100, -- 仮（M7b-6）。友達1人のときのゴールド
+	friendRewardGoldMult = 1, -- 仮（M7b-6）。友達1人のときの係数（rewardGoldBase に掛ける）
 	friendRewardBonusPerFriend = 0.25, -- 仮（M7b-6）。2人目から1人ごとに増える割合
 	friendRewardDailyCap = 12, -- 仮（M7b-6）。1日に押せる回数
 
-	-- 紹介（D-157, D-180。05章 GrantReferral）。報酬は受け取り箱へ（rewards の形はクエストと同じ）。量は仮（M7b-6）
+	-- 紹介（D-157, D-180, D-192。05章 GrantReferral）。報酬は受け取り箱へ（rewards の形はクエストと同じ）
+	-- 報酬はステータススロットチケット。招待した側・された側とも、招待された人が referralProgressCondition に届いたときに渡す
 	referralWeeklyCap = 3, -- 仮（M7b-6）。招待した側が報酬を受け取れる人数（週）
 	referralRewards = {
-		invitee = { items = { itm_slot_ticket = 2 } }, -- 仮（M7b-6）。招待された側（1回だけ）
-		inviter = { items = { itm_slot_ticket = 2 } }, -- 仮（M7b-6）。招待した側（相手1人ごと）
+		invitee = { items = { itm_slot_ticket = 2 } }, -- 量は仮（M7b-6）。招待された側（1回だけ）
+		inviter = { items = { itm_slot_ticket = 2 } }, -- 量は仮（M7b-6）。招待した側（相手1人ごと）
 	},
+	-- 招待された人の進み具合の条件（D-192。Friend.referralProgressReached）。仮（M7b-6）
+	--   kind = "rebirthedAdventurers"：転生した冒険者（rebirthCount ≥ 1）が count 人以上（初転生：D-157 の例）
+	referralProgressCondition = { kind = "rebirthedAdventurers", count = 1 },
 
 	-- 見た目（D-050）
 	appearanceGenderWeights = {
@@ -195,6 +220,7 @@ return {
 	raidDamagePerAtk = 1, -- 仮（M7b-6）
 	raidTravelSeconds = 60, -- レイドへの片道秒（到着でダメージを入れ、同じ秒数で帰る）。仮（M7b-6）
 	-- 旅の商人（D-152。06章 §12）
+	-- 品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン：D-189）
 	merchantItemCount = { min = 3, max = 5 }, -- 品の数（プレイヤーごと）
 	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）
 	merchantGradeCoef = 0.5, -- 仮（M7b-6）

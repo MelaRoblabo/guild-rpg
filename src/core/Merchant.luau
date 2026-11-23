@@ -1,9 +1,10 @@
 --!strict
--- 旅の商人（D-152, D-167, D-179、docs/system/06_formulas.md §12）
+-- 旅の商人（D-152, D-167, D-179, D-187, D-189、docs/system/06_formulas.md §12）
 --   品ぞろえはプレイヤーごと：Rng.new(Rng.derive(state.seed, eventSlot)) から作る（rngCounter は進めない。保存しない）
 --   品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで：
---     品ごとに、候補のダンジョン（踏破済み。まだどこも踏破していなければ並びの先頭：要確認）から等確率で1つ選び、
---     そのダンジョンの宝箱のレアリティの表でレアリティを引き、宝箱の中身と同じ抽選で装備を作る（Chest.rollEquipment）
+--     品ごとに、候補のダンジョン（踏破済み。まだどこも踏破していなければ古い墓地：D-187）から等確率で1つ選び、
+--     そのダンジョンの宝箱のレアリティの表からコモンを除いた表（Merchant.rarityTable。コモンしかない表ならコモン：D-189）で
+--     レアリティを引き、宝箱の中身と同じ抽選で装備を作る（Chest.rollEquipment）
 --   候補のダンジョンは、その時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに
 --   新しく踏破しても、品ぞろえと「買った」の並びがずれないように）
 -- 状態を持たない（関数の集合）。
@@ -14,7 +15,7 @@ local Rng = require("./Rng")
 
 local Merchant = {}
 
--- 今の踏破済みのダンジョン（並び順）。なければ並びの先頭だけ
+-- 今の踏破済みのダンジョン（並び順）。なければ並びの先頭（古い墓地：D-187）だけ
 function Merchant.currentDungeonIds(state: any, master: any): { string }
 	local ids = {}
 	for _, d in master.dungeonList do
@@ -56,6 +57,18 @@ local function weightOf(e: any): number
 	return e.weight
 end
 
+-- 品のレアリティの表（D-189）：そのダンジョンの宝箱の表（chestRarityTable）からコモン（rank 1）を除いたもの。
+-- コモンしかない表のときは宝箱の表のまま（コモン）。宝箱で出る範囲は超えない
+function Merchant.rarityTable(dungeon: any): { any }
+	local out = {}
+	for _, e in dungeon.chestRarityTable do
+		if e.rank > 1 then
+			table.insert(out, e)
+		end
+	end
+	return if #out > 0 then out else dungeon.chestRarityTable
+end
+
 -- 品ぞろえ：{ { item = 装備の中身（baseId・rarity・grade・itemLevel・modifierId・modifierValue）, price, dungeonId } }
 -- 乱数の消費順：品の数 → 品ごとに（ダンジョン → レアリティ → 装備の抽選）
 function Merchant.goods(state: any, slot: number, master: any): { any }
@@ -66,7 +79,7 @@ function Merchant.goods(state: any, slot: number, master: any): { any }
 	local out = {}
 	for _ = 1, n do
 		local d = master.dungeons[rng:pickWeighted(dungeonIds, uniform)]
-		local rank = rng:pickWeighted(d.chestRarityTable, weightOf).rank
+		local rank = rng:pickWeighted(Merchant.rarityTable(d), weightOf).rank -- D-189
 		local item = Chest.rollEquipment(rank, d, rng, master)
 		table.insert(out, { item = item, price = Merchant.price(item, master), dungeonId = d.id })
 	end

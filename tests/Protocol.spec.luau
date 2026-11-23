@@ -99,9 +99,9 @@ return function(t)
 			expect(v.seed).toBe(nil)
 			expect(v.rngCounter).toBe(nil)
 			expect(v.stats).toBe(nil)
-			-- 宝箱はダンジョンごとの数だけ（{ dungeonId, count } の配列）
+			-- 宝箱は山ごとの数だけ（{ pileKey, count } の配列。特別な宝箱の山も含む：D-166）
 			for _, c in v.chests do
-				expect(type(c.dungeonId)).toBe("string")
+				expect(type(c.pileKey)).toBe("string")
 				expect(type(c.count)).toBe("number")
 				expect(c.rank).toBe(nil)
 			end
@@ -114,6 +114,62 @@ return function(t)
 				expect(e.seed).toBe(nil)
 				expect(type(e.log.rewards.chestCount)).toBe("number")
 			end
+		end)
+		it(
+			"D-087 D-166 要約の chests は特別な宝箱を含む全部の山の { pileKey, count } の配列（ランクは隠す）",
+			function()
+				local s = Game.newState(master, 3, T0)
+				s.chests = {
+					dng_ruins = { 2, 1 },
+					dng_graveyard = { 4 },
+					["special:raid"] = { 0, 0, 2 },
+					["special:rare:dng_castle"] = { 0, 1 },
+					["special:quest"] = { 0, 0 }, -- 空の山は出さない
+				}
+				local v = Protocol.view(s, master)
+				-- 普通の山はダンジョンの順、続けて特別な宝箱の山を鍵の順
+				expect(v.chests).toEqual({
+					{ pileKey = "dng_graveyard", count = 4 },
+					{ pileKey = "dng_ruins", count = 3 },
+					{ pileKey = "special:raid", count = 2 },
+					{ pileKey = "special:rare:dng_castle", count = 1 },
+				})
+				for _, c in v.chests do
+					local n = 0
+					for _ in c do
+						n += 1
+					end
+					expect(n).toBe(2) -- pileKey と count だけ
+				end
+				expect(serde.decode("json", serde.encode("json", v.chests))).toEqual(v.chests)
+				-- 宝箱がなければ空
+				expect(Protocol.view(Game.newState(master, 3, T0), master).chests).toEqual({})
+			end
+		)
+		it("D-192 他のプレイヤーの UserId を要約・events に入れない", function()
+			local s = Game.newState(master, 3, T0)
+			s.referral.rewardedInvitees = { ["12345"] = true }
+			s.referral.claimedDeliveries = { ["referral:12345"] = true }
+			s.referral.referredBy = 67890
+			s.referral.weekCount = 1
+			local v = Protocol.view(s, master)
+			expect(v.referral.rewardedInvitees).toBe(nil)
+			expect(v.referral.claimedDeliveries).toBe(nil)
+			expect(v.referral.referredBy).toBe(nil)
+			expect(v.referral.weekCount).toBe(1) -- ほかの項目は残す
+			expect(v.referral.inviteeRewardDone).toBe(false)
+			local json = serde.encode("json", v)
+			expect(string.find(json, "12345", 1, true)).toBe(nil)
+			expect(string.find(json, "67890", 1, true)).toBe(nil)
+			-- 元の状態は変えない
+			expect(s.referral.rewardedInvitees["12345"]).toBe(true)
+			-- 紹介の結果の event から相手の UserId を除く
+			local out = Protocol.redactEvents({
+				{ type = "ReferralGranted", at = T0, role = "inviter", userId = 12345, inboxUid = "inb_1" },
+			})
+			expect(out[1].userId).toBe(nil)
+			expect(out[1].role).toBe("inviter")
+			expect(out[1].inboxUid).toBe("inb_1")
 		end)
 		it("D-087 events のランクは除く。開封結果（ChestsOpened）は残す", function()
 			local events = {

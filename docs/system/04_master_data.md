@@ -105,11 +105,12 @@
 | `playtimeDailyCapSeconds` | 7200（1日2時間まで） | D-154 |
 | `friendRewardIntervalSeconds` | 600（仮。M7b-6） | D-157 |
 | `friendRewardMaxFriends` | 3（報酬が増えるのは3人分まで） | D-157 |
-| `friendRewardGold` / `friendRewardBonusPerFriend` | 100 / 0.25（仮。M7b-6）。ゴールド = floor(friendRewardGold × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))（06章 §20） | D-157 |
+| `rewardGoldBase` | ダンジョンごとの報酬のゴールドの基準（`{ [dungeonId] = 整数 }`。全ダンジョン必須・知らないダンジョンは置かない）。報酬のゴールド = floor(rewardGoldBase[踏破した一番深いダンジョン] × 報酬ごとの係数)（06章 §22）。仮（M7b-6）：各ダンジョンの `battleReward.gold` に比例させ古い墓地 100 〜 天空の玉座 5960 | D-190, D-187 |
+| `friendRewardGoldMult` / `friendRewardBonusPerFriend` | 1 / 0.25（仮。M7b-6）。ゴールド = floor(rewardGoldBase[基準] × friendRewardGoldMult × (1 + friendRewardBonusPerFriend × (min(友達の数, friendRewardMaxFriends) − 1)))（06章 §20・§22） | D-157, D-190 |
 | `friendRewardDailyCap` | 12（1日に押せる回数。仮。M7b-6） | D-157 |
 | `referralWeeklyCap` | 3（招待した側が報酬を受け取れる人数／週。仮。M7b-6） | D-157 |
-| `referralRewards` | `invitee`（招待された側）・`inviter`（招待した側）の報酬（形は §9 の rewards）。どちらもチケット2（仮。M7b-6） | D-157, D-180 |
-| `referralProgressCondition` | 招待した側へ届ける進み具合。サーバー側で判定する（M7b-5・M7b-6。例 初転生）。core には置かない | D-157 |
+| `referralRewards` | `invitee`（招待された側）・`inviter`（招待した側）の報酬（形は §9 の rewards）。中身はステータススロットチケット、量はどちらも2（仮。M7b-6） | D-157, D-180, D-192 |
+| `referralProgressCondition` | 招待された人の進み具合の条件。両者の報酬はこれに届いたときに渡す。`{ kind = "rebirthedAdventurers", count = 1 }`（転生した冒険者が count 人以上＝初転生。仮。M7b-6）。判定は core の `Friend.referralProgressReached`（サーバーがこれを見て届け物を書き、招待された側に GrantReferral（invitee）を実行する）。検証：kind は `rebirthedAdventurers` だけ、count は1以上の整数 | D-157, D-192 |
 | `weeklyVisitorChance` | 0.03（今週の訪問者の別枠の確率。候補1人ごと。仮。M7b-6） | D-158, D-170 |
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
 | `mapEventKindWeights` | `{ { id = "mev_rare_dungeon", weight }, … }`。M7b-4 は 1 / 1 / 1 の仮（M7b-6） | D-152 |
@@ -117,7 +118,7 @@
 | `rareDungeonEffectRate` | `{ min = 0.20, max = 0.30 }`（レアダンジョンの山の演出率の基準） | D-171 |
 | `raidHpMult` / `raidHpSpread` / `raidDamagePerAtk` | HP とダメージの式は未決（M7b-6）。M7b-4 は仮の式（06章 §12）で 1 / `{ min = 0.8, max = 1.2 }` / 1 | D-152, D-179 |
 | `raidTravelSeconds` | レイドへの片道秒（仮 60。M7b-6）。`mapEventWindowSeconds + raidTravelSeconds ≤ mapEventIntervalSeconds` を検証（最後のダメージが次の時間帯より前に入る） | D-152 |
-| `merchantItemCount` | `{ min = 3, max = 5 }` | D-152 |
+| `merchantItemCount` | `{ min = 3, max = 5 }`。品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン） | D-152, D-189 |
 | `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 10 / 未決 / 未決（M7b-6。M7b-4 は 0.5 / 0.5 の仮） | D-152 |
 | `rewardShareTargets` | §13 の表 | D-160 |
 
@@ -204,21 +205,21 @@
 
 ```lua
 rewards = {
-	gold = 500,                                    -- 省略可
+	goldMult = 5,                                  -- 省略可。ゴールドの係数（固定額の gold は置かない：検証）。額 = floor(rewardGoldBase[基準] × goldMult)（06章 §22、D-190）
 	items = { itm_slot_ticket = 1 },               -- 省略可。売却用アイテムは置かない（検証）
 	chests = { { pileKey = "special:quest", count = 1, rank = nil } },  -- 省略可。表を持つ特別な宝箱の山だけ（検証）
 }                                                  -- rank を省くと届いたときに SpecialChests の表で引く。書けばそのランク
 ```
 
-M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（探索10・開封10・雇用1・トレーニング5・踏破5、×パーティ数）、ウィークリーは6種類（探索50・開封50・雇用3・トレーニング25・踏破25・転生1、×パーティ数）。報酬はゴールド・クエストの宝箱・チケット・見た目変更ポーション。
+M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（探索10・開封10・雇用1・トレーニング5・踏破5、×パーティ数）、ウィークリーは6種類（探索50・開封50・雇用3・トレーニング25・踏破25・転生1、×パーティ数）。報酬はゴールド・クエストの宝箱・チケット・見た目変更ポーション。ゴールドの係数（仮）はデイリー 5・ウィークリー 30（古い墓地なら 500G・3000G）。
 
 | kind | 数えるもの | period |
 | --- | --- | --- |
 | `expeditions` | 探索の回数（オンライン中に出発したもの） | daily / weekly |
 | `chestsOpened` | 宝箱を開けた数 | daily / weekly |
 | `hires` | 雇用 | daily / weekly |
-| `trainings` | トレーニング | daily / weekly |
-| `clears` | 踏破 | daily / weekly |
+| `trainings` | トレーニングを行った回数（D-191） | daily / weekly |
+| `clears` | 踏破（レアダンジョンの踏破も数える。レイドは数えない：D-191） | daily / weekly |
 | `rebirths` | 転生 | weekly のみ |
 
 - 量は「`amountPerParty` × パーティ数」（例：探索 ×パーティ数×10回）。お題の候補・量の式・報酬の量は未決（M7b-6）。
@@ -226,9 +227,9 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 
 ## 10. ログインボーナス・プレイ時間（LoginBonus.luau・PlaytimeRewards.luau）
 
-- `LoginBonus`：`{ days = { 1〜6日目の rewards（6行） }, fallback = rewards }`。1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク（`cycle` 周目は loginOrder の順で `cycle` 番目）。ログイン用のユニークがいない・そのユニークを持っている（受け取り箱に届いている）・ユニークが一巡した後は `fallback`（レアな宝箱＋チケット。M7b-4 では `special:login` のランク3（レア）1個＋チケット1）。量は未決（M7b-6、M7b-4 は仮の値）。（D-155）
+- `LoginBonus`：`{ days = { 1〜6日目の rewards（6行） }, fallback = rewards }`。1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク（`cycle` 周目は loginOrder の順で `cycle` 番目）。ログイン用のユニークがいない・そのユニークを持っている（受け取り箱に届いている）・ユニークが一巡した後は `fallback`（レアな宝箱＋チケット。M7b-4 では `special:login` のランク3（レア）1個＋チケット1）。量は未決（M7b-6、M7b-4 は仮の値）。ゴールドは `goldMult`（仮：1日目 3・4日目 6）。（D-155, D-190）
 - ログイン用のユニークの中身（誰か・人数）は未決（Q-025）。M7b-4 では仕組みだけを作り、Uniques に `acquire = "login"` の行は置かない（いないので7日目は毎周 fallback）。
-- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%）と宝箱（`special:playtime`）。量は未決（M7b-6。M7b-4 は固定額の仮の値）。（D-154）
+- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`。minutes は昇順、`minutes × 60 ≤ playtimeDailyCapSeconds` を検証）。報酬はゴールド（1時間の収入の数%。`goldMult` で踏破した一番深いダンジョンに応じて増える：D-190）と宝箱（`special:playtime`）。量は未決（M7b-6。仮の `goldMult` は 5分 1・20分 2・45分 3・90分 5・120分 5）。（D-154）
 
 ## 11. 特別な宝箱（SpecialChests.luau、D-166）
 
@@ -252,14 +253,14 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 | `spc_login` | 50 / 30 / 15 / 5 | レア | 20% | 15〜25% |
 | `spc_playtime` | 70 / 20 / 8 / 2 | レア | 10% | 8〜15% |
 
-- `spc_rare` の行は `pileKey = "special:rare"` だけを持ち、表・演出の値を持たない（相当するダンジョンの `chestRarityWeights` と `rareChestEffectMinRarity`、基準は `rareDungeonEffectRate`）。`rareChestEffectMinRarity` は M7b-4 前半では任意の項目（あれば検証する）。持たないダンジョンのレアダンジョンの山は開けられない（PILE_NOT_FOUND）。今の `chestRarityWeights` では 20〜30% に収まる演出ラインがないダンジョンがある（要確認）。
+- `spc_rare` の行は `pileKey = "special:rare"` だけを持ち、表・演出の値を持たない（相当するダンジョンの `chestRarityWeights` と `rareChestEffectMinRarity`、基準は `rareDungeonEffectRate`）。`rareChestEffectMinRarity` は M7b-4 前半では任意の項目（あれば検証する）。持たないダンジョンのレアダンジョンの山は開けられない（PILE_NOT_FOUND）。今の `chestRarityWeights` では 20〜30% に収まる演出ラインがないダンジョンがある（6つ。表を M7b-6 で作り直す：D-188）。
 - クエスト・ログインボーナス・プレイ時間の宝箱は特別な宝箱（D-171）。D-154 の「進み具合に合った」は中身のアイテムレベルのこと。
-- 中身のアイテムレベルは「開けたときに踏破している一番深いダンジョン」（06章 §19、D-171）。
+- 中身のアイテムレベルは「開けたときに踏破している一番深いダンジョン」（06章 §19、D-171）。まだどこも踏破していなければ古い墓地（D-187）。レアダンジョンの山は相当するダンジョンのアイテムレベル（D-187）。
 
 ## 12. マップイベント・旅の商人（MapEvents.luau・Merchant.luau、D-152）
 
 - `MapEvents`：`kinds`（`{ id, kind }`。`mev_rare_dungeon`＝rareDungeon・`mev_raid`＝raid・`mev_merchant`＝merchant）と、出る場所の一覧 `places`（`{ id }`。中身は M8 のマップ設計で決める。M7b-4 は `mev_place_1〜4` の仮）。種類の割合は `mapEventKindWeights`（未決（M7b-6））。検証：割合の id は kinds を指す、kind の重複なし、場所は1行以上。
-- 旅の商人の決まりは別のファイルを作らず `Constants` に置く：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで（品ごとに踏破済みのダンジョンから1つ選び、そのダンジョンの `chestRarityWeights` と宝箱の中身の抽選で作る。06章 §12）。
+- 旅の商人の決まりは別のファイルを作らず `Constants` に置く：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで（品ごとに踏破済みのダンジョン（未踏破なら古い墓地：D-187）から1つ選び、そのダンジョンの `chestRarityWeights` からコモンを除いた表（コモンしかなければコモン：D-189）と宝箱の中身の抽選で作る。06章 §12）。
 
 ## 13. 報酬の入手先の配分（rewardShareTargets、D-160）
 

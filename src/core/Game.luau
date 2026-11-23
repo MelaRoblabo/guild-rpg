@@ -167,7 +167,7 @@ local function planExpedition(
 ): any
 	local _, seed = takeRng(state)
 	local snaps = Party.snapshots(state, partyIndex, master)
-	-- レアダンジョン（rare = { eventSlot, pileKey }）は日替わりの特性を当てない（ダンジョンの日替わりとは別のイベント。要確認）
+	-- レアダンジョン（rare = { eventSlot, pileKey }）は日替わりの特性を当てない（D-187）
 	local traitId = if rare then nil else DailyTrait.traitIdFor(dungeonId, departAt, master)
 	local log = Expedition.simulate({
 		seed = seed,
@@ -388,8 +388,9 @@ local function raidArrivals(state: any, now: number, master: any, events: { any 
 	end
 end
 
--- 留守の始まり（06章 §13）。lastSavedAt（サーバーが保存のときに書く：M7b-5）を使う。
--- まだ書かれていない・オンラインの時間より古い場合に留守を重ねて数えないよう、最後の advance の時刻より前にはしない
+-- 留守の始まり（06章 §13、D-193）＝ max(lastSavedAt, lastAdvancedAt)。lastSavedAt はサーバーが保存のときに書く（M7b-5）。
+-- オンラインで進めた時間を留守として重ねて数えないよう、最後の advance の時刻より前にはしない。
+-- サーバーが落ちて失われた進み具合（最後の定期保存から落ちるまで）は、次のログインで留守として計算される（D-193）
 function Game.offlineStart(state: any): number
 	return math.max(state.lastSavedAt or state.lastAdvancedAt, state.lastAdvancedAt)
 end
@@ -411,6 +412,7 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 		local restLeft = rest - math.max(0, nextE.returnAt - t0)
 		collect(state, nextE, master, events, restLeft > 0)
 		-- クエストの「踏破」はオンライン中の帰還で数える（留守番の探索は数えない：D-153, D-161）
+		-- レアダンジョンの踏破は数え、レイドは数えない（D-191）
 		if nextE.log.result == "clear" and not nextE.offline and not nextE.raidDamage then
 			Quest.count(state, "clears", 1, nextE.returnAt, master, take, events)
 		end
@@ -1217,7 +1219,7 @@ handlers.Train = function(state, cmd, ctx)
 			levelsGained = #r.levels,
 		},
 	}
-	-- D-153：トレーニングは行った回数で数える（1コマンドで何回でも1回分とするかは要確認）
+	-- D-153, D-191：トレーニングは行った回数（sessions）で数える
 	Quest.count(state, "trainings", r.sessions, ctx.now, master, rngTaker(state), events)
 	return { ok = true, events = events }
 end
@@ -1482,8 +1484,8 @@ handlers.ClaimFriendReward = function(state, _cmd, ctx)
 	return { ok = true, events = { ev } }
 end
 
--- 紹介の報酬（05章 GrantReferral、D-157, D-180。サーバー専用）：受け取り箱へ入れる
---   role = "invitee"：招待された側（1回だけ）
+-- 紹介の報酬（05章 GrantReferral、D-157, D-180, D-192。サーバー専用）：受け取り箱へ入れる
+--   role = "invitee"：招待された側（1回だけ。Friend.referralProgressReached に届いてから：D-192）
 --   role = "inviter"：招待した側。userId は招待された人、deliveryId は届け物の id（同じ id は二度受け取らない）
 handlers.GrantReferral = function(state, cmd, ctx)
 	if type(cmd.userId) ~= "number" then
@@ -1645,7 +1647,7 @@ function Game.query.friend(state: any, now: number, friendCount: number, master:
 		nextAt = F.nextAt,
 		todayCount = if F.dayIndex == Calendar.dayIndex(now) then F.todayCount else 0,
 		dailyCap = master.K.friendRewardDailyCap,
-		gold = Friend.gold(friendCount, master),
+		gold = Friend.gold(state, friendCount, master),
 		blocker = Friend.blocker(state, now, friendCount, master),
 	}
 end

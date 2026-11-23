@@ -88,14 +88,14 @@ function MapEvent.status(now: number, master: any): any
 	return { current = cur, next = nxt, nextAt = nextAt }
 end
 
--- レアダンジョン（D-152, D-171, D-185、06章 §12）
---   強さ：踏破済みの一番深いダンジョン（まだどこも踏破していなければダンジョンの並びの先頭。要確認）
+-- レアダンジョン（D-152, D-171, D-185, D-187、06章 §12）
+--   強さ：基準のダンジョン（踏破済みの一番深いダンジョン。まだどこも踏破していなければ古い墓地：D-187）
 --   宝箱の山：special:rare:<1段上のダンジョン>。一番深いダンジョン（天空の玉座）の踏破後はそのダンジョンのまま。
---             まだどこも踏破していなければ並びの先頭（要確認）
+--             まだどこも踏破していなければ古い墓地（D-187）
 --   「1段上」＝ tier が踏破済みの一番深いダンジョンより大きいもののうち、tier が最も小さい（同じ tier は並びの先）
 function MapEvent.rareDungeonTarget(state: any, master: any): { dungeonId: string, pileKey: string }
 	local deepest = Chest.deepestCleared(state, master)
-	local strength = deepest or master.dungeonList[1]
+	local strength = Chest.baseDungeon(state, master)
 	local above = nil
 	if deepest == nil then
 		above = master.dungeonList[1]

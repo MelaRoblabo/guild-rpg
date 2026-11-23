@@ -105,11 +105,17 @@ function Chest.deepestCleared(state: any, master: any): any?
 	return best
 end
 
+-- 基準のダンジョン：踏破している一番深いダンジョン。まだどこも踏破していなければ一番浅いダンジョン（並びの先頭＝古い墓地：D-187）
+-- 特別な宝箱・レアダンジョン・レイド・旅の商人・報酬のゴールド（D-190）で使う
+function Chest.baseDungeon(state: any, master: any): any
+	return Chest.deepestCleared(state, master) or master.dungeonList[1]
+end
+
 -- 宝箱の山を開けるときの中身の表と演出ライン（D-089, D-166, D-171, D-185。06章 §19）。開けられない山なら nil
 --   普通の山（dungeonId）           → そのダンジョン、演出ラインは chestEffectMinRarity
 --   special:rare:<相当するダンジョン> → そのダンジョンの表、演出ラインは rareChestEffectMinRarity（無いダンジョンは開けられない）
---   special:<種類>（SpecialChests）  → 中身は開けたときに踏破している一番深いダンジョン（D-171）、演出ラインは行の effectMinRarity
---                                      まだどこも踏破していなければ、ダンジョンの並びの先頭（要確認：報告の Q 候補）
+--                                      アイテムレベルも相当するダンジョンのもの（D-187）
+--   special:<種類>（SpecialChests）  → 中身は開けたときの基準のダンジョン（D-171, D-187）、演出ラインは行の effectMinRarity
 function Chest.pileSource(pileKey: string, state: any, master: any): { dungeon: any, effectMinRarity: number }?
 	if not Chest.isSpecialPile(pileKey) then
 		local d = master.dungeons[pileKey]
@@ -127,7 +133,7 @@ function Chest.pileSource(pileKey: string, state: any, master: any): { dungeon: 
 		return nil
 	end
 	return {
-		dungeon = Chest.deepestCleared(state, master) or master.dungeonList[1],
+		dungeon = Chest.baseDungeon(state, master),
 		effectMinRarity = row.effectMinRarity,
 	}
 end

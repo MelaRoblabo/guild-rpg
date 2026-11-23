@@ -1,14 +1,19 @@
 --!strict
--- フレンドボタンと紹介（D-157, D-180、docs/system/06_formulas.md §20、05_commands.md ClaimFriendReward・GrantReferral）
+-- フレンドボタンと紹介（D-157, D-180, D-190, D-192、docs/system/06_formulas.md §20、05_commands.md ClaimFriendReward・GrantReferral）
 --   Friend.claim          フレンドボタン。同じサーバーの友達の数（サーバーが数えて ctx.friendCount で渡す：M7b-5）でゴールドが少し増える。
 --                         一定時間ごとに押せる（押さないとたまらない）・1日の上限あり。受け取り箱には入れず、その場で渡す
---   Friend.grantReferral  紹介の報酬を受け取り箱へ入れる。招待された側は1回だけ。招待した側は相手1人ごと・週の上限まで
+--   Friend.referralProgressReached  招待された人が紹介の進み具合（referralProgressCondition）に届いたか（D-192）。
+--                         サーバーはこれを見て、招待した人へ届け物を書き（markInviterDelivered）、招待された側に GrantReferral（invitee）を実行する
+--   Friend.grantReferral  紹介の報酬を受け取り箱へ入れる。招待された側は1回だけで、進み具合に届いてから（D-192）。
+--                         招待した側は相手1人ごと・週の上限まで
 --                         招待した側の報酬は「届け物」（別の保存場所。サーバーが M7b-5 で持つ）で届き、届け物の id を
 --                         記録して二重に受け取らない（サーバーが保存してから届け物を消す間に落ちると、同じ届け物がもう一度来るため）
 --   Friend.inviterDelivered / markInviterDelivered  招待された側の「招待した人へ届け物を書いた」印（同じ招待で2回届けない）
 -- 日・週の区切りは Calendar（D-168）。状態を持たない（関数の集合）。
 
 local Calendar = require("./Calendar")
+local Chest = require("./Chest")
+local Formulas = require("./Formulas")
 local Inbox = require("./Inbox")
 local Rng = require("./Rng")
 
@@ -29,14 +34,19 @@ function Friend.newReferralState(): any
 	}
 end
 
--- 報酬のゴールド（06章 §20）：人数は friendRewardMaxFriends まで
-function Friend.gold(friendCount: number, master: any): number
+-- 報酬のゴールド（06章 §20・§22、D-190）：人数は friendRewardMaxFriends まで。
+-- 基準のダンジョン（踏破した一番深いダンジョン、なければ古い墓地：D-187）の rewardGoldBase に係数を掛ける
+function Friend.gold(state: any, friendCount: number, master: any): number
 	local K = master.K
 	local n = math.min(math.floor(friendCount), K.friendRewardMaxFriends)
 	if n < 1 then
 		return 0
 	end
-	return math.floor(K.friendRewardGold * (1 + K.friendRewardBonusPerFriend * (n - 1)))
+	return Formulas.rewardGold(
+		Chest.baseDungeon(state, master),
+		K.friendRewardGoldMult * (1 + K.friendRewardBonusPerFriend * (n - 1)),
+		K
+	)
 end
 
 -- 押せるか。押せなければエラーコード
@@ -69,7 +79,7 @@ function Friend.claim(state: any, now: number, friendCount: number, master: any)
 	end
 	F.todayCount += 1
 	F.nextAt = now + master.K.friendRewardIntervalSeconds -- 押さないとたまらない（06章 §20）
-	local gold = Friend.gold(friendCount, master)
+	local gold = Friend.gold(state, friendCount, master)
 	state.gold += gold
 	return {
 		type = "FriendReward",
@@ -82,8 +92,24 @@ function Friend.claim(state: any, now: number, friendCount: number, master: any)
 		nil
 end
 
+-- 招待された人（この state の持ち主）が紹介の進み具合に届いたか（D-192。条件は Constants.referralProgressCondition）
+--   kind = "rebirthedAdventurers"：転生した冒険者（rebirthCount ≥ 1）が count 人以上
+function Friend.referralProgressReached(state: any, master: any): boolean
+	local cond = master.K.referralProgressCondition
+	if cond.kind == "rebirthedAdventurers" then
+		local n = 0
+		for _, a in state.adventurers do
+			if (a.rebirthCount or 0) >= 1 then
+				n += 1
+			end
+		end
+		return n >= cond.count
+	end
+	return false -- 知らない条件（MasterData の検証で止めるので起きない）
+end
+
 -- 紹介の報酬を受け取り箱へ（source = "referral"）。成功ならイベント、失敗ならエラーコード
---   role = "invitee"：招待された側（1回だけ）
+--   role = "invitee"：招待された側（1回だけ）。進み具合に届いていなければ PROGRESS_NOT_REACHED（D-192）
 --   role = "inviter"：招待した側。userId は招待された人。deliveryId は届け物の id（同じ id は二度受け取らない）
 function Friend.grantReferral(
 	state: any,
@@ -99,6 +125,9 @@ function Friend.grantReferral(
 	if role == "invitee" then
 		if R.inviteeRewardDone then
 			return nil, "ALREADY_REWARDED"
+		end
+		if not Friend.referralProgressReached(state, master) then
+			return nil, "PROGRESS_NOT_REACHED"
 		end
 		R.inviteeRewardDone = true
 	elseif role == "inviter" then

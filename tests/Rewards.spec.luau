@@ -104,8 +104,10 @@ return function(t)
 			"D-164 ゴールド・アイテム・宝箱をまとめて受け取る。宝箱は宝箱の山へ入る",
 			function()
 				local s = newState()
+				-- ゴールドは係数（D-190）：まだどこも踏破していないので古い墓地の基準 × 1
+				expect(K.rewardGoldBase.dng_graveyard).toBe(100)
 				Inbox.push(s, "quest", T0, {
-					gold = 100,
+					goldMult = 1,
 					items = { itm_slot_ticket = 2 },
 					chests = { { pileKey = "special:quest", rank = 2, count = 3 } },
 				}, rngOf(1), master)
@@ -182,7 +184,7 @@ return function(t)
 			function()
 				local m = masterWithLoginUniques(1)
 				local s = newState(1, m)
-				Inbox.push(s, "login", T0, { gold = 50 }, rngOf(1), m, "uni_test_login_1")
+				Inbox.push(s, "login", T0, { goldMult = 0.5 }, rngOf(1), m, "uni_test_login_1") -- 100 × 0.5（D-190）
 				fillRoster(s, m)
 				local gold0 = s.gold
 				local r = exec(s, { type = "ClaimInbox" }, T0, m)
@@ -269,7 +271,7 @@ return function(t)
 				expect(openLevel({ "dng_graveyard", "dng_ruins", "dng_tower" })).toBe(master.dungeons.dng_tower.tier)
 				-- 並びに関係なく tier の最大
 				expect(openLevel({ "dng_tower", "dng_graveyard" })).toBe(master.dungeons.dng_tower.tier)
-				-- まだどこも踏破していなければダンジョンの並びの先頭（要確認の仮の扱い）
+				-- まだどこも踏破していなければダンジョンの並びの先頭＝古い墓地（D-187）
 				expect(openLevel({})).toBe(master.dungeonList[1].tier)
 				-- 山は数だけを保存するので、届いた後に深く踏破すれば深い方で決まる
 				local s = newState()
@@ -507,6 +509,31 @@ return function(t)
 			expect(exec(s, { type = "RebirthChoose", which = "current" }, e.returnAt).ok).toBeTruthy()
 			expect(s.quests.weekly.entries[1].progress).toBe(1)
 		end)
+		it(
+			"D-191 トレーニングは行った回数で数える（1コマンドの回数ぶん。ゴールドが尽きて止まったら実際の回数）",
+			function()
+				local s = newState()
+				today(s)
+				s.gold = 10 ^ 9
+				s.quests.daily.entries =
+					{ { questId = "qst_daily_trainings", target = 1000, progress = 0, done = false } }
+				s.quests.weekly.entries = {}
+				local uid = s.parties[1].slots[1]
+				expect(exec(s, { type = "Train", adventurerUid = uid, sessions = 3 }).ok).toBeTruthy()
+				expect(s.quests.daily.entries[1].progress).toBe(3)
+				expect(exec(s, { type = "Train", adventurerUid = uid, sessions = 1 }).ok).toBeTruthy()
+				expect(s.quests.daily.entries[1].progress).toBe(4)
+				-- ゴールドが2回分しかなければ2回で止まり、2回と数える
+				local adv = s.adventurers[uid]
+				local c1 = Game.query.trainingSessionCost(adv.level, master)
+				s.gold = c1 * 2 + (c1 - 1) -- 2回目以降にレベルが上がっても足りるとは限らないので、実際の回数で確かめる
+				local r = exec(s, { type = "Train", adventurerUid = uid, sessions = 50 })
+				expect(r.ok).toBeTruthy()
+				local done = r.events[1].sessions
+				expect(done < 50).toBeTruthy()
+				expect(s.quests.daily.entries[1].progress).toBe(4 + done)
+			end
+		)
 		it("D-153 D-164 達成したら報酬を受け取り箱へ。全部達成でボーナス", function()
 			local s = newState()
 			today(s)
@@ -521,7 +548,10 @@ return function(t)
 			expect(done[1].questId).toBe("qst_daily_expeditions")
 			expect(#s.inbox).toBe(1)
 			expect(s.inbox[1].source).toBe("quest")
-			expect(s.inbox[1].rewards.gold).toBe(master.quests.qst_daily_expeditions.rewards.gold)
+			-- ゴールドは基準のダンジョン（未踏破なので古い墓地）× goldMult（D-190）
+			expect(s.inbox[1].rewards.gold).toBe(
+				math.floor(K.rewardGoldBase.dng_graveyard * master.quests.qst_daily_expeditions.rewards.goldMult)
+			)
 			expect(s.quests.daily.bonusDone).toBe(false)
 			-- 達成済みは数えない（量を超えない）
 			exec(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = nil })
@@ -558,7 +588,9 @@ return function(t)
 				expect(lb[1].day).toBe(1)
 				expect(#s.inbox).toBe(1)
 				expect(s.inbox[1].source).toBe("login")
-				expect(s.inbox[1].rewards.gold).toBe(master.loginBonus.days[1].gold)
+				expect(s.inbox[1].rewards.gold).toBe(
+					math.floor(K.rewardGoldBase.dng_graveyard * master.loginBonus.days[1].goldMult) -- D-190
+				)
 				expect(s.login.day).toBe(2)
 				expect(s.login.lastDayIndex).toBe(Calendar.dayIndex(T0))
 				expect(#eventsOf(Game.advance(s, ctx(T0 + 3600)), "LoginBonus")).toBe(0)

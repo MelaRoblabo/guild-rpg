@@ -5,6 +5,7 @@ local serde = require("@lune/serde")
 
 local Chest = require("../src/core/Chest")
 local CommandText = require("../src/core/CommandText")
+local DailyTrait = require("../src/core/DailyTrait")
 local Expedition = require("../src/core/Expedition")
 local Game = require("../src/core/Game")
 local Hiring = require("../src/core/Hiring")
@@ -231,7 +232,7 @@ return function(t)
 				expect(MapEvent.rareDungeonTarget(s, master)).toEqual({
 					dungeonId = "dng_graveyard",
 					pileKey = "special:rare:dng_graveyard",
-				}) -- まだどこも踏破していない（要確認）
+				}) -- まだどこも踏破していなければ古い墓地（D-187）
 				clearUpTo(s, 2)
 				expect(MapEvent.rareDungeonTarget(s, master)).toEqual({
 					dungeonId = "dng_ruins",
@@ -649,6 +650,291 @@ return function(t)
 				expect(Merchant.goods(s, slot, master)).toEqual(before)
 			end
 		)
+	end)
+
+	describe("宝箱を増やす効果・レアダンジョン・レイドの細部（D-187）", function()
+		-- 日替わり chestMult・専用ギフトのパーティ効果 chestMult を置いたマスターデータ（専用ギフトは本番に置かない：D-165）
+		local function chestMaster(traitValue: number, giftValue: number): any
+			return Fixtures.master(function(d)
+				for _, row in d.DailyTraits do
+					if row.id == "dt_chest" then
+						row.value = traitValue
+					end
+				end
+				table.insert(d.Gifts, {
+					id = "gift_test_ex_chest",
+					name = "テスト専用・宝箱",
+					exclusive = true,
+					partyEffect = { kind = "chestMult", value = giftValue },
+				})
+				for _, u in d.Uniques do
+					if u.id == "uni_garrett" then
+						u.exclusiveGiftId = "gift_test_ex_chest"
+					end
+				end
+			end)
+		end
+		local function simulate(m: any, seed: number, opts: any): any
+			local s = newState(1, m)
+			local members = Game._deepClone(Party.snapshots(s, 1, m))
+			if opts.gift then
+				table.insert(members[1].giftIds, "gift_test_ex_chest")
+			end
+			return Expedition.simulate({
+				seed = seed,
+				departAt = T0,
+				dungeonId = "dng_graveyard",
+				members = members,
+				dailyTraitId = if opts.trait then "dt_chest" else nil,
+				chestMult = opts.event,
+			}, m)
+		end
+		it(
+			"D-187 ① 3つの倍率（日替わり→専用ギフト→レアダンジョン）は元の宝箱に掛けて足し合わせる（掛け合わせない）",
+			function()
+				local m = chestMaster(2, 2)
+				local seed = 1
+				while #simulate(m, seed, {}).rewards.chests == 0 do
+					seed += 1
+				end
+				local plain = simulate(m, seed, {})
+				local all = simulate(m, seed, { trait = true, gift = true, event = 2 })
+				local base = #plain.rewards.chests
+				-- 増えた分は 1 + 1 + 1（足し合わせ）。掛け合わせなら 2 × 2 × 2 = 8 倍になる
+				expect(all.traitChests).toBe(base)
+				expect(all.partyChests).toBe(base)
+				expect(all.eventChests).toBe(base)
+				expect(#all.rewards.chests).toBe(4 * base)
+				-- 増える前の宝箱は同じ。増えた分は「日替わり → 専用ギフト → レアダンジョン」の順に後ろへ並び、元の宝箱を指す
+				for i, c in plain.rewards.chests do
+					expect(all.rewards.chests[i].rank).toBe(c.rank)
+				end
+				local at = base
+				for _, list in { all.traitChestSources, all.partyChestSources, all.eventChestSources } do
+					for _, src in list do
+						at += 1
+						expect(src >= 1 and src <= base).toBe(true)
+						expect(all.rewards.chests[at].rank).toBe(plain.rewards.chests[src].rank)
+					end
+				end
+				-- 端数（1.5）でも、増えた分の期待値は 0.5 + 0.5 + 0.5（どれも元の宝箱に掛ける）
+				local m2 = chestMaster(1.5, 1.5)
+				local b, extra = 0, 0
+				for sd = 1, 300 do
+					local p = simulate(m2, sd, {})
+					local a = simulate(m2, sd, { trait = true, gift = true, event = 1.5 })
+					b += #p.rewards.chests
+					extra += #a.rewards.chests - #p.rewards.chests
+					expect((a.traitChests or 0) <= #p.rewards.chests).toBe(true)
+					expect((a.partyChests or 0) <= #p.rewards.chests).toBe(true)
+					expect((a.eventChests or 0) <= #p.rewards.chests).toBe(true)
+				end
+				expect(extra / b > 1.3 and extra / b < 1.7).toBe(true)
+			end
+		)
+		it(
+			"D-187 D-186 3つの倍率を同時に掛けても、途中ログイン（rewardsAt）では元の宝箱を持ち帰るときだけ増えた分も持ち帰る",
+			function()
+				local m = chestMaster(2, 2)
+				local seed = 1
+				while true do
+					local p = simulate(m, seed, {})
+					-- 途中のフロアに宝箱があり、踏破の確定宝箱もある探索を選ぶ
+					if p.result == "clear" and #p.rewards.chests > #(p.clearChestRanks or {}) then
+						break
+					end
+					seed += 1
+				end
+				local plain = simulate(m, seed, {})
+				local all = simulate(m, seed, { trait = true, gift = true, event = 2 })
+				for k = 0, #plain.floors - 1 do
+					local at = if k == 0 then 0 else plain.floors[k].startOffset + plain.floors[k].duration
+					local p = Expedition.rewardsAt(plain, at, K)
+					local a = Expedition.rewardsAt(all, at, K)
+					expect(a.interrupted).toBe(true)
+					expect(#a.rewards.chests).toBe(4 * #p.rewards.chests)
+					-- 持ち帰る増えた分は、持ち帰る元の宝箱と同じランク
+					local count: { [number]: number } = {}
+					for _, c in p.rewards.chests do
+						count[c.rank] = (count[c.rank] or 0) + 4
+					end
+					for _, c in a.rewards.chests do
+						count[c.rank] -= 1
+					end
+					for _, n in count do
+						expect(n).toBe(0)
+					end
+				end
+				-- 全フロアを終えていればログのとおり全部（踏破の確定宝箱と、その増えた分も）
+				local last = all.floors[#all.floors]
+				local full = Expedition.rewardsAt(all, last.startOffset + last.duration, K)
+				expect(full.interrupted).toBe(false)
+				expect(#full.rewards.chests).toBe(#all.rewards.chests)
+			end
+		)
+		it(
+			"D-187 ② レアダンジョンの宝箱のアイテムレベルは相当ダンジョン（1段上）のもの",
+			function()
+				local m = Fixtures.master(function(d)
+					for _, g in d.Dungeons do
+						if g.id == "dng_tower" then
+							g.rareChestEffectMinRarity = 2
+						end
+					end
+				end)
+				local s = newState(1, m)
+				s.settings.autoSell.enabled = false
+				clearUpTo(s, 2) -- 一番深い踏破は罠の遺跡（tier 2）、相当ダンジョンは封印の塔（tier 3）
+				expect(MapEvent.rareDungeonTarget(s, m).pileKey).toBe("special:rare:dng_tower")
+				Chest.add(s, "special:rare:dng_tower", 1, 3)
+				local r = exec(s, { type = "OpenChests", pileKey = "special:rare:dng_tower" }, T0, m)
+				expect(r.ok).toBe(true)
+				local n = 0
+				for _, list in { r.events[1].normal, r.events[1].special } do
+					for _, opened in list do
+						for _, uid in opened.equipmentUids do
+							expect(s.equipment[uid].itemLevel).toBe(m.dungeons.dng_tower.tier)
+							n += 1
+						end
+					end
+				end
+				expect(n > 0).toBe(true)
+			end
+		)
+		it(
+			"D-187 ③ まだどこも踏破していなければ、特別な宝箱・レアダンジョン・レイド・商人は古い墓地を基準にする",
+			function()
+				local s = newState()
+				expect(master.dungeonList[1].id).toBe("dng_graveyard")
+				expect(Chest.baseDungeon(s, master).id).toBe("dng_graveyard")
+				expect(Chest.pileSource("special:quest", s, master).dungeon.id).toBe("dng_graveyard")
+				expect(MapEvent.rareDungeonTarget(s, master)).toEqual({
+					dungeonId = "dng_graveyard",
+					pileKey = "special:rare:dng_graveyard",
+				})
+				local m = Fixtures.master(function(d)
+					d.Constants.raidHpSpread = { min = 1, max = 1 }
+				end)
+				expect(Raid.hp(newState(1, m), findSlot("raid", m), m)).toBe(
+					math.floor(m.dungeons.dng_graveyard.base.hp * m.K.raidHpMult)
+				)
+				local slot = findSlot("merchant")
+				for i = 0, 20 do
+					for _, g in Merchant.goods(s, slot + i, master) do
+						expect(g.dungeonId).toBe("dng_graveyard")
+						expect(g.item.itemLevel).toBe(master.dungeons.dng_graveyard.tier)
+					end
+				end
+				-- 踏破すれば一番深い踏破ダンジョン
+				clearUpTo(s, 3)
+				expect(Chest.baseDungeon(s, master).id).toBe(master.dungeonList[3].id)
+			end
+		)
+		it("D-187 ④ レアダンジョンには日替わりの特性を当てない", function()
+			-- 古い墓地に特性が当たっている日のレアダンジョンの時間帯を探す
+			local slot = MapEvent.slotOf(T0, K)
+			while
+				MapEvent.eventAt(slot, master).kind ~= "rareDungeon"
+				or DailyTrait.traitIdFor("dng_graveyard", startOf(slot), master) == nil
+			do
+				slot += 1
+			end
+			local s = newState()
+			local at = startOf(slot)
+			expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, at).ok).toBe(true)
+			local e = expeditionOf(s, 1)
+			expect(e.dungeonId).toBe("dng_graveyard")
+			expect(e.dailyTraitId).toBe(nil)
+			expect(e.log.dailyTraitId).toBe(nil)
+			expect(e.log.traitChests).toBe(nil)
+			-- 同じ時刻の普通の出発には当たる
+			local s2 = newState()
+			expect(exec(s2, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" }, at).ok).toBe(true)
+			expect(expeditionOf(s2, 1).dailyTraitId ~= nil).toBe(true)
+		end)
+		it(
+			"D-187 ⑤ レイドへの参加は1パーティ1回まで（帰ってきても同じ時間帯には出られない）",
+			function()
+				local slot = findSlot("raid")
+				local s = newState()
+				local at = startOf(slot)
+				expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, at).ok).toBe(true)
+				local e = expeditionOf(s, 1)
+				expect(e.returnAt < MapEvent.closeOf(slot, K)).toBe(true) -- 3分間のうちに帰ってくる
+				Game.advance(s, ctx(e.returnAt))
+				expect(expeditionOf(s, 1)).toBe(nil)
+				expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, e.returnAt).error).toBe(
+					"EVENT_ALREADY_JOINED"
+				)
+				expect(s.raid.parties).toEqual({ 1 })
+			end
+		)
+	end)
+
+	describe("クエストの踏破（D-191）", function()
+		local function clearsQuest(s: any)
+			s.quests.daily.entries = { { questId = "qst_daily_clears", target = 100, progress = 0, done = false } }
+			s.quests.weekly.entries = {}
+		end
+		it("D-191 レアダンジョンの踏破はクエストの「踏破」に数える", function()
+			local slot = findSlot("rareDungeon")
+			local s = newState()
+			local at = startOf(slot)
+			Game.advance(s, ctx(at))
+			clearsQuest(s)
+			expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, at).ok).toBe(true)
+			local e = expeditionOf(s, 1)
+			e.log.result = "clear"
+			Game.advance(s, ctx(e.returnAt))
+			expect(s.quests.daily.entries[1].progress).toBe(1)
+		end)
+		it("D-191 レイドはクエストの「踏破」に数えない", function()
+			local m = Fixtures.master(function(d)
+				d.Constants.raidHpMult = 0.01 -- 討伐する
+			end)
+			local slot = findSlot("raid", m)
+			local s = newState(1, m)
+			local at = startOf(slot)
+			Game.advance(s, ctx(at, true, m))
+			clearsQuest(s)
+			expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, at, m).ok).toBe(true)
+			local e = expeditionOf(s, 1)
+			Game.advance(s, ctx(e.returnAt, true, m))
+			expect(s.raid.defeated).toBe(true)
+			expect(s.quests.daily.entries[1].progress).toBe(0)
+		end)
+	end)
+
+	describe("旅の商人の品のレアリティ（D-189）", function()
+		it("D-189 そのダンジョンの宝箱の表からコモンを除いて引く", function()
+			local s = newState(3)
+			clearUpTo(s, 3)
+			local slot = MapEvent.slotOf(T0, K)
+			local seen: { [number]: boolean } = {}
+			for i = 0, 80 do
+				for _, g in Merchant.goods(s, slot + i, master) do
+					expect(g.item.rarity >= 2).toBe(true)
+					-- 宝箱で出る範囲は超えない
+					expect(g.item.rarity <= #master.dungeons[g.dungeonId].chestRarityWeights).toBe(true)
+					expect(master.dungeons[g.dungeonId].chestRarityWeights[g.item.rarity] > 0).toBe(true)
+					seen[g.item.rarity] = true
+				end
+			end
+			expect(seen[2]).toBe(true)
+			expect(seen[3]).toBe(true) -- 罠の遺跡・封印の塔のレア
+			-- 表はコモンを除いた行（重みはそのまま）
+			expect(Merchant.rarityTable(master.dungeons.dng_tower)).toEqual({
+				{ rank = 2, weight = 16 },
+				{ rank = 3, weight = 10 },
+				{ rank = 4, weight = 2 },
+			})
+			-- 古い墓地（コモン・アンコモンだけ）はアンコモンだけになる
+			expect(Merchant.rarityTable(master.dungeons.dng_graveyard)).toEqual({ { rank = 2, weight = 12 } })
+		end)
+		it("D-189 コモンしかない表のときはコモンを使う", function()
+			local only = { chestRarityTable = { { rank = 1, weight = 100 } } }
+			expect(Merchant.rarityTable(only)).toEqual({ { rank = 1, weight = 100 } })
+		end)
 	end)
 
 	describe("留守中（D-161）", function()

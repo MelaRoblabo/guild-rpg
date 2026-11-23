@@ -326,4 +326,10 @@ function Formulas.rollRebirthBonus(prevStat: number, newRebirthCount: number, rn
 	return math.floor(max * rng:float() ^ Formulas.rebirthBonusSkew(newRebirthCount, K))
 end
 
+-- 06章 §22：報酬のゴールド（D-190）。dungeon は基準のダンジョン（踏破した一番深いダンジョン、なければ古い墓地：D-187）
+-- ゴールド = floor(rewardGoldBase[dungeon.id] × mult)
+function Formulas.rewardGold(dungeon: any, mult: number, K: any): number
+	return math.floor(K.rewardGoldBase[dungeon.id] * mult)
+end
+
 return Formulas

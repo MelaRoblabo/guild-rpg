@@ -13,10 +13,11 @@ local Rng = require("./Rng")
 local Raid = {}
 
 -- その時間帯のボスの HP（プレイヤーごと。Rng.derive(state.seed, eventSlot)。rngCounter は進めない）
---   floor(踏破済みの一番深いダンジョンの base.hp × raidHpMult × 一様乱数[min, max))。まだどこも踏破していなければ並びの先頭
+--   floor(基準のダンジョンの base.hp × raidHpMult × 一様乱数[min, max))。
+--   基準のダンジョンは踏破済みの一番深いダンジョン（まだどこも踏破していなければ古い墓地：D-187）
 function Raid.hp(state: any, slot: number, master: any): number
 	local K = master.K
-	local d = Chest.deepestCleared(state, master) or master.dungeonList[1]
+	local d = Chest.baseDungeon(state, master)
 	local rng = Rng.new(Rng.derive(state.seed, slot))
 	local spread = K.raidHpSpread.min + rng:float() * (K.raidHpSpread.max - K.raidHpSpread.min)
 	return math.max(1, math.floor(d.base.hp * K.raidHpMult * spread))
@@ -40,7 +41,7 @@ function Raid.stateFor(state: any, slot: number): any?
 	return nil
 end
 
--- そのパーティはこの時間帯のレイドに出発済みか（1パーティ1回まで）
+-- そのパーティはこの時間帯のレイドに出発済みか（1パーティ1回まで：D-187）
 function Raid.joined(state: any, slot: number, partyIndex: number): boolean
 	local r = Raid.stateFor(state, slot)
 	return r ~= nil and table.find(r.parties, partyIndex) ~= nil

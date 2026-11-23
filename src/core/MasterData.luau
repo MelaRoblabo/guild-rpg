@@ -158,6 +158,9 @@ end
 
 -- 各データの検証 ----------------------------------------------------------
 
+-- 紹介の進み具合の条件の種類（D-192。Friend.referralProgressReached が判定する）
+local REFERRAL_PROGRESS_KINDS = { rebirthedAdventurers = true }
+
 local function validateConstants(c: Checker, k: any, nRarity: number)
 	local p = "Constants"
 	if type(k) ~= "table" then
@@ -294,10 +297,20 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	-- フレンドボタン・紹介（D-157）
 	c:integer(p .. ".friendRewardIntervalSeconds", k.friendRewardIntervalSeconds, 1)
 	c:integer(p .. ".friendRewardMaxFriends", k.friendRewardMaxFriends, 1)
-	c:integer(p .. ".friendRewardGold", k.friendRewardGold, 0)
+	c:number(p .. ".friendRewardGoldMult", k.friendRewardGoldMult, 0) -- D-190
 	c:number(p .. ".friendRewardBonusPerFriend", k.friendRewardBonusPerFriend, 0)
 	c:integer(p .. ".friendRewardDailyCap", k.friendRewardDailyCap, 1)
 	c:integer(p .. ".referralWeeklyCap", k.referralWeeklyCap, 1)
+	-- 招待された人の進み具合の条件（D-192）
+	local rpc = k.referralProgressCondition
+	if type(rpc) ~= "table" then
+		c:error(p .. ".referralProgressCondition", "テーブルが必要")
+	else
+		if not REFERRAL_PROGRESS_KINDS[rpc.kind] then
+			c:error(p .. ".referralProgressCondition.kind", `知らない条件: {tostring(rpc.kind)}`)
+		end
+		c:integer(p .. ".referralProgressCondition.count", rpc.count, 1)
+	end
 
 	-- 見た目
 	c:weights(p .. ".appearanceGenderWeights", k.appearanceGenderWeights, "weight", true)
@@ -1111,7 +1124,8 @@ local function validateSpecialChests(c: Checker, d: any)
 end
 
 -- 報酬の形（クエスト・ログインボーナス・プレイ時間で共通。受け取り箱に入る：D-164）
---   { gold?, items? = { [itemId] = 数 }, chests? = { { pileKey, count, rank? } } }
+--   { goldMult?, items? = { [itemId] = 数 }, chests? = { { pileKey, count, rank? } } }
+-- ゴールドは固定額を置かず、係数 goldMult を Constants.rewardGoldBase に掛ける（D-190、06章 §22）
 -- 宝箱の山は表を持つ特別な宝箱（D-171）。rank を省けばその表で抽選する
 local function validateRewards(c: Checker, path: string, r: any, d: any)
 	if type(r) ~= "table" then
@@ -1119,12 +1133,12 @@ local function validateRewards(c: Checker, path: string, r: any, d: any)
 		return
 	end
 	for k in r do
-		if k ~= "gold" and k ~= "items" and k ~= "chests" then
+		if k ~= "goldMult" and k ~= "items" and k ~= "chests" then
 			c:error(path, `知らない報酬の種類: {tostring(k)}`)
 		end
 	end
-	if r.gold ~= nil then
-		c:integer(path .. ".gold", r.gold, 0)
+	if r.goldMult ~= nil then
+		c:number(path .. ".goldMult", r.goldMult, 0)
 	end
 	if r.items ~= nil then
 		if type(r.items) ~= "table" then
@@ -1181,6 +1195,19 @@ local QUEST_KINDS = {
 -- クエスト・ログインボーナス・プレイ時間（D-153, D-154, D-155）
 local function validateRewardSources(c: Checker, d: any)
 	local K = if type(d.Constants) == "table" then d.Constants else {}
+	-- 報酬のゴールドの基準（D-190）：すべてのダンジョンに1つずつ、知らないダンジョンは置かない
+	local base = K.rewardGoldBase
+	if type(base) ~= "table" then
+		c:error("Constants.rewardGoldBase", "テーブルが必要")
+	else
+		local known = idSet(d.Dungeons)
+		for id in known do
+			c:integer(`Constants.rewardGoldBase.{id}`, base[id], 0)
+		end
+		for id in base do
+			c:ref("Constants.rewardGoldBase", id, known)
+		end
+	end
 	local rows = d.Quests
 	if c:array("Quests", rows) then
 		c:uniqueIds("Quests", rows, "qst_")

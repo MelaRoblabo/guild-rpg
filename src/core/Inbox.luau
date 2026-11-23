@@ -6,6 +6,7 @@
 -- 状態を持たない（関数の集合）。乱数は呼び出し側から受け取る。
 
 local Chest = require("./Chest")
+local Formulas = require("./Formulas")
 local Hiring = require("./Hiring")
 local Inventory = require("./Inventory")
 local Rng = require("./Rng")
@@ -39,10 +40,14 @@ end
 
 -- 報酬の形（rewards）を受け取り箱の中身にする。rank の無い宝箱は SpecialChests の表でランクを引き、
 -- 宝箱の山×ランクごとにまとめる（並びは spec の順・ランクの低い順）
-local function resolve(spec: any, takeRng: () -> Rng.Rng, master: any): any
+-- ゴールドは goldMult × 入れたときの基準のダンジョンの rewardGoldBase（D-190、06章 §22）。額はここで決めて保存する
+local function resolve(state: any, spec: any, takeRng: () -> Rng.Rng, master: any): any
 	local out: any = {}
-	if spec.gold and spec.gold > 0 then
-		out.gold = spec.gold
+	if spec.goldMult and spec.goldMult > 0 then
+		local gold = Formulas.rewardGold(Chest.baseDungeon(state, master), spec.goldMult, master.K)
+		if gold > 0 then
+			out.gold = gold
+		end
 	end
 	if spec.items then
 		local items = {}
@@ -93,7 +98,7 @@ function Inbox.push(
 	master: any,
 	uniqueId: string?
 ): any
-	local rewards = resolve(spec or {}, takeRng, master)
+	local rewards = resolve(state, spec or {}, takeRng, master)
 	rewards.uniqueId = uniqueId
 	local entry = { uid = `inb_{state.nextUid}`, source = source, at = at, rewards = rewards }
 	state.nextUid += 1

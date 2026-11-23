@@ -74,7 +74,7 @@ export type InboxEntry = {           -- version 8（M7b-4）
 	source: "quest" | "playtime" | "login" | "raid" | "referral",  -- referral は紹介の届け物（D-180）
 	at: number,                       -- 届いた時刻（ctx.now。クエストは達成した行動の時刻）
 	rewards: {
-		gold: number?,
+		gold: number?,                 -- 額。マスターデータの goldMult から届いたときの踏破で決める（D-190、06章 §22）
 		items: { [string]: number }?,  -- チケット・ポーション（売却用アイテムは報酬にしない）
 		chests: { { pileKey: string, rank: number, count: number } }?,  -- ランクは届いたときに SpecialChests の表で決める（D-166）。山×ランクでまとめ、ランクの低い順
 		uniqueId: string?,             -- ログインボーナス7日目のユニーク（D-155）
@@ -138,7 +138,8 @@ export type PlayerState = {
 	itemLog: { ItemLogEntry },        -- 有料・無料の入手経路の記録（10章。直近N件）
 
 	-- ここから M7b-3 以降の段階で追加（D-152〜D-168。段階ごとに version を上げる：下の「セーブの移行」）
-	lastSavedAt: number,              -- 最後に保存した時刻＝ログアウト時刻。留守の計算の基準（D-161）。サーバーが保存のときに ctx.now を書く（11章）。version 7
+	lastSavedAt: number,              -- 最後に保存した時刻（ふつうはログアウト時刻）。サーバーが保存のときに ctx.now を書く（11章）。version 7
+	                                  -- 留守の始まりは max(lastSavedAt, lastAdvancedAt)（D-161, D-193、06章 §13）
 	restBonusSeconds: number,         -- 休息ボーナスの残り秒（D-161。上限 restBonusMaxSeconds）。version 7
 	quests: {                         -- D-153。version 8
 		daily: { dayIndex: number, entries: { QuestEntry }, bonusDone: boolean },
@@ -158,10 +159,11 @@ export type PlayerState = {
 		nextAt: number,               -- 次に押せる時刻
 		dayIndex: number, todayCount: number,  -- 1日の上限の数え方
 	},
-	referral: {                       -- 紹介（D-157）。version 9
+	referral: {                       -- 紹介（D-157, D-192）。version 9。他のプレイヤーの UserId を含む referredBy・rewardedInvitees・claimedDeliveries は Protocol.view で除く（D-192）
 		referredBy: number?,          -- 招待した人の UserId（ReferredByPlayerId。サーバーが入れる）
-		inviteeRewardDone: boolean,   -- 招待された側の報酬を渡したか（1回だけ）
-		inviterDelivered: boolean,    -- 招待された側：招待した人へ届け物を書いたか（同じ招待で2回届けない。読み書きは Friend.inviterDelivered / markInviterDelivered。書くきっかけの判定はサーバー：M7b-5）
+		inviteeRewardDone: boolean,   -- 招待された側の報酬を渡したか（1回だけ。Friend.referralProgressReached に届いてから：D-192）
+		inviterDelivered: boolean,    -- 招待された側：招待した人へ届け物を書いたか（同じ招待で2回届けない。読み書きは Friend.inviterDelivered / markInviterDelivered。
+		                              --   書くきっかけ：サーバーが Friend.referralProgressReached を見て判定する（D-192））
 		rewardedInvitees: { [string]: boolean },  -- 招待した側：報酬を渡した相手の UserId（文字列キー）
 		claimedDeliveries: { [string]: boolean }, -- 招待した側：受け取った届け物の id（例 "referral:<招待された人の UserId>"）。同じ id は二度受け取らない
 		weekIndex: number, weekCount: number,     -- 招待した側の人数の上限（週）

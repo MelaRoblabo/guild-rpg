@@ -68,5 +68,9 @@
 | 特別な宝箱 | specialChest | D-166 |
 | 一括売却 | BulkSell | D-167 |
 | 日・週の番号 | dayIndex / weekIndex | UTC 0時、週は月曜、D-168 |
+| 基準のダンジョン | baseDungeon | 踏破した一番深いダンジョン。未踏破なら古い墓地（D-187）。特別な宝箱・レアダンジョン・レイド・商人・報酬のゴールドで使う |
+| 報酬のゴールド | rewardGold / rewardGoldBase / goldMult | 基準のダンジョンの rewardGoldBase × 報酬ごとの係数（D-190、06章 §22） |
+| 紹介の進み具合 | referralProgressCondition / referralProgressReached | 紹介の報酬を渡す条件（初転生。D-192） |
+| 留守の始まり | offlineStart | max(lastSavedAt, lastAdvancedAt)（D-193） |
 
 **使わない用語**：前衛・後衛・戦闘力・パーティ最大HP・前衛系・編成ボーナス・ダンジョン相性・ダンジョン補正・鍵付き宝箱・見た目図鑑・派遣費（D-163 で廃止）。

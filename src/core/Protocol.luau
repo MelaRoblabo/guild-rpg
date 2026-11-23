@@ -226,13 +226,22 @@ local function stripRanks(v: any): any
 end
 
 -- events から宝箱のランクを除く。開封結果（ChestsOpened）は開けた後なのでそのまま（演出に使う）
+-- 紹介の結果（ReferralGranted）からは相手の UserId を除く（D-192）
 function Protocol.redactEvents(events: { any }): { any }
 	local out = {}
 	for _, e in events do
-		table.insert(out, if e.type == "ChestsOpened" then deepCopy(e) else stripRanks(e))
+		local x = if e.type == "ChestsOpened" then deepCopy(e) else stripRanks(e)
+		if e.type == "ReferralGranted" then
+			x.userId = nil
+		end
+		table.insert(out, x)
 	end
 	return out
 end
+
+-- 紹介の状態のうちクライアントに送らないもの：他のプレイヤーの UserId を含む（D-192）
+--   rewardedInvitees（報酬済みの相手の UserId）・claimedDeliveries（届け物の id。UserId を含む）・referredBy（招待した人）
+local HIDDEN_REFERRAL_KEYS = { rewardedInvitees = true, claimedDeliveries = true, referredBy = true }
 
 -- クライアントに送る状態の要約
 function Protocol.view(state: any, master: any): any
@@ -242,7 +251,13 @@ function Protocol.view(state: any, master: any): any
 			v[k] = deepCopy(x)
 		end
 	end
-	v.chests = Game.query.chestsByDungeon(state, master)
+	if type(v.referral) == "table" then
+		for k in HIDDEN_REFERRAL_KEYS do
+			v.referral[k] = nil
+		end
+	end
+	-- 未開封の宝箱：特別な宝箱を含む全部の山の { { pileKey, count } } の配列。ランクは隠す（D-087, D-166）
+	v.chests = Game.query.chestsByPile(state, master)
 	-- 受け取り箱の宝箱はランクを隠し、山ごとの数だけにする（D-087, D-164）
 	v.inbox = Game.query.inbox(state)
 	for _, e in v.expeditions or {} do

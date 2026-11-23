@@ -230,6 +230,22 @@ return function(t)
 				expect(Game.query.weeklyVisitor(s, T0, master).owned).toBe(true)
 			end
 		)
+		it("D-194 今週の訪問者は visitor のユニークから均等に選ぶ", function()
+			local list = master.visitorUniques
+			expect(#list >= 2).toBeTruthy()
+			local count: { [string]: number } = {}
+			local weeks = 600 * #list
+			local week = Calendar.weekIndex(T0)
+			for w = week, week + weeks - 1 do
+				local id = Visitor.forWeek(w, master).id
+				count[id] = (count[id] or 0) + 1
+			end
+			local mean = weeks / #list
+			for _, u in list do
+				local n = count[u.id] or 0
+				expect(n > mean * 0.85 and n < mean * 1.15).toBeTruthy()
+			end
+		end)
 		it("D-158 weeklyVisitorChance は確率（0〜1）として検証する", function()
 			expect(has(
 				errorsOf(function(d)
@@ -452,16 +468,21 @@ return function(t)
 		it(
 			"D-157 押すとゴールドがその場で入り、人数で少し増える（上限 friendRewardMaxFriends 人分）",
 			function()
+				-- まだどこも踏破していないので基準は古い墓地（D-187, D-190）
 				local function expected(n: number): number
 					local c = math.min(n, K.friendRewardMaxFriends)
-					return math.floor(K.friendRewardGold * (1 + K.friendRewardBonusPerFriend * (c - 1)))
+					return math.floor(
+						K.rewardGoldBase.dng_graveyard
+							* K.friendRewardGoldMult
+							* (1 + K.friendRewardBonusPerFriend * (c - 1))
+					)
 				end
-				for n = 1, 5 do
-					expect(Friend.gold(n, master)).toBe(expected(n))
-				end
-				expect(Friend.gold(2, master) > Friend.gold(1, master)).toBeTruthy()
-				expect(Friend.gold(5, master)).toBe(Friend.gold(K.friendRewardMaxFriends, master))
 				local s = newState()
+				for n = 1, 5 do
+					expect(Friend.gold(s, n, master)).toBe(expected(n))
+				end
+				expect(Friend.gold(s, 2, master) > Friend.gold(s, 1, master)).toBeTruthy()
+				expect(Friend.gold(s, 5, master)).toBe(Friend.gold(s, K.friendRewardMaxFriends, master))
 				local gold = s.gold
 				local r = exec(s, { type = "ClaimFriendReward" }, T0, nil, 2)
 				expect(r.ok).toBeTruthy()
@@ -513,6 +534,17 @@ return function(t)
 		)
 	end)
 
+	-- 招待された人を進み具合（referralProgressCondition：転生した冒険者が count 人以上）に届かせる（D-192）
+	local function reachProgress(s: any)
+		local n = 0
+		for _, uid in s.parties[1].slots do
+			if n < K.referralProgressCondition.count then
+				s.adventurers[uid].rebirthCount = 1
+				n += 1
+			end
+		end
+	end
+
 	describe("紹介（D-157, D-180）", function()
 		it("D-157 紹介の報酬はサーバー専用（クライアントからは受け付けない）", function()
 			expect(Protocol.SERVER_ONLY.GrantReferral).toBe(true)
@@ -520,6 +552,7 @@ return function(t)
 		end)
 		it("D-157 招待された側は1回だけ、受け取り箱へ", function()
 			local s = newState()
+			reachProgress(s) -- 進み具合に届いてから（D-192）
 			local r = exec(s, { type = "GrantReferral", role = "invitee", userId = 10 })
 			expect(r.ok).toBeTruthy()
 			expect(#s.inbox).toBe(1)
@@ -574,6 +607,70 @@ return function(t)
 				expect(Friend.markInviterDelivered(s)).toBe(false)
 			end
 		)
+		it(
+			"D-192 Friend.referralProgressReached：転生した冒険者が referralProgressCondition.count 人以上で届く",
+			function()
+				expect(K.referralProgressCondition.kind).toBe("rebirthedAdventurers")
+				local s = newState()
+				expect(Friend.referralProgressReached(s, master)).toBe(false)
+				s.adventurers[s.parties[1].slots[1]].level = 20 -- レベルだけでは届かない
+				expect(Friend.referralProgressReached(s, master)).toBe(false)
+				reachProgress(s)
+				expect(Friend.referralProgressReached(s, master)).toBe(true)
+				-- 人数の条件はマスターデータで変えられる
+				local m2 = Fixtures.master(function(d)
+					d.Constants.referralProgressCondition = { kind = "rebirthedAdventurers", count = 2 }
+				end)
+				local s2 = newState(1, m2)
+				s2.adventurers[s2.parties[1].slots[1]].rebirthCount = 3
+				expect(Friend.referralProgressReached(s2, m2)).toBe(false)
+				s2.adventurers[s2.parties[1].slots[2]].rebirthCount = 1
+				expect(Friend.referralProgressReached(s2, m2)).toBe(true)
+				-- 状態は変えない
+				local before = Game._deepClone(s)
+				Friend.referralProgressReached(s, master)
+				expect(s).toEqual(before)
+			end
+		)
+		it(
+			"D-192 招待された側の報酬は進み具合に届くまで渡さない（PROGRESS_NOT_REACHED、状態は変えない）",
+			function()
+				local s = newState()
+				local before = Game._deepClone(s)
+				expect(exec(s, { type = "GrantReferral", role = "invitee", userId = 10 }).error).toBe(
+					"PROGRESS_NOT_REACHED"
+				)
+				expect(s).toEqual(before)
+				reachProgress(s)
+				local r = exec(s, { type = "GrantReferral", role = "invitee", userId = 10 })
+				expect(r.ok).toBeTruthy()
+				expect(r.events[1].role).toBe("invitee")
+				-- 中身はステータススロットチケット
+				expect(s.inbox[1].rewards.items).toEqual(K.referralRewards.invitee.items)
+				expect(K.referralRewards.invitee.items.itm_slot_ticket > 0).toBeTruthy()
+				expect(K.referralRewards.inviter.items.itm_slot_ticket > 0).toBeTruthy()
+			end
+		)
+		it("D-192 進み具合の条件はマスターデータで検証する", function()
+			expect(has(
+				errorsOf(function(d)
+					d.Constants.referralProgressCondition = { kind = "guildLevel", count = 1 }
+				end),
+				"Constants.referralProgressCondition.kind"
+			)).toBeTruthy()
+			expect(has(
+				errorsOf(function(d)
+					d.Constants.referralProgressCondition = { kind = "rebirthedAdventurers", count = 0 }
+				end),
+				"Constants.referralProgressCondition.count"
+			)).toBeTruthy()
+			expect(has(
+				errorsOf(function(d)
+					d.Constants.referralProgressCondition = nil
+				end),
+				"Constants.referralProgressCondition"
+			)).toBeTruthy()
+		end)
 	end)
 
 	describe("セーブの移行 version 8 → 9（M7b-4 後半）", function()

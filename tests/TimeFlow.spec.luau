@@ -404,6 +404,38 @@ return function(t)
 			end
 		end)
 		it(
+			"D-193 留守の始まりは max(lastSavedAt, lastAdvancedAt)。落ちて失われたオンラインの時間は留守として数える（二重にはならない）",
+			function()
+				local s = loggedOutWithRepeat()
+				-- 最後に時間を進めた時刻が保存より後（保存のあともオンラインで進めた）なら、そこから
+				Game.advance(s, ctx(T0 + 120))
+				expect(s.lastAdvancedAt).toBe(T0 + 120)
+				s.lastSavedAt = T0 + 60
+				expect(Game.offlineStart(s)).toBe(T0 + 120)
+				-- 保存が後なら保存の時刻から
+				s.lastSavedAt = T0 + 300
+				expect(Game.offlineStart(s)).toBe(T0 + 300)
+				-- lastSavedAt がまだ書かれていなければ lastAdvancedAt
+				s.lastSavedAt = nil
+				expect(Game.offlineStart(s)).toBe(T0 + 120)
+				-- サーバーが落ちた：最後の定期保存（T0 + 60）の状態から読み込むと、その後のオンラインの進みは失われ、
+				-- 保存した時刻からを留守として計算する（休息ボーナスも保存した時刻から）
+				local saved = loggedOutWithRepeat()
+				saved.lastSavedAt = T0 + 60
+				saved.lastAdvancedAt = T0 + 60
+				local login = T0 + 3600
+				Game.advance(saved, ctx(login, false))
+				expect(saved.restBonusSeconds).toBe(
+					math.min(math.floor((login - (T0 + 60)) * K.restBonusRate), K.restBonusMaxSeconds)
+				)
+				expect(saved.lastAdvancedAt).toBe(login)
+				-- 同じ時刻にもう一度留守の計算をしても、留守は 0（二重にならない）
+				local rest = saved.restBonusSeconds
+				Game.advance(saved, ctx(login, false))
+				expect(saved.restBonusSeconds).toBe(rest)
+			end
+		)
+		it(
 			"D-161 留守中は雇用・転生・トレーニングをしない（状態が変わらない）",
 			function()
 				local s = loggedOutWithRepeat()
