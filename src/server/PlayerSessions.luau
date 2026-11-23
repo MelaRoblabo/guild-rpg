@@ -39,11 +39,18 @@ local MSG_LOAD_FAILED =
 	"データを読み込めませんでした。しばらくしてから入り直してください。"
 local MSG_LOST = "別のサーバーで同じデータが使われたため、切断しました。"
 
--- 届け物を受け取り箱へ入れる（D-180、11章 §3.6）。
--- 仮の口：M7b-4 の GrantReferral に差し替える。
---   受け取り箱へ入れたら (true, events) を返す。入れなかった・知らない種類なら (false, {}) を返し、届け物は消さずに残す。
---   今は何もせず false を返すので、届け物は次のログインまで残る。
-local function grantDelivery(_state: any, _delivery: Deliveries.Delivery, _ctx: any): (boolean, { any })
+-- 届け物を受け取り箱へ入れる（D-180、11章 §3.6）。core の Game.grantDelivery を使う。
+--   受け取り箱へ入れたら (true, events)。前に受け取り済み（同じ id）なら消してよいので (true, {})。
+--   それ以外（週の上限・知らない種類）は (false, {}) で、届け物は消さずに残す。
+local function grantDelivery(state: any, delivery: Deliveries.Delivery, ctx: any): (boolean, { any })
+	local ok, events = Game.grantDelivery(state, delivery, ctx)
+	if ok then
+		return true, events
+	end
+	local claimed = state.referral and state.referral.claimedDeliveries
+	if claimed and claimed[delivery.id] then
+		return true, {}
+	end
 	return false, {}
 end
 
