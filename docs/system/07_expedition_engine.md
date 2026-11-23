@@ -10,11 +10,13 @@ input = {
 	departAt: number,
 	dungeonId: string,
 	members: { MemberSnapshot },   -- 隊列1〜4の順。出発時点の実効値を固定したもの
+	dailyTraitId: string?,         -- 出発時刻の日に当たっている日替わりの特性（D-156、06章 §16）
+	timeMult: number?,             -- 所要秒の倍率。留守番は offlineTimeMult（10）、それ以外は 1（D-161）
 }
 MemberSnapshot = { uid, jobId, attackType, heals, maxHp, atk, pdef, mdef, agi, dex, giftIds, modifiers }
 ```
 
-出発時点で実効値を計算して固定する（探索中に装備等は変えられないため）。
+出発時点で実効値を計算して固定する（探索中に装備等は変えられないため）。日替わりの特性も出発時に決めて固定する（探索中に日が変わっても変えない：D-156）。
 
 ## 2. 手順
 
@@ -90,6 +92,15 @@ FloorLog = {
 
 - `startOffset` は出発からの経過秒（行きの移動を含む）。再生側はこれで「今どのフロアか」を求める。
 - 報酬はログ確定時点で決まっているが、**状態への反映は帰還時（advance）**。
+- 休息ボーナスの経験値の倍率（D-161）はログに入れず、帰還時（advance）に残りを見て掛ける（06章 §14）。
+
+## 4b. 留守番・日替わり・マップイベント（D-152, D-156, D-161）
+
+- **留守番の探索**：`input.timeMult = offlineTimeMult` で同じ `simulate` を使う。戦闘・イベント・報酬は普通の探索と同じで、`travelSeconds`・各フロアの `startOffset`/`duration`・`totalSeconds` だけを倍率で伸ばす。`Expedition.offline = true` の印を付け、クエストに数えない（D-153, D-161）。
+- **日替わりの特性**：`dailyTraitId` の効果を出発時の計算に入れる（攻撃力・移動時間は MemberSnapshot・片道秒の計算で、宝箱の数・経験値は報酬の計算で。06章 §16）。留守番も出発した日の特性を当てる。
+- **レアダンジョン**：踏破済みの一番深いダンジョンのデータで計算し、宝箱の数に `rareDungeonChestMult` を掛け、宝箱の山は `special:rare`（D-152, D-166）。
+- **レイドボス**：パーティのダメージは出発時に計算して `Expedition.raidDamage` に保存し、到着時刻（advance）に合計へ入れる。結果は出発時に決まる（D-152）。ダメージの計算方法は未決。
+- 攻撃力・移動時間・経験値・所要秒の倍率は乱数を使わない。宝箱の数を増やす効果（`chestMult`・`rareDungeonChestMult`）で抽選が増える場合は乱数の消費順が変わるので、`engineVersion` を上げる（§3）。増えた分のランクの抽選の順番は M7b-3 で決めて §3 に書き足す。
 
 ## 5. 再生位置の計算（Expedition.progressAt）
 

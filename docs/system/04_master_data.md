@@ -26,6 +26,13 @@
 | `GuildLevels.luau` | ギルドレベル | — |
 | `Expansions.luau` | 拡張 | `exp_` |
 | `StarterSet.luau` | 初期状態（Q-020） | — |
+| `DailyTraits.luau` | 日替わりの特性（D-156） | `dt_` |
+| `Quests.luau` | クエストのお題（D-153） | `qst_` |
+| `LoginBonus.luau` | ログインボーナスのカレンダー（D-155） | — |
+| `PlaytimeRewards.luau` | プレイ時間の段階（D-154） | — |
+| `SpecialChests.luau` | 特別な宝箱の表（D-166） | `spc_` |
+| `MapEvents.luau` | マップイベント（種類・場所。D-152） | `mev_` |
+| `Merchant.luau` | 旅の商人の品ぞろえの決まり（D-152） | — |
 
 ## 2. 検証（MasterData.luau）
 
@@ -33,6 +40,8 @@
 
 - `id` の重複がない。参照先の `id` が存在する。
 - 確率の表は合計が 1（許容誤差 1e-9）。重み表は全部 0 以上で合計 > 0。
+- 演出率（D-090）の 10〜15% の検査は普通のダンジョンの `chestRarityWeights` だけ。特別な宝箱は `SpecialChests` の行ごとの基準で検査する（D-166）。
+- 専用ギフト（`exclusive = true`）は、持ち主のユニークが1人だけ参照している（D-165）。ログインボーナス用のユニーク（`acquire = "login"`）は今週の訪問者の候補に入らない（D-155, D-158）。
 - 必須項目が揃っている。数値の範囲（確率は 0〜1、レアリティは 1〜5 など）。
 - 見た目は 16 カテゴリ × 15 種が揃っている（コンテンツが揃うまでは警告に留めるフラグを持つ）。
 
@@ -85,7 +94,27 @@
 | `guildLevelMax` | 20（仮） | Q-017 |
 | （宝箱の保管上限） | なし（旧 `chestStorageMax` 500 は廃止） | D-084 |
 | `chestBatchOpen` | 100（まとめて開く個数） | D-089 |
-| `chestEffectRate` | 0.10〜0.15（開封演出が入る割合の基準） | D-090 |
+| `chestEffectRate` | 0.10〜0.15（開封演出が入る割合の基準。普通のダンジョンだけ） | D-090, D-166 |
+| `offlineTimeMult` | 10（留守番の探索1回の時間の倍率） | D-161 |
+| `offlineMaxSeconds` | 21600（1回の留守で6時間まで。拡張しない） | D-161 |
+| `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（たまる速さは未決（M7b-6）） | D-161 |
+| `restBonusExpMult` | 2（未決（M7b-6）） | D-161 |
+| `dailyTraitBands` | {1〜4}, {5〜8}, {9〜12}（難度＝ダンジョンの tier の帯） | D-156 |
+| `calendarSeed` | 日替わり・今週の訪問者・マップイベントの共通の乱数の元（全員共通。値は任意の固定値） | D-156, D-158, D-152 |
+| `questDailyCount` / `questWeeklyCount` | 3 / 3〜5（ウィークリーの数は未決（M7b-6）） | D-153 |
+| `playtimeDailyCapSeconds` | 7200（1日2時間まで） | D-154 |
+| `friendRewardIntervalSeconds` | 未決（M7b-6。例 600） | D-157 |
+| `friendRewardMaxFriends` | 3（報酬が増えるのは3人分まで） | D-157 |
+| `friendRewardDailyCap` | 未決（M7b-6） | D-157 |
+| `referralWeeklyCap` / `referralProgressCondition` | 未決（M7b-6。例 週3人 / 初転生） | D-157 |
+| `weeklyVisitorMult` | 未決（M7b-6。例 0.5%→3%） | D-158 |
+| `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
+| `mapEventKindWeights` | レアダンジョン / レイドボス / 旅の商人：未決（M7b-6） | D-152 |
+| `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6） | D-152 |
+| `raidHp` | 未決（M7b-6。決め方も未決） | D-152 |
+| `merchantItemCount` | 3〜5 | D-152 |
+| `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 約10 / 未決 / 未決（M7b-6） | D-152 |
+| `rewardShareTargets` | §13 の表 | D-160 |
 
 ## 4. ダンジョン（D-068, D-069）
 
@@ -114,7 +143,7 @@
 - 上位のレアリティの出やすさ（そのレアリティ以上が出る割合）は、深いダンジョンほど増える（または同じ）。
 
 - **レアリティを増やすとき（D-085）**：`Rarities.luau` の末尾に行を足し、`equipRarityMult`・`sellRarityMult` を同じ長さに伸ばし、出したいダンジョンの `chestRarityWeights` に値を足し、必要なら `chestEffectMinRarity` を見直す。検証が長さの食い違いをエラーにする。
-- 派遣費 `dispatchFee`（D-079）はテンプレートに書き、calibrate がそのまま写す。難度7以降のみ（仮：1千〜3万G）。
+- 派遣費 `dispatchFee` は廃止（D-163。D-079 を廃止）。テンプレート・calibrate・Dungeons から消す。
 - 経験値は「深いダンジョンほど1秒あたりの経験値が前の1.08倍以上」になるよう calibrate が引き上げる（D-097）。
 - 結果の確認は `lune run tools/sim -- sweep`。報告は `docs/reports/M1b_balance.md`。
 
@@ -126,4 +155,86 @@
 
 - 所持金 500G、パーティ枠1、候補枠3、所属枠8、倉庫300（D-071）。
 - 冒険者4人（戦士・盗賊・魔法使い・僧侶 各1、Lv1、基礎ステータスは固定値）を初期パーティの隊列1〜4に配置。各自コモンの武器・防具を装備。
+- 自動売却は最初からオン（コモン・アンコモン、修飾語つきは残す。D-167）。売却用アイテム（素材）は設定にかかわらず常に自動で売る（D-167）。
 - 「最初の宝箱を1分以内」（01章）を満たすよう、古い墓地の初回は確実に宝箱1個以上（踏破確定宝箱）を得られる強さにする。
+
+## 7. 日替わりの特性（DailyTraits.luau、D-156）
+
+各行：`id, effect, value`。良い効果だけを置く（「レアリティが上がる」は置かない。レアダンジョン D-152 だけの特徴）。
+
+| effect | 内容（例） | value |
+| --- | --- | --- |
+| `chestMult` | 宝箱の数 ×1.5 | 未決（M7b-6） |
+| `expMult` | 経験値 ×2 | 未決（M7b-6） |
+| `atkPctPhysical` | 物理攻撃職の攻撃力 +20% | 未決（M7b-6） |
+| `atkPctMagic` | 魔法攻撃職の攻撃力 +20% | 未決（M7b-6） |
+| `travelMult` | 移動時間 −30% | 未決（M7b-6） |
+
+- 候補の行と効果量は未決（M7b-6）。どの日にどのダンジョン・特性が当たるかは 06章 §16。
+
+## 8. ユニーク・ギフトの追加項目（Uniques.luau・Gifts.luau）
+
+| ファイル | 項目 | 内容 | 根拠 |
+| --- | --- | --- | --- |
+| Uniques | `acquire` | `visitor`（雇用の特別な訪問者）・`firstClear:<dungeonId>`（初回踏破）に `login`（ログインボーナス7日目）を足す。`login` のユニークは雇用に出さない | D-055, D-155 |
+| Uniques | `loginOrder` | `login` のユニークを配る順（1周ごとに別のユニーク）。人数は未決（Q-025） | D-155 |
+| Uniques | `visitorWeight` | 特別な訪問者の抽選の重み（`visitor` のユニークだけ）。値は未決（M7b-6） | D-158 |
+| Uniques | `exclusiveGiftId` | そのユニークの専用ギフト。中身は未決 | D-165 |
+| Gifts | `exclusive` | 専用ギフトの印。true なら一般の抽選（雇用の初期ギフト・転生で増えるギフト）に出さない。最大4つの枠（D-024）には数える | D-165 |
+
+- ユニークの強さの基準は「雇用の新人の平均より上、当たりよりは下」（D-165）。`baseStats` はこの基準で決め直す（数値は未決、シミュレーションで確認）。
+- 専用ギフトの効果の種類は、中身が決まってから必要な分だけ足す（D-165）。
+
+## 9. クエストのお題（Quests.luau、D-153）
+
+各行：`id, period（daily / weekly）, kind, amountPerParty, rewards`。
+
+| kind | 数えるもの | period |
+| --- | --- | --- |
+| `expeditions` | 探索の回数（オンライン中に出発したもの） | daily / weekly |
+| `chestsOpened` | 宝箱を開けた数 | daily / weekly |
+| `hires` | 雇用 | daily / weekly |
+| `trainings` | トレーニング | daily / weekly |
+| `clears` | 踏破 | daily / weekly |
+| `rebirths` | 転生 | weekly のみ |
+
+- 量は「`amountPerParty` × パーティ数」（例：探索 ×パーティ数×10回）。お題の候補・量の式・報酬の量は未決（M7b-6）。
+- 報酬はゴールド・宝箱・ポーション・ステータススロットチケット。全部達成のボーナス（宝箱など）は `questDailyBonus` / `questWeeklyBonus` に置く（量は未決（M7b-6））。
+
+## 10. ログインボーナス・プレイ時間（LoginBonus.luau・PlaytimeRewards.luau）
+
+- `LoginBonus`：1〜6日目の報酬（ゴールド・チケット・ポーション・宝箱）。7日目は `loginOrder` 順のユニーク。そのユニークを持っている、またはユニークが一巡した後は `fallback`（レアな宝箱＋チケット）。量は未決（M7b-6）。（D-155）
+- `PlaytimeRewards`：段階 5・10・20・30・45・60・90・120分（行ごとに `minutes, rewards`）。報酬はゴールド（1時間の収入の数%）と宝箱。量は未決（M7b-6）。（D-154）
+
+## 11. 特別な宝箱（SpecialChests.luau、D-166）
+
+各行：`id, pileKey, rarityWeights, effectMinRarity, effectRateMin, effectRateMax`。
+
+| id | pileKey | 出どころ | 演出率の基準 |
+| --- | --- | --- | --- |
+| `spc_rare` | `special:rare` | レアダンジョン（D-152） | 未決（M7b-6。例 20〜30%） |
+| `spc_raid` | `special:raid` | レイドのレアな宝箱（D-152） | 未決（M7b-6） |
+| `spc_quest` | `special:quest` | クエストの報酬（D-153） | 未決（M7b-6） |
+| `spc_login` | `special:login` | ログインボーナス（D-155） | 未決（M7b-6） |
+| `spc_playtime` | `special:playtime` | プレイ時間報酬（D-154） | 未決（M7b-6） |
+
+- 出現率（`rarityWeights`）と演出率は未決（M7b-6）。検証は行ごとに `effectRateMin`〜`effectRateMax` に収まるかを見る（D-090 の検査は普通のダンジョンだけ）。
+- 中身のアイテムレベルは「踏破した一番深いダンジョン」（06章 §19）。
+
+## 12. マップイベント・旅の商人（MapEvents.luau・Merchant.luau、D-152）
+
+- `MapEvents`：種類（`mev_rare_dungeon`・`mev_raid`・`mev_merchant`）と、出る場所の一覧。種類の割合は `mapEventKindWeights`（未決（M7b-6））。
+- `Merchant`：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。アイテムレベル・レアリティは踏破済みの範囲まで。チケットなど量を管理している品は売らない。
+
+## 13. 報酬の入手先の配分（rewardShareTargets、D-160）
+
+全体の量は今の水準を保ち、入手先の割合だけを変える。各入手先の量（§7〜§12）はこの配分に合うよう自動プレイで調整する（M7b-6）。表の値は目標の割合（%）。
+
+| 報酬 | 冒険 | クエスト | ログイン | プレイ時間・留守 | フレンド | マップイベント | ギルドレベル |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ゴールド | 65 | 10 | 5 | 10 | 5 | 5 | — |
+| 宝箱 | 70 | 10 | 5 | 5 | — | 10 | — |
+| ステータススロットチケット | 10 | 40 | 15 | 5 | 5 | — | 25 |
+| ポーション | 50 | 20 | 20 | — | — | 10 | — |
+
+- ユニークキャラの入手は初回踏破・ログインボーナス7日目（D-155）・今週の訪問者（D-158）の3経路。

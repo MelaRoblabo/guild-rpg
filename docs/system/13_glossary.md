@@ -22,7 +22,7 @@
 | 探索ログ | expeditionLog | |
 | 踏破／撤退 | clear / retreat | |
 | 戦闘不能 | down | |
-| 宝箱／宝箱ランク | chest / rank | 保管は数だけ（chests[dungeonId][rank]、D-084） |
+| 宝箱／宝箱ランク | chest / rank | 保管は数だけ（chests[pileKey][rank]、D-084, D-166） |
 | レアリティ | rarity | 1〜（リリース時6＝ミシック。D-085） |
 | 基本アイテム | equipmentBase | |
 | 装備個体 | equipmentItem | uid を持つ |
@@ -43,13 +43,30 @@
 | 拡張 | expansion | |
 | トレーニング | training / Train | ゴールドで経験値を得る（D-076） |
 | トレーニング場 | trainingLevel / trainingFacility | 拡張の一つ（D-077） |
-| まとめて開く | OpenChests / chestBatchOpen | ダンジョンの宝箱を最大100個まとめて開ける（D-089） |
-| 開封演出 | effect / chestEffectMinRarity / chestEffectRate | 発生ライン以上のレアリティの宝箱で入る演出。演出率10〜15%（D-089, D-090） |
-| 派遣費 | dispatchFee | 上級ダンジョンの出発時の費用（D-079） |
+| まとめて開く | OpenChests / chestBatchOpen | 宝箱の山ごとに最大100個まとめて開ける（D-089, D-166） |
+| 開封演出 | effect / chestEffectMinRarity / chestEffectRate | 発生ライン以上のレアリティの宝箱で入る演出。演出率10〜15%は普通のダンジョンだけ（特別な宝箱は種類ごとの基準、D-089, D-090, D-166） |
 | 転生費用 | rebirthCost | D-080 |
 | 経験値補正 | expRate / expPct | ギフト＋装備（修練の護符）。上限 expBonusCap（D-082） |
 | ティッカー | ticker | 次の行動へ導く印（数・！・NEW・光る）（D-123, D-124） |
 | デザインシステム | Guild UI | 全画面の色の役割・配置・部品・入力の決まり（D-150） |
 | 仮想時計 | virtualClock | ツール側のみ |
+| 受け取り箱 | inbox | D-164 |
+| 休息ボーナス | restBonus | D-161 |
+| 留守番 | offlineRun | D-161 |
+| 日替わりの特性 | dailyTrait | D-156 |
+| マップイベント | mapEvent | D-152 |
+| レアダンジョン | rareDungeon | D-152 |
+| レイドボス | raid | D-152 |
+| 旅の商人 | merchant | D-152 |
+| クエスト | quest | daily / weekly、D-153 |
+| プレイ時間報酬 | playtimeReward | D-154 |
+| ログインボーナス | loginBonus | D-155 |
+| フレンドボタン | friendReward | D-157 |
+| 今週の訪問者 | weeklyVisitor | D-158 |
+| 専用ギフト | exclusive | Gifts の印、D-165 |
+| 宝箱の山 | chestPile / pileKey | 通常は dungeonId、特別は special:xxx、D-166 |
+| 特別な宝箱 | specialChest | D-166 |
+| 一括売却 | BulkSell | D-167 |
+| 日・週の番号 | dayIndex / weekIndex | UTC 0時、週は月曜、D-168 |
 
-**使わない用語**：前衛・後衛・戦闘力・パーティ最大HP・前衛系・編成ボーナス・ダンジョン相性・ダンジョン補正・鍵付き宝箱・見た目図鑑。
+**使わない用語**：前衛・後衛・戦闘力・パーティ最大HP・前衛系・編成ボーナス・ダンジョン相性・ダンジョン補正・鍵付き宝箱・見た目図鑑・派遣費（D-163 で廃止）。
