@@ -3,6 +3,9 @@
 -- greedy：行ける中で1秒あたりの経験値が最も多いダンジョンへ。良い装備は即装備、不要品は売却、
 --         買える拡張はすぐ買う、パーティは雇用で埋める、上限レベルに達したら転生する（費用が払えれば）。
 --         遅れている冒険者には修練の護符を持たせ（D-082）、余ったゴールドでトレーニングする（D-076）。
+-- M7b-6：受け取り箱を受け取る（D-164）、開封のあとに一括売却（D-167）、フレンドボタン（D-157。友達の数は ctx.friendCount）、
+--         マップイベント（D-152）は出ている時間帯に空いているパーティをレアダンジョン・レイドへ、商人は余裕があれば買う。
+--         クエスト・ログインボーナス・プレイ時間・今週の訪問者は、ふだんの行動と advance で自然に進む。
 
 local Expedition = require("../../src/core/Expedition")
 local Formulas = require("../../src/core/Formulas")
@@ -37,10 +40,49 @@ local EXPANSION_PRIORITY = { "exp_party", "exp_warehouse", "exp_roster", "exp_tr
 -- トレーニングに使うのは「転生の備え」を除いた所持金のこの割合まで
 local TRAIN_BUDGET_SHARE = 0.5
 
-export type Ctx = { now: number, master: any, online: boolean }
+export type Ctx = { now: number, master: any, online: boolean, friendCount: number? }
+
+-- 行動の設定（試し方の設定で、ゲームの数値ではない。tools/autoplay/Schedule.luau の behavior を Policy.configure で入れる）
+local behavior: { [string]: any } = {
+	mapEvents = true,
+	merchant = true,
+	merchantBudgetShare = 0.3,
+	bulkSell = true,
+}
+
+function Policy.configure(b: { [string]: any })
+	for k, v in b do
+		behavior[k] = v
+	end
+end
+
+-- 報酬の入手先を数えるための聞き手（tools/autoplay/Ledger.luau）。listener(state, cmd, result, extra)
+--   extra：ClaimInbox は受け取る前の受け取り箱、Sell / BulkSell は売る前の売却額（uid → ゴールド）
+local listener: ((any, any, any, any) -> ())? = nil
+function Policy.setListener(fn: ((any, any, any, any) -> ())?)
+	listener = fn
+end
 
 local function exec(state: any, cmd: any, ctx: Ctx): any
-	return Game.execute(state, cmd, ctx)
+	local extra = nil
+	if listener then
+		if cmd.type == "ClaimInbox" then
+			extra = table.clone(state.inbox)
+		elseif cmd.type == "Sell" or cmd.type == "BulkSell" then
+			extra = {}
+			for _, uid in cmd.equipmentUids or {} do
+				local e = state.equipment[uid]
+				if e then
+					extra[uid] = Game.query.sellPrice(e, ctx.master)
+				end
+			end
+		end
+	end
+	local r = Game.execute(state, cmd, ctx)
+	if listener and r.ok then
+		(listener :: any)(state, cmd, r, extra)
+	end
+	return r
 end
 
 -- 装備の評価（性能値の合計 × 倍率）
@@ -58,14 +100,48 @@ local function itemScore(item: any, master: any): number
 end
 Policy.itemScore = itemScore
 
--- 開けられるダンジョンの宝箱を、まとめ開き（D-089）で開けられるだけ開ける
+-- 開けられる宝箱の山を、まとめ開き（D-089）で開けられるだけ開ける
+-- 1回のまとめ開きのあとに、出た装備のうち「今の装備より弱い」ものを一括売却する（D-167, D-175）
 local function openAll(state: any, ctx: Ctx)
 	for _, c in Game.query.chestsByPile(state, ctx.master) do
 		for _ = 1, 1000 do
-			if not exec(state, { type = "OpenChests", pileKey = c.pileKey }, ctx).ok then
+			local r = exec(state, { type = "OpenChests", pileKey = c.pileKey }, ctx)
+			if not r.ok then
 				break
 			end
+			if behavior.bulkSell then
+				local uids = {}
+				for _, ev in r.events do
+					if ev.type == "ChestsOpened" then
+						for _, list in { ev.normal, ev.special } do
+							for _, res in list do
+								for _, uid in res.equipmentUids do
+									table.insert(uids, uid)
+								end
+							end
+						end
+					end
+				end
+				if #uids > 0 then
+					exec(state, { type = "BulkSell", equipmentUids = uids }, ctx) -- 弱い品がなければ失敗するだけ
+				end
+			end
 		end
+	end
+end
+
+-- 受け取り箱をまとめて受け取る（D-164）
+local function claimInbox(state: any, ctx: Ctx)
+	if #state.inbox > 0 then
+		exec(state, { type = "ClaimInbox" }, ctx)
+	end
+end
+
+-- フレンドボタン（D-157）：友達がいる想定（ctx.friendCount > 0）のときだけ、押せるなら押す
+local function pressFriend(state: any, ctx: Ctx)
+	local n = ctx.friendCount or 0
+	if n > 0 and Game.query.friend(state, ctx.now, n, ctx.master).blocker == nil then
+		exec(state, { type = "ClaimFriendReward" }, ctx)
 	end
 end
 
@@ -242,6 +318,56 @@ local function rebirthReserve(state: any, master: any): number
 		end
 	end
 	return sum
+end
+
+-- 旅の商人（D-152）：今の時間帯が商人なら、誰かの今の装備より良い品を、予算（転生の備えを除いた所持金 × merchantBudgetShare）内で買う
+local function buyFromMerchant(state: any, ctx: Ctx)
+	if not behavior.merchant then
+		return
+	end
+	local master = ctx.master
+	local cur = Game.query.mapEvent(ctx.now, master).current
+	if cur.kind ~= "merchant" or not cur.open then
+		return
+	end
+	local m = Game.query.merchant(state, cur.eventSlot, ctx.now, master)
+	if not m or not m.open then
+		return
+	end
+	for i, item in m.items do
+		if not item.bought then
+			local budget = (state.gold - rebirthReserve(state, master)) * behavior.merchantBudgetShare
+			if item.price <= budget then
+				local slot = master.equipmentBases[item.baseId].slot
+				local sc = itemScore(item, master)
+				local upgrade = false
+				for _, a in state.adventurers do
+					if Inventory.canEquip(a.jobId, item.baseId, master) then
+						local eq = a.equipment[slot]
+						if eq == nil or itemScore(state.equipment[eq], master) < sc then
+							upgrade = true
+							break
+						end
+					end
+				end
+				if upgrade then
+					exec(state, { type = "BuyFromMerchant", eventSlot = cur.eventSlot, itemIndex = i }, ctx)
+				end
+			end
+		end
+	end
+end
+
+-- 今の時間帯のマップイベントがレアダンジョン・レイドで出発できるなら、その時間帯（nil なら出ていない）
+local function openEventSlot(ctx: Ctx): number?
+	if not behavior.mapEvents then
+		return nil
+	end
+	local cur = Game.query.mapEvent(ctx.now, ctx.master).current
+	if cur.open and (cur.kind == "rareDungeon" or cur.kind == "raid") then
+		return cur.eventSlot
+	end
+	return nil
 end
 
 -- トレーニング（D-076）：レベルの低い人から、予算内で上げられるところまで
@@ -437,22 +563,82 @@ local function chooseDungeon(state: any, partyIndex: number, ctx: Ctx, rng: Rng.
 	return push or best
 end
 
+-- パーティごとに最後に選んだ普通のダンジョン（ログアウトのときの自動再派遣の行き先）
+local lastDungeon: { [number]: string } = {}
+
+-- 空いているパーティを出す。マップイベント（レアダンジョン・レイド）が出ていて、まだ参加していなければそちらへ（D-152）
+local function dispatchIdle(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
+	local slot = openEventSlot(ctx)
+	for i = 1, #state.parties do
+		if not Party.isBusy(state, i) and not Party.isEmpty(state.parties[i]) then
+			local sent = false
+			if slot then
+				local r = exec(state, { type = "DispatchEvent", partyIndex = i, eventSlot = slot }, ctx)
+				if r.ok then
+					sent = true
+					local kind = r.events[1].kind
+					stats.eventDispatches = stats.eventDispatches or {}
+					stats.eventDispatches[kind] = (stats.eventDispatches[kind] or 0) + 1
+				end
+			end
+			if not sent then
+				local d = chooseDungeon(state, i, ctx, rng)
+				if d and exec(state, { type = "Dispatch", partyIndex = i, dungeonId = d }, ctx).ok then
+					lastDungeon[i] = d
+				end
+			end
+		end
+	end
+end
+
 function Policy.manage(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
+	claimInbox(state, ctx)
+	pressFriend(state, ctx)
 	openAll(state, ctx)
 	equipBest(state, ctx)
 	sellJunk(state, ctx)
 	buyExpansions(state, ctx)
 	rebirthCapped(state, ctx, stats)
 	hireIfNeeded(state, ctx, stats)
+	buyFromMerchant(state, ctx)
 	trainBehind(state, ctx, stats)
 	arrangeParties(state, ctx)
 	equipBest(state, ctx)
+	dispatchIdle(state, ctx, rng, stats)
+end
+
+-- 帰還がないときの軽い見回り（マップイベントの始まり・フレンドボタンの時刻に呼ぶ）
+function Policy.glance(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
+	pressFriend(state, ctx)
+	buyFromMerchant(state, ctx)
+	dispatchIdle(state, ctx, rng, stats)
+end
+
+-- 空いているパーティがあるか（マップイベントの始まりに起きるかの判断）
+function Policy.hasIdleParty(state: any): boolean
 	for i = 1, #state.parties do
-		if not Party.isBusy(state, i) then
-			local d = chooseDungeon(state, i, ctx, rng)
-			if d then
-				exec(state, { type = "Dispatch", partyIndex = i, dungeonId = d }, ctx)
-			end
+		if not Party.isBusy(state, i) and not Party.isEmpty(state.parties[i]) then
+			return true
+		end
+	end
+	return false
+end
+
+-- ログイン：留守番の自動再派遣を外し、オンラインでは帰還のたびに方針で出し直す
+function Policy.onLogin(state: any, ctx: Ctx)
+	for i, p in state.parties do
+		if p.autoRepeat then
+			exec(state, { type = "SetAutoRepeat", partyIndex = i }, ctx)
+		end
+	end
+end
+
+-- ログアウト：各パーティに自動再派遣を付ける（留守番：D-161）。行き先は最後に選んだ普通のダンジョン
+function Policy.onLogout(state: any, ctx: Ctx)
+	for i = 1, #state.parties do
+		local d = lastDungeon[i]
+		if d and not Party.isEmpty(state.parties[i]) then
+			exec(state, { type = "SetAutoRepeat", partyIndex = i, dungeonId = d }, ctx)
 		end
 	end
 end

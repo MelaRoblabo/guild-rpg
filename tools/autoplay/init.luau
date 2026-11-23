@@ -1,8 +1,10 @@
 --!strict
 -- 自動プレイヤー（docs/system/09_cli_sim_autoplay.md §3）
 -- 使い方: lune run tools/autoplay -- --hours 10 --seed 1
--- 帰還のたびに方針（Policy）で管理し、指標を1時間ごとに集計して out/autoplay/ に保存する。
--- プレイヤーはずっとオンラインで、帰還したらすぐ操作する想定（自動再派遣は使わない）。
+--         lune run tools/autoplay -- --days 15 --profile heavy --seed 1 [--friends 1] [--quiet]
+-- --hours：帰還のたびに方針（Policy）で管理し、指標を1時間ごとに集計して out/autoplay/ に保存する。
+--          プレイヤーはずっとオンラインで、帰還したらすぐ操作する想定（自動再派遣は使わない）。
+-- --days ：1日の流れ（tools/autoplay/Days.luau）。ログイン・ログアウトをくり返し、留守番を core の advance で進める。
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
@@ -11,9 +13,11 @@ local Data = require("../src/data")
 local Game = require("../src/core/Game")
 local MasterData = require("../src/core/MasterData")
 local Rng = require("../src/core/Rng")
+local Days = require("@self/Days")
 local Policy = require("@self/Policy")
+local Schedule = require("@self/Schedule")
 
-local opts = { hours = 10, seed = 1, policy = "greedy" }
+local opts: any = { hours = 10, seed = 1, policy = "greedy", profile = "core" }
 do
 	local a = process.args
 	for i = 1, #a do
@@ -23,12 +27,27 @@ do
 			opts.policy = a[i + 1] or opts.policy
 		elseif a[i] == "--seed" then
 			opts.seed = tonumber(a[i + 1]) or opts.seed
+		elseif a[i] == "--days" then
+			opts.days = tonumber(a[i + 1])
+		elseif a[i] == "--profile" then
+			opts.profile = a[i + 1] or opts.profile
+		elseif a[i] == "--friends" then
+			opts.friends = tonumber(a[i + 1])
+		elseif a[i] == "--quiet" then
+			opts.quiet = true
 		end
 	end
 end
 
 local master = MasterData.load(Data)
 Policy.use(opts.policy)
+Policy.configure(Schedule.behavior)
+
+-- 1日の流れ（--days。D-161、M7b-6）：ログイン・ログアウトをくり返して暦日数で測る
+if opts.days then
+	Days.main(opts, master, os.clock)
+	process.exit(0)
+end
 local T0 = 1767225600
 local state = Game.newState(master, opts.seed, T0)
 local rng = Rng.new(opts.seed * 31337)
