@@ -447,8 +447,12 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 		"| 価値 | オンライン/時 | 留守/時（留守の全時間） | 比 | 留守/時（6時間まで） | 比 |"
 	)
 	table.insert(lines, "| --- | --- | --- | --- | --- | --- |")
-	for _, row in { { "経験値", "exp" }, { "ゴールド（探索）", "gold" }, { "宝箱", "chests" } } do
-		local a, b, c = per(on[row[2]], hOn), per(off[row[2]], hOff), per(off[row[2]], hAct)
+	-- 宝箱はレイドの宝箱を含めて数える（D-200）。レイドはオンラインでだけ出せる派遣で、宝箱は帰還ではなく受け取り箱に届く
+	for _, row in
+		{ { "経験値", "exp" }, { "ゴールド（探索）", "gold" }, { "宝箱", "chests", "raidChests" } }
+	do
+		local onV = on[row[2]] + (if row[3] then on[row[3]] else 0)
+		local a, b, c = per(onV, hOn), per(off[row[2]], hOff), per(off[row[2]], hAct)
 		table.insert(
 			lines,
 			string.format(
@@ -463,13 +467,13 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 		)
 	end
 	do
-		-- レイドはオンラインでだけ出せる派遣だが、宝箱は帰還ではなく受け取り箱に届くので上の行に入らない。足した行も出す
-		local a = per(on.chests + on.raidChests, hOn)
+		-- 参考：レイドの宝箱を除いた行（D-200 より前の数え方）
+		local a = per(on.chests, hOn)
 		local b, c = per(off.chests, hOff), per(off.chests, hAct)
 		table.insert(
 			lines,
 			string.format(
-				"| 宝箱（レイドの宝箱を含む） | %s | %s | %s | %s | %s |",
+				"| 宝箱（参考：レイドの宝箱を除く） | %s | %s | %s | %s | %s |",
 				short(a),
 				short(b),
 				ratio(a, b),
@@ -553,7 +557,7 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 	table.insert(lines, "")
 	table.insert(
 		lines,
-		"ゴールド（直接）は入手先が直接くれた分（探索のゴールドと素材の自動売却・受け取り箱・フレンド）。ゴールド（宝箱込み）は宝箱の中身のゴールドと装備の売却を、宝箱の入手先に足したもの。紹介・商人は表にないが分母に入れる。"
+		"ゴールド（直接）は入手先が直接くれた分（探索のゴールドと素材の自動売却・受け取り箱・フレンド）。ゴールド（宝箱込み）は宝箱の中身のゴールドと装備の売却を、宝箱の入手先に足したもの。紹介・商人は表にないが分母に入れる。留守番の探索の分は「冒険」に入れる（D-200）。"
 	)
 	table.insert(lines, "")
 	local header = "| 報酬 | 行 |"

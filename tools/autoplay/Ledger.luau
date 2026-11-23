@@ -23,12 +23,13 @@ Ledger.SOURCES = {
 }
 Ledger.RESOURCES = { "gold", "chestGold", "chests", "tickets", "potions" }
 
--- D-160 の目標の表（docs/system/04_master_data.md §13）の列。プレイ時間と留守は1つの列
+-- D-160 の目標の表（docs/system/04_master_data.md §13）の列。留守番の探索は「冒険」に数える（D-200）。
+-- 「プレイ時間」の列はプレイ時間報酬だけ
 Ledger.COLUMNS = {
-	{ name = "冒険", sources = { "adventure" } },
+	{ name = "冒険", sources = { "adventure", "offline" } },
 	{ name = "クエスト", sources = { "quest" } },
 	{ name = "ログイン", sources = { "login" } },
-	{ name = "プレイ時間・留守", sources = { "playtime", "offline" } },
+	{ name = "プレイ時間", sources = { "playtime" } },
 	{ name = "フレンド", sources = { "friend" } },
 	{ name = "マップイベント", sources = { "mapevent" } },
 	{ name = "ギルドレベル", sources = { "guild" } },
@@ -39,7 +40,7 @@ Ledger.COLUMNS = {
 Ledger.TARGETS = {
 	gold = { 65, 10, 5, 10, 5, 5, nil },
 	chests = { 70, 10, 5, 5, nil, 10, nil },
-	tickets = { 10, 40, 15, 5, 5, nil, 25 },
+	tickets = { 10, 45, 15, 5, nil, nil, 25 }, -- D-200：フレンドの5%はクエストへ
 	potions = { 50, 20, 20, nil, nil, 10, true },
 }
 
