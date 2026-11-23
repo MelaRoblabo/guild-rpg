@@ -48,6 +48,9 @@ local function updateWithRetry(store: DataStore, key: string, transform: (any) -
 	return false, lastError
 end
 
+-- 届け物（Deliveries）でも同じ再試行を使う
+Persistence.updateWithRetry = updateWithRetry
+
 function Persistence.new(jobId: string, placeId: number)
 	local self = setmetatable({}, Persistence)
 	self.store = DataStoreService:GetDataStore(Config.dataStoreName)

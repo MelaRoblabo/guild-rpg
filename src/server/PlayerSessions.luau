@@ -1,13 +1,20 @@
 --!strict
 -- プレイヤーごとのセッション（11章 §2・§3）
--- 参加時の読み込み（ロック・移行・オフライン中の帰還）、定期保存、退出時・サーバー終了時の保存と解放。
--- コマンドと通知は M7-3 で追加する。
+-- 参加時の読み込み（ロック・移行・留守番・届け物）、定期保存、退出時・サーバー終了時の保存と解放。
+--
+-- 同じ留守を二重に計算しない（05章 §3、11章 §3.5、M7b-5）：
+--   - 留守番の advance（ctx.online == false）は、ロックを取って読み込んだあと、ログイン1回につき loadPlayer の中で1回だけ呼ぶ。
+--   - 保存のたびに state.lastSavedAt を書く（D-161 の留守の始まり）。留守番を計算していない記録（読み込み中の退出・移行の失敗）は、
+--     中身を変えずにロックだけ解放する（lastSavedAt を進めない）。
+--   - 同じプレイヤーの読み込み・保存は、このサーバーの中で1つずつ行う（withUser）。同じサーバーへすぐ入り直したとき、
+--     退出時の保存が終わる前に古い記録を読んで留守を計算し直すのを防ぐ（同じ jobId のロックはすぐ取れるため）。
 
 local HttpService = game:GetService("HttpService")
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Migration = require("@game/ReplicatedStorage/Core/Migration")
 local Config = require("./Config")
+local Deliveries = require("./Deliveries")
 local Persistence = require("./Persistence")
 
 local PlayerSessions = {}
@@ -32,17 +39,28 @@ local MSG_LOAD_FAILED =
 	"データを読み込めませんでした。しばらくしてから入り直してください。"
 local MSG_LOST = "別のサーバーで同じデータが使われたため、切断しました。"
 
+-- 届け物を受け取り箱へ入れる（D-180、11章 §3.6）。
+-- 仮の口：M7b-4 の GrantReferral に差し替える。
+--   受け取り箱へ入れたら (true, events) を返す。入れなかった・知らない種類なら (false, {}) を返し、届け物は消さずに残す。
+--   今は何もせず false を返すので、届け物は次のログインまで残る。
+local function grantDelivery(_state: any, _delivery: Deliveries.Delivery, _ctx: any): (boolean, { any })
+	return false, {}
+end
+
 function PlayerSessions.new(master: any)
 	local self = setmetatable({}, PlayerSessions)
 	-- Studio のプレイテストでは JobId が空になるので、起動ごとに一意の文字列を作る（11章 §3.1）
 	local jobId = if game.JobId ~= "" then game.JobId else "studio-" .. HttpService:GenerateGUID(false)
 	self.master = master
 	self.persistence = Persistence.new(jobId, game.PlaceId)
+	self.deliveries = Deliveries.new()
 	self.sessions = {} :: { [number]: Session }
 	self.onLoaded = nil :: ((Session, { any }) -> ())?
 	-- 処理中の読み込み・保存の数。サーバー終了時は、退出時の保存や読み込み中のものも終わるまで待つ（M7-5 で発見）
 	self.inFlight = 0
 	self.closing = false
+	-- 読み込み・保存の処理中のプレイヤー（同じプレイヤーの処理を重ねない：withUser）
+	self.userBusy = {} :: { [number]: boolean }
 	return self
 end
 
@@ -54,8 +72,51 @@ function PlayerSessions.get(self: any, player: Player): Session?
 	return self.sessions[player.UserId]
 end
 
+-- 同じプレイヤーの読み込み・保存を1つずつ行う。待っている間も inFlight に数える（サーバー終了時に待つため）。
+local function withUser(self: any, userId: number, label: string, fn: () -> ())
+	self.inFlight += 1
+	while self.userBusy[userId] do
+		task.wait()
+	end
+	self.userBusy[userId] = true
+	local ok, err = pcall(fn)
+	self.userBusy[userId] = nil
+	self.inFlight -= 1
+	if not ok then
+		warn(`[PlayerSessions] {label}の処理でエラー（{userId}）：{err}`)
+	end
+end
+
+-- セッションの状態を保存する。保存のたびに最後に保存した時刻を書く（D-161、03章 lastSavedAt）。
+-- withUser の中から呼ぶ。
+local function saveSession(self: any, session: Session, release: boolean): string
+	session.state.lastSavedAt = os.time()
+	local ok, resultOrErr = pcall(function()
+		return self.persistence:save(session.userId, session.state, release)
+	end)
+	local result = if ok then resultOrErr else "error"
+	if not ok then
+		warn(`[PlayerSessions] 保存の処理でエラー（{session.userId}）：{resultOrErr}`)
+	end
+	if result == "ok" then
+		session.lastSavedAt = session.state.lastSavedAt
+	end
+	return result
+end
+
+-- 届け物を読み出す。読めなくてもログインは止めない（届け物は残り、次のログインで受け取る）
+local function readDeliveries(self: any, userId: number): { Deliveries.Delivery }
+	local ok, okRead, items = pcall(self.deliveries.read, self.deliveries, userId)
+	if not ok or not okRead then
+		warn(`[PlayerSessions] 届け物を読めなかった（{userId}）`)
+		return {}
+	end
+	return items
+end
+
 local function loadPlayer(self: any, player: Player)
 	local userId = player.UserId
+	-- ロックが取れなければ、ここで待って再試行する（Persistence.load）。取れるまで留守番は計算しない
 	local status, record, err = self.persistence:load(userId)
 
 	if status == "locked" then
@@ -67,7 +128,11 @@ local function loadPlayer(self: any, player: Player)
 		return
 	end
 
-	-- 読み込み中に退出した、またはサーバーが終了中：取ったロックを、中身を変えずに解放する
+	-- 届け物の読み出し（D-180）。待ちが入る処理は、退出の確認より前に済ませる
+	local deliveries = readDeliveries(self, userId)
+
+	-- 読み込み中に退出した、またはサーバーが終了中：取ったロックを、中身を変えずに解放する。
+	-- 留守番を計算していないので lastSavedAt も変えない（次のログインで同じ留守を1回だけ計算する）
 	if player.Parent == nil or self.closing then
 		self.persistence:save(userId, record.state, true)
 		return
@@ -91,8 +156,25 @@ local function loadPlayer(self: any, player: Player)
 	end
 	local state = stateOrErr
 
-	-- オフライン中に帰還した探索だけを処理する（05章 §3、企画書§16.8 案A）
-	local offlineEvents = Game.advance(state, self:ctx(false))
+	-- 留守番（05章 §3、06章 §13・§14、D-161・D-172・D-186）。ログイン1回につきここで1回だけ。
+	-- 留守の始まりは core の Game.offlineStart（lastSavedAt と lastAdvancedAt の遅いほう）。
+	-- ここから session を登録するまで待ちを入れない（途中で退出・定期の advance が割り込まないように）
+	local ctx = self:ctx(false)
+	local offlineEvents = Game.advance(state, ctx)
+
+	-- 届け物を受け取り箱へ（D-180）。入れたものの id だけを、保存できたあとで消す
+	local granted: { string } = {}
+	for _, d in deliveries do
+		local okGrant, done, events = pcall(grantDelivery, state, d, ctx)
+		if not okGrant then
+			warn(`[PlayerSessions] 届け物を受け取れなかった（{userId}、{d.id}）：{done}`)
+		elseif done then
+			table.insert(granted, d.id)
+			for _, e in events do
+				table.insert(offlineEvents, e)
+			end
+		end
+	end
 
 	local now = os.time()
 	local session: Session = {
@@ -114,52 +196,69 @@ local function loadPlayer(self: any, player: Player)
 	if self.onLoaded then
 		self.onLoaded(session, offlineEvents)
 	end
+
+	-- 届け物を受け取ったら、すぐ保存してから届け物を消す（保存より先に消すと、落ちたときに届け物を失う）
+	if #granted > 0 then
+		local result = saveSession(self, session, false)
+		if result == "ok" then
+			if not self.deliveries:remove(userId, granted) then
+				warn(`[PlayerSessions] 受け取った届け物を消せなかった（{userId}）`)
+			end
+		elseif result == "lost" then
+			if self.sessions[userId] == session then
+				self.sessions[userId] = nil
+			end
+			player:Kick(MSG_LOST)
+		else
+			warn(`[PlayerSessions] 届け物を受け取ったあとの保存に失敗（{userId}）`)
+		end
+	end
 end
 
 function PlayerSessions.onPlayerAdded(self: any, player: Player)
-	self.inFlight += 1
-	local ok, err = pcall(loadPlayer, self, player)
-	self.inFlight -= 1
-	if not ok then
-		warn(`[PlayerSessions] 読み込みの処理でエラー（{player.UserId}）：{err}`)
-	end
-end
-
-local function saveSession(self: any, session: Session, release: boolean): string
-	self.inFlight += 1
-	local ok, resultOrErr = pcall(function()
-		return self.persistence:save(session.userId, session.state, release)
+	withUser(self, player.UserId, "読み込み", function()
+		loadPlayer(self, player)
 	end)
-	self.inFlight -= 1
-	local result = if ok then resultOrErr else "error"
-	if result == "ok" then
-		session.lastSavedAt = os.time()
-	end
-	return result
 end
 
 function PlayerSessions.onPlayerRemoving(self: any, player: Player)
-	local session = self.sessions[player.UserId]
+	local userId = player.UserId
+	local session = self.sessions[userId]
 	if session == nil then
 		return
 	end
-	self.sessions[player.UserId] = nil
-	local result = saveSession(self, session, true)
-	if result == "error" then
-		warn(`[PlayerSessions] 退出時の保存に失敗（{player.UserId}）`)
-	end
+	self.sessions[userId] = nil
+	withUser(self, userId, "退出時の保存", function()
+		local result = saveSession(self, session, true)
+		if result == "error" then
+			warn(`[PlayerSessions] 退出時の保存に失敗（{userId}）`)
+		end
+	end)
 end
 
--- 定期保存（11章 §3.3）。ロックを失っていたら書かずに切断する
+-- 定期保存（11章 §3.3）。ロックを失っていたら書かずに切断する。
+-- 保存の待ちの間に入れ替わる（退出・入り直し）ので、先に一覧を写し、保存の前後でセッションが同じか確かめる
 function PlayerSessions.autosave(self: any)
-	for userId, session in self.sessions do
-		local result = saveSession(self, session, false)
-		if result == "lost" then
-			self.sessions[userId] = nil
-			session.player:Kick(MSG_LOST)
-		elseif result == "error" then
-			warn(`[PlayerSessions] 定期保存に失敗（{userId}）`)
-		end
+	local list: { Session } = {}
+	for _, session in self.sessions do
+		table.insert(list, session)
+	end
+	for _, session in list do
+		local userId = session.userId
+		withUser(self, userId, "定期保存", function()
+			if self.sessions[userId] ~= session then
+				return -- 待っている間に退出した（退出時の保存で書いた）
+			end
+			local result = saveSession(self, session, false)
+			if result == "lost" then
+				if self.sessions[userId] == session then
+					self.sessions[userId] = nil
+				end
+				session.player:Kick(MSG_LOST)
+			elseif result == "error" then
+				warn(`[PlayerSessions] 定期保存に失敗（{userId}）`)
+			end
+		end)
 	end
 end
 
@@ -169,7 +268,9 @@ function PlayerSessions.saveAll(self: any)
 	self.closing = true
 	for userId, session in self.sessions do
 		self.sessions[userId] = nil
-		task.spawn(saveSession, self, session, true)
+		task.spawn(withUser, self, userId, "終了時の保存", function()
+			saveSession(self, session, true)
+		end)
 	end
 	local started = os.clock()
 	while self.inFlight > 0 and os.clock() - started < Config.closeWaitSeconds do

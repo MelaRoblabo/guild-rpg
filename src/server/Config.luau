@@ -14,6 +14,11 @@ return {
 	saveSizeWarnBytes = 3000000, -- 仮。DataStore の上限は 4MB
 	closeWaitSeconds = 25, -- サーバー終了時に保存を待つ上限（Roblox の BindToClose は最大30秒）
 
+	-- 届け物（D-180、11章 §3.6）。プレイヤーのセーブとは別の DataStore に置く
+	deliveryStoreName = "Deliveries_v1", -- 仮
+	deliveryKeyPrefix = "delivery_",
+	deliveryMaxItems = 100, -- 仮。1人の届け物の箱に置ける数の上限（DataStore の大きさの保護）
+
 	-- サーバー権限・通信（M7-3 で使う）
 	advanceIntervalSeconds = 1, -- 仮
 	commandRateLimit = 10, -- 仮。1人あたり1秒の上限
