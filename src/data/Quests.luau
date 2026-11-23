@@ -9,7 +9,8 @@
 --             受け取り箱へ入れたときの踏破で決める。固定額のゴールドは置かない
 -- 報酬は達成したときに受け取り箱へ入る（D-164）。全部達成のボーナスは Constants.questDailyBonus / questWeeklyBonus
 -- お題の候補・量は仮（M7b-6）。報酬の量は M7b-6 の自動プレイで入手先の配分（D-160）に合わせた（docs/reports/M7b6_balance.md）
---   どのお題も同じ報酬（期間ごと）。チケット40%・ゴールド10%・宝箱10%・ポーションを主にクエストから出す
+--   どのお題も同じ報酬（期間ごと）。チケット・ゴールド・宝箱の割合（D-160, D-200）に合わせた。
+--   ポーションは量を優先してお題ごとには出さない（D-201。全部達成のボーナスに少しだけ）
 
 local QUEST_CHEST = "special:quest"
 
@@ -17,13 +18,13 @@ local QUEST_CHEST = "special:quest"
 local DAILY_REWARDS = {
 	goldMult = 30,
 	chests = { { pileKey = QUEST_CHEST, count = 60 } },
-	items = { itm_slot_ticket = 5, itm_potion_appearance_change = 2, itm_potion_appearance_keep = 2 },
+	items = { itm_slot_ticket = 6 },
 }
 -- ウィークリーのお題1つの報酬（M7b-6）
 local WEEKLY_REWARDS = {
 	goldMult = 120,
 	chests = { { pileKey = QUEST_CHEST, count = 350 } },
-	items = { itm_slot_ticket = 15, itm_potion_appearance_change = 18, itm_potion_appearance_keep = 12 },
+	items = { itm_slot_ticket = 18 },
 }
 
 return {

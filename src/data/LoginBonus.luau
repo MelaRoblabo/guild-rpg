@@ -10,14 +10,14 @@ local LOGIN_CHEST = "special:login"
 
 return {
 	days = {
-		{ goldMult = 120, items = { itm_slot_ticket = 5, itm_potion_appearance_change = 40 } }, -- 1日目（M7b-6）
+		{ goldMult = 120, items = { itm_slot_ticket = 5 } }, -- 1日目（M7b-6）
 		{ goldMult = 40, chests = { { pileKey = LOGIN_CHEST, count = 500 } }, items = { itm_slot_ticket = 5 } }, -- 2日目
-		{ items = { itm_slot_ticket = 20, itm_potion_appearance_keep = 50 } }, -- 3日目
+		{ items = { itm_slot_ticket = 20 } }, -- 3日目
 		{ goldMult = 240, items = { itm_slot_ticket = 5 } }, -- 4日目
 		{
 			goldMult = 50,
-			items = { itm_slot_ticket = 5, itm_potion_appearance_change = 100, itm_potion_appearance_keep = 50 },
-		}, -- 5日目
+			items = { itm_slot_ticket = 5, itm_potion_appearance_change = 1, itm_potion_appearance_keep = 1 },
+		}, -- 5日目（ポーションは量を優先：D-201）
 		{ goldMult = 60, chests = { { pileKey = LOGIN_CHEST, count = 800 } }, items = { itm_slot_ticket = 10 } }, -- 6日目
 	},
 	-- 7日目のユニークがいない・持っている・一巡した後：レアな宝箱＋チケット（D-155）。量は M7b-6

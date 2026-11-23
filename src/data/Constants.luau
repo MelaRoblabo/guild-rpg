@@ -213,6 +213,8 @@ return {
 	-- 旅の商人（D-152。06章 §12）
 	-- 品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン：D-189）
 	merchantItemCount = { min = 3, max = 5 }, -- 品の数（プレイヤーごと）
+	-- 品を引くダンジョン（D-202）：踏破済みのうち深い方からこの数（2 ＝ 一番深いダンジョンとその1つ浅いダンジョン）
+	merchantDungeonCount = 2,
 	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）。M7b-6 で見直し、据え置き（D-198）
 	merchantGradeCoef = 0.5, -- 仮（M7b-6）
 	merchantModifierCoef = 0.5, -- 仮（M7b-6）
@@ -220,16 +222,16 @@ return {
 	-- クエスト（D-153。06章 §15）。お題の候補と報酬は src/data/Quests.luau
 	questDailyCount = 3,
 	questWeeklyCount = 4, -- 3〜5 のうち仮（M7b-6）
-	-- 全部達成のボーナス（rewards の形は Quests と同じ）。量は M7b-6 で配分（D-160）に合わせた
+	-- 全部達成のボーナス（rewards の形は Quests と同じ）。量は M7b-6 で配分（D-160）に合わせた。ポーションは量を優先（D-201）
 	questDailyBonus = {
 		goldMult = 60,
 		chests = { { pileKey = "special:quest", count = 150 } },
-		items = { itm_slot_ticket = 10, itm_potion_appearance_change = 6, itm_potion_appearance_keep = 6 },
+		items = { itm_slot_ticket = 12 },
 	},
 	questWeeklyBonus = {
 		goldMult = 220,
 		chests = { { pileKey = "special:quest", count = 700 } },
-		items = { itm_slot_ticket = 40, itm_potion_appearance_change = 25, itm_potion_appearance_keep = 25 },
+		items = { itm_slot_ticket = 46, itm_potion_appearance_change = 1, itm_potion_appearance_keep = 1 },
 	},
 
 	-- プレイ時間（D-154。06章 §20）。段階と報酬は src/data/PlaytimeRewards.luau
