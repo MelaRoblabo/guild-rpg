@@ -967,21 +967,65 @@ return function(t)
 			end
 			expect(seen[2]).toBe(true)
 			expect(seen[3]).toBe(true) -- 罠の遺跡・封印の塔のレア
-			-- 表はコモンを除いた行（重みはそのまま）
-			expect(Merchant.rarityTable(master.dungeons.dng_tower)).toEqual({
+			-- 表はコモンを除いた行（重みは D-204 の倍率を掛けたもの）
+			local bias = K.merchantRarityBias
+			expect(Merchant.rarityTable(master.dungeons.dng_tower, K)).toEqual({
 				{ rank = 2, weight = 16 },
-				{ rank = 3, weight = 10 },
-				{ rank = 4, weight = 2 },
+				{ rank = 3, weight = 10 * bias },
+				{ rank = 4, weight = 2 * bias ^ 2 },
 			})
 			-- 古い墓地もコモンを除いた行（D-188 の表：78/12/10）
-			expect(Merchant.rarityTable(master.dungeons.dng_graveyard)).toEqual({
+			expect(Merchant.rarityTable(master.dungeons.dng_graveyard, K)).toEqual({
 				{ rank = 2, weight = 12 },
-				{ rank = 3, weight = 10 },
+				{ rank = 3, weight = 10 * bias },
 			})
 		end)
 		it("D-189 コモンしかない表のときはコモンを使う", function()
 			local only = { chestRarityTable = { { rank = 1, weight = 100 } } }
-			expect(Merchant.rarityTable(only)).toEqual({ { rank = 1, weight = 100 } })
+			expect(Merchant.rarityTable(only, K)).toEqual({ { rank = 1, weight = 100 } })
+		end)
+		it("D-204 上位のレアリティほど重く、宝箱の表にないレアリティは出ない", function()
+			expect(K.merchantRarityBias >= 1).toBe(true)
+			-- 倍率 1 なら宝箱の表（コモン抜き）と同じ重み
+			local m1 = Fixtures.master(function(d)
+				d.Constants.merchantRarityBias = 1
+			end)
+			expect(Merchant.rarityTable(m1.dungeons.dng_tower, m1.K)).toEqual({
+				{ rank = 2, weight = 16 },
+				{ rank = 3, weight = 10 },
+				{ rank = 4, weight = 2 },
+			})
+			-- 倍率を上げると上位の割合が増える。出る rank は宝箱の表と同じ
+			local function topShare(m: any): number
+				local total, top = 0, 0
+				local list = Merchant.rarityTable(m.dungeons.dng_sky_throne, m.K)
+				for _, e in list do
+					total += e.weight
+					if e.rank >= 5 then
+						top += e.weight
+					end
+				end
+				return top / total
+			end
+			expect(topShare(master) > topShare(m1)).toBe(true)
+			local ranks = {}
+			for _, e in Merchant.rarityTable(master.dungeons.dng_sky_throne, K) do
+				table.insert(ranks, e.rank)
+			end
+			local chestRanks = {}
+			for _, e in master.dungeons.dng_sky_throne.chestRarityTable do
+				if e.rank > 1 then
+					table.insert(chestRanks, e.rank)
+				end
+			end
+			expect(ranks).toEqual(chestRanks)
+			-- 1 未満は検証で止める（下位を重くしない）
+			local ok = pcall(function()
+				Fixtures.master(function(d)
+					d.Constants.merchantRarityBias = 0.5
+				end)
+			end)
+			expect(ok).toBe(false)
 		end)
 	end)
 

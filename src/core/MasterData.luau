@@ -397,6 +397,7 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 		c:integer(p .. ".merchantItemCount.max", k.merchantItemCount.max, 1)
 	end
 	c:integer(p .. ".merchantDungeonCount", k.merchantDungeonCount, 1) -- D-202
+	c:number(p .. ".merchantRarityBias", k.merchantRarityBias, 1) -- D-204（1 以上：下位を重くしない）
 	c:number(p .. ".merchantPriceMult", k.merchantPriceMult, 0)
 	c:number(p .. ".merchantGradeCoef", k.merchantGradeCoef, 0)
 	c:number(p .. ".merchantModifierCoef", k.merchantModifierCoef, 0)

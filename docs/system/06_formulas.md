@@ -142,7 +142,7 @@ weekIndex(now) = floor((dayIndex(now) + 3) / 7)      -- 週の始まり＝月曜
 次の日の区切りの時刻 = (dayIndex(now) + 1) × 86400   -- 画面の残り時間・「明日の日替わり」の表示用
 ```
 
-## 12. マップイベントの時間帯・旅の商人（D-152, D-187, D-189, D-202）
+## 12. マップイベントの時間帯・旅の商人（D-152, D-187, D-189, D-202, D-204）
 
 ```
 eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごとに1つ
@@ -155,6 +155,8 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
                                  ＝踏破した一番深いダンジョンとその1つ浅いダンジョン
                                  踏破が1つならそのダンジョンだけ、まだどこも踏破していなければ古い墓地だけ（D-187）
               → そのダンジョンの chestRarityWeights からコモン（rank 1）を除いた表でレアリティ（コモンしかない表ならコモン：D-189）
+                 重み = chestRarityWeights[rank] × merchantRarityBias ^ (rank − 2)        -- D-204：上位ほど出やすく。0 の rank は 0 のまま（宝箱で出る範囲は超えない）
+                 （コモンしかない表のときはコモンの重みのまま）
               → 宝箱の中身と同じ装備の抽選（アイテムレベル＝そのダンジョンの tier。宝箱で出る範囲は超えない）
               候補のダンジョンはその時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに踏破が進んでも品ぞろえを変えない）
 商人の価格   ：floor( 売却価格（§10） × merchantPriceMult × (1 + merchantGradeCoef × grade) × (修飾語つきなら 1 + merchantModifierCoef) )   -- 係数は未決（M7b-6）

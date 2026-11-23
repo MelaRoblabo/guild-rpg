@@ -4,7 +4,7 @@
 --   品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで：
 --     品ごとに、候補のダンジョン（踏破済みのうち深い方から merchantDungeonCount 個＝一番深いダンジョンとその1つ浅いダンジョン：D-202。
 --     まだどこも踏破していなければ古い墓地：D-187）から等確率で1つ選び、
---     そのダンジョンの宝箱のレアリティの表からコモンを除いた表（Merchant.rarityTable。コモンしかない表ならコモン：D-189）で
+--     そのダンジョンの宝箱のレアリティの表からコモンを除き上位を重くした表（Merchant.rarityTable。コモンしかない表ならコモン：D-189, D-204）で
 --     レアリティを引き、宝箱の中身と同じ抽選で装備を作る（Chest.rollEquipment）
 --   候補のダンジョンは、その時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに
 --   新しく踏破しても、品ぞろえと「買った」の並びがずれないように）
@@ -76,13 +76,14 @@ local function weightOf(e: any): number
 	return e.weight
 end
 
--- 品のレアリティの表（D-189）：そのダンジョンの宝箱の表（chestRarityTable）からコモン（rank 1）を除いたもの。
--- コモンしかない表のときは宝箱の表のまま（コモン）。宝箱で出る範囲は超えない
-function Merchant.rarityTable(dungeon: any): { any }
+-- 品のレアリティの表（D-189, D-204）：そのダンジョンの宝箱の表（chestRarityTable）からコモン（rank 1）を除き、
+-- 重みに merchantRarityBias ^ (rank − 2) を掛けたもの（上位ほど出やすい）。
+-- コモンしかない表のときは宝箱の表のまま（コモン）。宝箱の表にない rank は出ない（宝箱で出る範囲は超えない）
+function Merchant.rarityTable(dungeon: any, K: any): { any }
 	local out = {}
 	for _, e in dungeon.chestRarityTable do
 		if e.rank > 1 then
-			table.insert(out, e)
+			table.insert(out, { rank = e.rank, weight = e.weight * K.merchantRarityBias ^ (e.rank - 2) })
 		end
 	end
 	return if #out > 0 then out else dungeon.chestRarityTable
@@ -98,7 +99,7 @@ function Merchant.goods(state: any, slot: number, master: any): { any }
 	local out = {}
 	for _ = 1, n do
 		local d = master.dungeons[rng:pickWeighted(dungeonIds, uniform)]
-		local rank = rng:pickWeighted(Merchant.rarityTable(d), weightOf).rank -- D-189
+		local rank = rng:pickWeighted(Merchant.rarityTable(d, K), weightOf).rank -- D-189, D-204
 		local item = Chest.rollEquipment(rank, d, rng, master)
 		table.insert(out, { item = item, price = Merchant.price(item, master), dungeonId = d.id })
 	end
