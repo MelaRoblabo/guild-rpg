@@ -159,6 +159,30 @@ return {
 	-- 特別な宝箱（D-166, D-171。06章 §19）
 	rareDungeonEffectRate = { min = 0.20, max = 0.30 }, -- レアダンジョンの山の演出率の基準（D-171）
 
+	-- マップイベント（D-152, D-179。06章 §12）。種類と出る場所は src/data/MapEvents.luau
+	mapEventIntervalSeconds = 300, -- 5分ごとに1つ
+	mapEventNoticeSeconds = 60, -- 1分前に予告
+	mapEventWindowSeconds = 180, -- 出発・購入できるのは出てから3分間
+	mapEventKindWeights = { -- 種類の割合（仮。M7b-6）
+		{ id = "mev_rare_dungeon", weight = 1 },
+		{ id = "mev_raid", weight = 1 },
+		{ id = "mev_merchant", weight = 1 },
+	},
+	-- レアダンジョン（D-152, D-171, D-173）
+	rareDungeonChestMult = 1.5, -- 宝箱の数の倍率。1.5〜2 の範囲で仮（M7b-6）。端数は確率で切り上げ
+	-- レイドボス（D-152, D-179。06章 §12）。HP とダメージの式は仮（M7b-6 で決める）
+	--   HP     = floor(踏破済みの一番深いダンジョンの base.hp × raidHpMult × 一様乱数[raidHpSpread.min, max))（プレイヤーごと）
+	--   ダメージ = floor(パーティ全員の攻撃力（出発時の実効値）の合計 × raidDamagePerAtk)
+	raidHpMult = 1, -- 仮（M7b-6）
+	raidHpSpread = { min = 0.8, max = 1.2 }, -- 仮（M7b-6）
+	raidDamagePerAtk = 1, -- 仮（M7b-6）
+	raidTravelSeconds = 60, -- レイドへの片道秒（到着でダメージを入れ、同じ秒数で帰る）。仮（M7b-6）
+	-- 旅の商人（D-152。06章 §12）
+	merchantItemCount = { min = 3, max = 5 }, -- 品の数（プレイヤーごと）
+	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）
+	merchantGradeCoef = 0.5, -- 仮（M7b-6）
+	merchantModifierCoef = 0.5, -- 仮（M7b-6）
+
 	-- クエスト（D-153。06章 §15）。お題の候補と報酬は src/data/Quests.luau
 	questDailyCount = 3,
 	questWeeklyCount = 4, -- 3〜5 のうち仮（M7b-6）

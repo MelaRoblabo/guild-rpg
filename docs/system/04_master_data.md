@@ -32,7 +32,6 @@
 | `PlaytimeRewards.luau` | プレイ時間の段階（D-154） | — |
 | `SpecialChests.luau` | 特別な宝箱の表（D-166） | `spc_` |
 | `MapEvents.luau` | マップイベント（種類・場所。D-152） | `mev_` |
-| `Merchant.luau` | 旅の商人の品ぞろえの決まり（D-152） | — |
 
 ## 2. 検証（MasterData.luau）
 
@@ -110,12 +109,13 @@
 | `referralWeeklyCap` / `referralProgressCondition` | 未決（M7b-6。例 週3人 / 初転生） | D-157 |
 | `weeklyVisitorChance` | 今週の訪問者の別枠の確率（候補1人ごと）。未決（M7b-6。例 0.03） | D-158, D-170 |
 | `mapEventIntervalSeconds` / `mapEventNoticeSeconds` / `mapEventWindowSeconds` | 300 / 60 / 180 | D-152 |
-| `mapEventKindWeights` | レアダンジョン / レイドボス / 旅の商人：未決（M7b-6） | D-152 |
-| `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6） | D-152 |
+| `mapEventKindWeights` | `{ { id = "mev_rare_dungeon", weight }, … }`。M7b-4 は 1 / 1 / 1 の仮（M7b-6） | D-152 |
+| `rareDungeonChestMult` | 1.5〜2 の範囲で未決（M7b-6）。M7b-4 は 1.5 の仮 | D-152 |
 | `rareDungeonEffectRate` | `{ min = 0.20, max = 0.30 }`（レアダンジョンの山の演出率の基準） | D-171 |
-| `raidHp` | 未決（M7b-6。HP とダメージの式も M7b-6） | D-152, D-179 |
-| `merchantItemCount` | 3〜5 | D-152 |
-| `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 約10 / 未決 / 未決（M7b-6） | D-152 |
+| `raidHpMult` / `raidHpSpread` / `raidDamagePerAtk` | HP とダメージの式は未決（M7b-6）。M7b-4 は仮の式（06章 §12）で 1 / `{ min = 0.8, max = 1.2 }` / 1 | D-152, D-179 |
+| `raidTravelSeconds` | レイドへの片道秒（仮 60。M7b-6）。`mapEventWindowSeconds + raidTravelSeconds ≤ mapEventIntervalSeconds` を検証（最後のダメージが次の時間帯より前に入る） | D-152 |
+| `merchantItemCount` | `{ min = 3, max = 5 }` | D-152 |
+| `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 10 / 未決 / 未決（M7b-6。M7b-4 は 0.5 / 0.5 の仮） | D-152 |
 | `rewardShareTargets` | §13 の表 | D-160 |
 
 ## 4. ダンジョン（D-068, D-069）
@@ -254,8 +254,8 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 
 ## 12. マップイベント・旅の商人（MapEvents.luau・Merchant.luau、D-152）
 
-- `MapEvents`：種類（`mev_rare_dungeon`・`mev_raid`・`mev_merchant`）と、出る場所の一覧。種類の割合は `mapEventKindWeights`（未決（M7b-6））。
-- `Merchant`：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。アイテムレベル・レアリティは踏破済みの範囲まで。チケットなど量を管理している品は売らない。
+- `MapEvents`：`kinds`（`{ id, kind }`。`mev_rare_dungeon`＝rareDungeon・`mev_raid`＝raid・`mev_merchant`＝merchant）と、出る場所の一覧 `places`（`{ id }`。中身は M8 のマップ設計で決める。M7b-4 は `mev_place_1〜4` の仮）。種類の割合は `mapEventKindWeights`（未決（M7b-6））。検証：割合の id は kinds を指す、kind の重複なし、場所は1行以上。
+- 旅の商人の決まりは別のファイルを作らず `Constants` に置く：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで（品ごとに踏破済みのダンジョンから1つ選び、そのダンジョンの `chestRarityWeights` と宝箱の中身の抽選で作る。06章 §12）。
 
 ## 13. 報酬の入手先の配分（rewardShareTargets、D-160）
 

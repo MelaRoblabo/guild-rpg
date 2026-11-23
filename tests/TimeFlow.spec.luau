@@ -266,15 +266,18 @@ return function(t)
 			end
 			expect(play("dt_exp") > play(nil)).toBeTruthy()
 		end)
-		it("D-173 乱数の消費順を変えたので engineVersion は 2", function()
-			expect(Expedition.ENGINE_VERSION).toBe(2)
-			local s = newState()
-			local log = Expedition.simulate(
-				{ seed = 1, departAt = T0, dungeonId = "dng_graveyard", members = snapsOf(s) },
-				master
-			)
-			expect(log.engineVersion).toBe(2)
-		end)
+		it(
+			"D-173 D-152 乱数の消費順を変えたので engineVersion は 3（レアダンジョンの宝箱の倍率で 2 → 3）",
+			function()
+				expect(Expedition.ENGINE_VERSION).toBe(3)
+				local s = newState()
+				local log = Expedition.simulate(
+					{ seed = 1, departAt = T0, dungeonId = "dng_graveyard", members = snapsOf(s) },
+					master
+				)
+				expect(log.engineVersion).toBe(3)
+			end
+		)
 	end)
 
 	describe("留守番（D-161, D-172、06章 §13）", function()

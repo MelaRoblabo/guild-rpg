@@ -6,7 +6,7 @@
 
 local Migration = {}
 
-Migration.CURRENT = 8
+Migration.CURRENT = 9
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -98,6 +98,17 @@ local STEPS: { [number]: (any, any) -> () } = {
 		state.playtime = state.playtime or { dayIndex = -1, seconds = 0, claimedSteps = 0 }
 		state.inbox = state.inbox or {}
 		state.version = 8
+	end,
+	-- v8 → v9（M7b-4 後半・担当B。マップイベント・レアダンジョン・レイド・旅の商人：D-152, D-175）
+	--   ※同時に作っている担当A（今週の訪問者・専用ギフト・フレンド）の手順と合わせるときに v9 → v10 に振り直す
+	--   expeditions[*] の eventSlot・raidDamage・arriveAt・chestPile：nil のまま（旧版の探索は普通の探索）
+	--   equipment[*].fromMerchant：nil のまま（旧版の装備は商人で買ったものではない）
+	--   merchant・raid・rareDungeonSlots：nil のまま（参加したイベントはない）
+	[8] = function(state)
+		state.merchant = nil
+		state.raid = nil
+		state.rareDungeonSlots = nil
+		state.version = 9
 	end,
 }
 

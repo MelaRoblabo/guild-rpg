@@ -61,6 +61,8 @@ Protocol.CLIENT_COMMANDS = {
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
 	ClaimInbox = {}, -- D-164
+	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
+	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179
 } :: { [string]: { [string]: Field } }
 
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）

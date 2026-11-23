@@ -10,7 +10,8 @@ local Rng = require("./Rng")
 local Expedition = {}
 
 -- v2：日替わりの特性 chestMult の端数の判定を最後に足した（07章 §3 の 4、D-173）
-Expedition.ENGINE_VERSION = 2
+-- v3：レアダンジョンの宝箱の倍率（input.chestMult）の端数の判定をその後に足した（07章 §3 の 5、D-152, D-173）
+Expedition.ENGINE_VERSION = 3
 
 export type Input = {
 	seed: number,
@@ -19,6 +20,7 @@ export type Input = {
 	members: { Formulas.MemberSnapshot }, -- 隊列順。出発時点の実効値（07章 §1）
 	dailyTraitId: string?, -- 出発時刻の日に当たっている日替わりの特性（D-156、06章 §16）
 	timeMult: number?, -- 所要秒の倍率。留守番は offlineTimeMult、それ以外は 1（D-161）
+	chestMult: number?, -- 宝箱の数の倍率。レアダンジョンは rareDungeonChestMult（D-152）。端数は確率で切り上げ（D-173）
 }
 
 export type FloorLog = {
@@ -61,7 +63,9 @@ export type Log = {
 	travelGiftId: string?,
 	dailyTraitId: string?,
 	traitChests: number?, -- 日替わりの特性 chestMult で増えた宝箱の数（rewards.chests に含む）
-	traitChestSources: { number }?, -- 増えた宝箱それぞれの元の宝箱の番号（rewards.chests の何番目か）
+	traitChestSources: { number }?, -- 増えた宝箱（日替わりの特性・レアダンジョン）それぞれの元の宝箱の番号（rewards.chests の何番目か）
+	eventChests: number?, -- レアダンジョンの倍率（input.chestMult）で増えた宝箱の数（rewards.chests に含む：D-152）
+	chestMult: number?,
 	timeMult: number?,
 	rewards: Events.Rewards,
 }
@@ -254,6 +258,28 @@ function Expedition.simulate(input: Input, master: any): Log
 			traitChests += extra
 		end
 	end
+	-- レアダンジョンの宝箱の倍率（D-152, D-173、07章 §3 の 5）：元の宝箱1個ごとに、整数部ぶん増やし、端数は確率で +1
+	-- 増えた宝箱は日替わりの分の後ろに足し、元の宝箱の番号を traitChestSources に続けて記録する（D-186 と同じ扱い）
+	local eventChests = nil
+	local chestMult = input.chestMult
+	if chestMult and chestMult ~= 1 then
+		eventChests = 0
+		traitChestSources = traitChestSources or {}
+		local whole = math.floor(chestMult - 1)
+		local frac = (chestMult - 1) - whole
+		local baseCount = #rewards.chests - #(traitChestSources :: { number })
+		for i = 1, baseCount do
+			local extra = whole
+			if frac > 0 and rng:chance(frac) then
+				extra += 1
+			end
+			for _ = 1, extra do
+				table.insert(rewards.chests, { rank = rewards.chests[i].rank })
+				table.insert(traitChestSources :: { number }, i)
+			end
+			eventChests += extra
+		end
+	end
 	-- ギルド経験値（Q-017）。初回踏破のボーナスは状態に依存するため M2 で加算する
 	rewards.guildExp = rewards.floorsCleared * K.guildExpPerFloor
 		+ (if result == "clear" then K.guildExpClearBonus else 0)
@@ -286,6 +312,8 @@ function Expedition.simulate(input: Input, master: any): Log
 		dailyTraitId = input.dailyTraitId,
 		traitChests = traitChests,
 		traitChestSources = traitChestSources,
+		eventChests = eventChests,
+		chestMult = if chestMult and chestMult ~= 1 then chestMult else nil,
 		timeMult = if timeMult ~= 1 then timeMult else nil,
 		rewards = rewards,
 	}

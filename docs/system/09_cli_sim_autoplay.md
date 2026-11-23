@@ -35,8 +35,8 @@ lune run tools/cli -- --save out/save.json < tools/cli/scenarios/one_hour.txt   
 | `quests` | 今日・今週のクエストと進み具合（D-153） |
 | `calendar` | ログインボーナスのカレンダー・今日のプレイ時間・休息ボーナスの残り（D-154, D-155, D-161） |
 | `daily` | 今日・明日の日替わりの特性（D-156） |
-| `event` / `eventgo <n>` | 今のマップイベントと予告／DispatchEvent（D-152） |
-| `merchant` / `buy <番号>` | 旅の商人の品／BuyFromMerchant（D-152） |
+| `event` / `eventgo <n> [時間帯]` | 今のマップイベントと予告／DispatchEvent（D-152。時間帯を省くと今の時間帯） |
+| `merchant` / `buy <番号> [時間帯]` | 旅の商人の品／BuyFromMerchant（D-152。時間帯を省くと今の時間帯） |
 | `friend [人数]` | ClaimFriendReward（同じサーバーの友達の数を引数で与える：D-157） |
 | `visitor` | 今週の訪問者と出現率（D-158） |
 | `sell <eq_uid>...` / `lock <uid>` | Sell / SetLock |

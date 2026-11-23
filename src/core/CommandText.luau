@@ -35,7 +35,9 @@ CommandText.HELP = [[
   expand <exp_id>            拡張を買う（トレーニング場もここ）
   train <adv_uid> [回数|max] トレーニング（ゴールドで経験値。既定1回）
   autosell <on|off> [最大レアリティ] [keep|all]  自動売却（keep＝修飾語つきは残す）
-  claim                      受け取り箱の中身をまとめて受け取る（受け取れないものは残る）]]
+  claim                      受け取り箱の中身をまとめて受け取る（受け取れないものは残る）
+  eventgo <n> [時間帯]       今のマップイベント（レアダンジョン・レイドボス）へパーティを出す（時間帯は省略で今の時間帯）
+  buy <番号> [時間帯]        旅の商人の品を買う（時間帯は省略で今の時間帯）]]
 
 function CommandText.tokens(line: string): { string }
 	local t = {}
@@ -122,6 +124,11 @@ function CommandText.fromTokens(tokens: { string }): any?
 		return { type = "Train", adventurerUid = tokens[2], sessions = n }
 	elseif c == "claim" then
 		return { type = "ClaimInbox" }
+	elseif c == "eventgo" then
+		-- 時間帯を省いたときは呼び出し側が今の時間帯（Game.query.mapEvent）で埋める（D-152）
+		return { type = "DispatchEvent", partyIndex = tonumber(tokens[2]), eventSlot = tonumber(tokens[3]) }
+	elseif c == "buy" then
+		return { type = "BuyFromMerchant", itemIndex = tonumber(tokens[2]), eventSlot = tonumber(tokens[3]) }
 	elseif c == "autosell" then
 		return {
 			type = "SetAutoSell",

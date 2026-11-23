@@ -62,6 +62,9 @@ export type Expedition = {
 	dailyTraitId: string?,            -- 出発時に当たっていた日替わりの特性（D-156）。留守番も出発した日の特性。M7b-3（version 7）で追加
 	eventSlot: number?,               -- マップイベントへの派遣なら、そのイベントの時間帯の番号（D-152、06章 §12）
 	raidDamage: number?,              -- レイドへの派遣なら、出発時に計算したダメージ（到着時刻に入れる。D-152）
+	arriveAt: number?,                -- レイドへの派遣なら、ボスに着く時刻（出発 + raidTravelSeconds。06章 §12）
+	raidArrived: boolean?,            -- レイドのダメージを入れ終わった
+	chestPile: string?,               -- レアダンジョンへの派遣なら、宝箱の山の鍵 special:rare:<相当するダンジョン>（D-171, D-185）
 }
 
 -- 受け取り箱（D-164）：クエスト・プレイ時間・ログインボーナス・レイドなどの報酬の受け取り口。フレンドボタンの報酬は入れない（D-157）
@@ -161,8 +164,10 @@ export type PlayerState = {
 		rewardedInvitees: { [string]: boolean },  -- 招待した側：報酬を渡した相手の UserId（文字列キー）
 		weekIndex: number, weekCount: number,     -- 招待した側の人数の上限（週）
 	},                                -- 招待した側への報酬は「届け物」として別の保存場所に置き、次のログインで受け取り箱へ入れる（D-180。このセーブには書かない。詳細は M7b-5）
-	merchant: { eventSlot: number, bought: { boolean } }?,  -- 今の旅の商人の品のうち買ったもの（D-152）。品ぞろえは eventSlot と seed から決まるので保存しない
-	raid: { eventSlot: number, damage: number, defeated: boolean }?,  -- 今のレイドボスの進み具合（D-152。自分専用）
+	merchant: { eventSlot: number, bought: { boolean }, dungeonIds: { string } }?,  -- 今の旅の商人の品のうち買ったもの（D-152）。品ぞろえは eventSlot と seed から決まるので保存しない
+	                                  -- bought は品の数だけの配列（穴なし）。dungeonIds は最初に買ったときの候補のダンジョン（3分間のうちに踏破が進んでも品ぞろえを変えない：06章 §12）
+	raid: { eventSlot: number, hp: number, damage: number, defeated: boolean, parties: { number }, arrived: number }?,  -- 今のレイドボスの進み具合（D-152。自分専用）
+	                                  -- hp は最初に出発したときに決める。parties は出発したパーティ（1パーティ1回まで）、arrived は到着した数（宝箱の数に使う：D-179）
 	rareDungeonSlots: { [string]: number }?,  -- レアダンジョンに出発したパーティ（partyIndex → eventSlot。1パーティ1回まで：D-152）
 	inbox: { InboxEntry },            -- 受け取り箱（D-164）。version 8
 }
@@ -216,17 +221,24 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 
 新規のセーブも同じ初期値を持つ（`Game.newState`）。
 
-### version 8 → 9 以降（M7b-4 後半以降の各段階）
+### version 8 → 9（M7b-4 後半・担当B。マップイベント）　`Migration.CURRENT = 9`
+
+担当A（今週の訪問者・専用ギフト・フレンド）と同時に作業したため、まとめるときに番号を振り直す（担当Aが v8 → 9 なら、この節は v9 → 10）。
+
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `expeditions[*]` | `eventSlot`・`raidDamage`・`arriveAt`・`raidArrived`・`chestPile` は nil（旧版の探索は普通の探索） | D-152 |
+| `equipment[*]` | `fromMerchant` は nil | D-175 |
+| `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 |
+
+### version 9 → 10 以降（M7b-4 後半以降の各段階）
 
 次の項目は、それを使う段階で version を上げて足す。どの段階かは 12章「M7b の進め方」の内容に合わせ、足した段階でこの表を「version n → n+1」の節に移す。
 
 | 項目 | 旧版からの変換 | 根拠 | 足す段階（予定） |
 | --- | --- | --- | --- |
-| `expeditions[*]` | `eventSlot`・`raidDamage` は nil | D-152 | M7b-4 後半 |
-| `equipment[*]` | `fromMerchant` は nil | D-175 | M7b-4 後半 |
 | `friend` | `nextAt = 0, dayIndex = -1, todayCount = 0` | D-157 | M7b-4〜5（未定） |
 | `referral` | `inviteeRewardDone = false, rewardedInvitees = {}, weekIndex = -1, weekCount = 0` | D-157 | M7b-4〜5（未定） |
-| `merchant`・`raid`・`rareDungeonSlots` | nil | D-152 | M7b-4 後半 |
 | ユニークの冒険者 | `exclusiveGiftId` のギフトを `giftIds` に足す。ギフトの枠（giftMax）がいっぱいなら一番古いギフト（`giftIds` の先頭）と入れ替える | D-165, D-177, D-185 | M7b-4 後半 |
 
 新規のセーブ（`Game.newState`）は、その時点の version で足した項目を初期値で持ち、`settings.autoSell` は StarterSet の D-167 の初期値（オン）にする。

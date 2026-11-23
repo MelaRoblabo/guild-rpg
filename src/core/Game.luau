@@ -19,10 +19,13 @@ local Inbox = require("./Inbox")
 local JobChange = require("./JobChange")
 local Inventory = require("./Inventory")
 local Login = require("./Login")
+local MapEvent = require("./MapEvent")
+local Merchant = require("./Merchant")
 local Migration = require("./Migration")
 local Party = require("./Party")
 local Playtime = require("./Playtime")
 local Quest = require("./Quest")
+local Raid = require("./Raid")
 local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
 local Training = require("./Training")
@@ -154,11 +157,13 @@ local function planExpedition(
 	dungeonId: string,
 	departAt: number,
 	master: any,
-	offline: boolean
+	offline: boolean,
+	rare: any?
 ): any
 	local _, seed = takeRng(state)
 	local snaps = Party.snapshots(state, partyIndex, master)
-	local traitId = DailyTrait.traitIdFor(dungeonId, departAt, master)
+	-- レアダンジョン（rare = { eventSlot, pileKey }）は日替わりの特性を当てない（ダンジョンの日替わりとは別のイベント。要確認）
+	local traitId = if rare then nil else DailyTrait.traitIdFor(dungeonId, departAt, master)
 	local log = Expedition.simulate({
 		seed = seed,
 		departAt = departAt,
@@ -166,6 +171,7 @@ local function planExpedition(
 		members = snaps,
 		dailyTraitId = traitId,
 		timeMult = if offline then master.K.offlineTimeMult else nil,
+		chestMult = if rare then master.K.rareDungeonChestMult else nil, -- D-152
 	}, master)
 	local memberUids = {}
 	for _, s in snaps do
@@ -182,6 +188,8 @@ local function planExpedition(
 		log = log,
 		offline = if offline then true else nil, -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない
 		dailyTraitId = traitId,
+		eventSlot = if rare then rare.eventSlot else nil, -- マップイベントへの派遣（D-152）
+		chestPile = if rare then rare.pileKey else nil, -- 宝箱の山（レアダンジョンは special:rare:<相当>：D-171）
 	}
 end
 
@@ -211,6 +219,19 @@ end
 -- 帰還処理：報酬を状態に反映する
 -- restActive：休息ボーナスが効くか（オンライン中の帰還で、帰還時に残りがある：06章 §14）
 local function collect(state: any, e: any, master: any, events: { any }, restActive: boolean)
+	if e.raidDamage then
+		-- レイドからの帰還：報酬は到着時に入れた（受け取り箱：D-179）。ここでは帰るだけ
+		state.expeditions[e.uid] = nil
+		bump(state, "raidReturns")
+		table.insert(events, {
+			type = "RaidReturned",
+			at = e.returnAt,
+			partyIndex = e.partyIndex,
+			eventSlot = e.eventSlot,
+			damage = e.raidDamage,
+		})
+		return
+	end
 	local K = master.K
 	local log = e.log
 	local r = log.rewards
@@ -223,8 +244,10 @@ local function collect(state: any, e: any, master: any, events: { any }, restAct
 		itemsSoldGold += Inventory.gainItem(state, itemId, c, master)
 	end
 	-- 宝箱はギルドの宝箱置き場へ（倉庫とは別、上限なし：D-084）。普通の探索の山の鍵は dungeonId（D-166）
+	-- レアダンジョンは special:rare:<相当するダンジョン>（D-171, D-185）
+	local pileKey = e.chestPile or e.dungeonId
 	for _, c in r.chests do
-		Chest.add(state, e.dungeonId, c.rank, 1)
+		Chest.add(state, pileKey, c.rank, 1)
 	end
 
 	-- 経験値（D-041：生存者で等分済み。個人倍率はここで掛ける）。順序を固定するため隊列順に処理
@@ -277,6 +300,8 @@ local function collect(state: any, e: any, master: any, events: { any }, restAct
 		interrupted = e.interrupted, -- 途中ログインで戻った（D-186）
 		dailyTraitId = e.dailyTraitId,
 		restBonus = if useRest then true else nil,
+		eventSlot = e.eventSlot, -- レアダンジョンからの帰還（D-152）
+		pileKey = if e.chestPile then e.chestPile else nil,
 	})
 	for _, lu in levelUps do
 		table.insert(events, { type = "LevelUp", at = e.returnAt, uid = lu.uid, level = lu.level })
@@ -336,6 +361,28 @@ local function nextReturn(state: any, now: number): any?
 	return nextE
 end
 
+-- レイドの到着（D-152, D-179）：到着時刻が ctx.now 以前でまだ入れていないダメージを、到着の早い順に入れる
+-- 結果は出発時に決まっているので、オンラインでも留守の計算でも同じに入れる
+local function raidArrivals(state: any, now: number, master: any, events: { any })
+	local list = {}
+	for _, e in state.expeditions do
+		if e.raidDamage and not e.raidArrived and e.arriveAt <= now then
+			table.insert(list, e)
+		end
+	end
+	table.sort(list, function(x, y)
+		if x.arriveAt ~= y.arriveAt then
+			return x.arriveAt < y.arriveAt
+		end
+		return tonumber(string.sub(x.uid, 4)) < tonumber(string.sub(y.uid, 4))
+	end)
+	local take = rngTaker(state)
+	for _, e in list do
+		e.raidArrived = true
+		Raid.arrive(state, e, take, master, events)
+	end
+end
+
 -- 留守の始まり（06章 §13）。lastSavedAt（サーバーが保存のときに書く：M7b-5）を使う。
 -- まだ書かれていない・オンラインの時間より古い場合に留守を重ねて数えないよう、最後の advance の時刻より前にはしない
 function Game.offlineStart(state: any): number
@@ -349,6 +396,7 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 	local t0 = state.lastAdvancedAt
 	local rest = state.restBonusSeconds or 0
 	local take = rngTaker(state)
+	raidArrivals(state, ctx.now, master, events)
 	while true do
 		local nextE = nextReturn(state, ctx.now)
 		if nextE == nil then
@@ -358,7 +406,7 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 		local restLeft = rest - math.max(0, nextE.returnAt - t0)
 		collect(state, nextE, master, events, restLeft > 0)
 		-- クエストの「踏破」はオンライン中の帰還で数える（留守番の探索は数えない：D-153, D-161）
-		if nextE.log.result == "clear" and not nextE.offline then
+		if nextE.log.result == "clear" and not nextE.offline and not nextE.raidDamage then
 			Quest.count(state, "clears", 1, nextE.returnAt, master, take, events)
 		end
 
@@ -402,6 +450,8 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 	local away = math.max(0, ctx.now - start)
 	local gained = math.floor(away * K.restBonusRate)
 	state.restBonusSeconds = math.min((state.restBonusSeconds or 0) + gained, K.restBonusMaxSeconds)
+	-- ログアウトの前に出発したレイドのダメージは入れる（結果は出発時に決まる：D-152）。留守中は新しく参加しない（D-161）
+	raidArrivals(state, ctx.now, master, events)
 
 	while true do
 		local nextE = nextReturn(state, ctx.now)
@@ -1230,6 +1280,170 @@ handlers.SetAutoSell = function(state, cmd, ctx)
 	return { ok = true, events = {} }
 end
 
+-- マップイベント（05章 DispatchEvent・BuyFromMerchant、06章 §12、D-152, D-179） ---------------------
+-- コマンドはオンラインでだけ届く。留守中（advance の ctx.online == false）はイベントに参加しない（D-161）
+
+-- レアダンジョンに出発したパーティ（partyIndex → eventSlot）。今の時間帯の分だけ残す（03章）
+local function rareJoined(state: any, slot: number, partyIndex: number): boolean
+	local slots = state.rareDungeonSlots
+	return slots ~= nil and slots[tostring(partyIndex)] == slot
+end
+
+local function markRareJoined(state: any, slot: number, partyIndex: number)
+	local slots = {}
+	for k, v in state.rareDungeonSlots or {} do
+		if v == slot then
+			slots[k] = v
+		end
+	end
+	slots[tostring(partyIndex)] = slot
+	state.rareDungeonSlots = slots
+end
+
+handlers.DispatchEvent = function(state, cmd, ctx)
+	local master = ctx.master
+	local p = state.parties[cmd.partyIndex]
+	if not p then
+		return fail("PARTY_NOT_FOUND")
+	end
+	local slot = cmd.eventSlot
+	-- 種類はその時間帯のイベント（全員共通）で決まる。商人には派遣できない
+	local kind = if type(slot) == "number" and slot == math.floor(slot)
+		then MapEvent.eventAt(slot, master).kind
+		else nil
+	if kind ~= "rareDungeon" and kind ~= "raid" then
+		return fail("EVENT_NOT_ACTIVE")
+	end
+	local err = MapEvent.check(slot, kind, ctx.now, master)
+	if err then
+		return fail(err)
+	end
+	if
+		(kind == "rareDungeon" and rareJoined(state, slot, cmd.partyIndex))
+		or (kind == "raid" and Raid.joined(state, slot, cmd.partyIndex))
+	then
+		return fail("EVENT_ALREADY_JOINED") -- 1パーティ1回まで（D-152）
+	end
+	if Party.isBusy(state, cmd.partyIndex) then
+		return fail("PARTY_BUSY")
+	end
+	if state.rebirthSession and table.find(p.slots, state.rebirthSession.adventurerUid) then
+		return fail("ADVENTURER_IN_REBIRTH")
+	end
+	if Party.isEmpty(p) then
+		return fail("PARTY_EMPTY")
+	end
+	local events: { any } = {}
+	if kind == "rareDungeon" then
+		-- 強さは踏破済みの一番深いダンジョン、宝箱 × rareDungeonChestMult、山は special:rare:<1段上>（D-152, D-171, D-185）
+		local target = MapEvent.rareDungeonTarget(state, master)
+		local e = commitExpedition(
+			state,
+			planExpedition(
+				state,
+				cmd.partyIndex,
+				target.dungeonId,
+				ctx.now,
+				master,
+				false,
+				{ eventSlot = slot, pileKey = target.pileKey }
+			)
+		)
+		markRareJoined(state, slot, cmd.partyIndex)
+		bump(state, "rareDungeonDispatches")
+		table.insert(events, {
+			type = "EventDispatched",
+			at = ctx.now,
+			kind = kind,
+			eventSlot = slot,
+			partyIndex = cmd.partyIndex,
+			dungeonId = target.dungeonId,
+			pileKey = target.pileKey,
+			returnAt = e.returnAt,
+		})
+	else
+		-- レイド：ダメージは出発時に計算し、到着時刻にボスへ入れる（D-152, D-179、07章 §4b）
+		local K = master.K
+		local snaps = Party.snapshots(state, cmd.partyIndex, master)
+		local damage = Raid.damage(snaps, K)
+		local memberUids = {}
+		for _, sn in snaps do
+			table.insert(memberUids, sn.uid)
+		end
+		-- 表示用にダンジョンを持たせる（強さの基準と同じ、踏破済みの一番深いダンジョン）
+		local dungeonId = MapEvent.rareDungeonTarget(state, master).dungeonId
+		local travel = K.raidTravelSeconds
+		Raid.join(state, slot, cmd.partyIndex, master)
+		local e = commitExpedition(state, {
+			uid = "",
+			partyIndex = cmd.partyIndex,
+			dungeonId = dungeonId,
+			seed = 0,
+			departAt = ctx.now,
+			arriveAt = ctx.now + travel,
+			returnAt = ctx.now + travel * 2,
+			memberUids = memberUids,
+			log = {
+				engineVersion = Expedition.ENGINE_VERSION,
+				seed = 0,
+				dungeonId = dungeonId,
+				departAt = ctx.now,
+				result = "raid",
+				reachedFloor = 0,
+				travelSeconds = travel,
+				replaySeconds = 0,
+				totalSeconds = travel * 2,
+				floors = {},
+				rewards = { exp = {}, gold = 0, chests = {}, items = {}, floorsCleared = 0, guildExp = 0 },
+			},
+			eventSlot = slot,
+			raidDamage = damage,
+		})
+		bump(state, "raidDispatches")
+		table.insert(events, {
+			type = "EventDispatched",
+			at = ctx.now,
+			kind = kind,
+			eventSlot = slot,
+			partyIndex = cmd.partyIndex,
+			damage = damage,
+			hp = state.raid.hp,
+			arriveAt = e.arriveAt,
+			returnAt = e.returnAt,
+		})
+	end
+	-- D-179：オンライン中の出発（DispatchEvent）も「探索の回数」に数える
+	Quest.count(state, "expeditions", 1, ctx.now, master, rngTaker(state), events)
+	return { ok = true, events = events }
+end
+
+handlers.BuyFromMerchant = function(state, cmd, ctx)
+	local master = ctx.master
+	local err = MapEvent.check(cmd.eventSlot, "merchant", ctx.now, master)
+	if err then
+		return fail(err)
+	end
+	local buyErr, r = Merchant.buy(state, cmd.eventSlot, cmd.itemIndex, master)
+	if buyErr then
+		return fail(buyErr)
+	end
+	bump(state, "goldSpentOnMerchant", r.price)
+	bump(state, "merchantBought")
+	return {
+		ok = true,
+		events = {
+			{
+				type = "MerchantBought",
+				at = ctx.now,
+				eventSlot = cmd.eventSlot,
+				itemIndex = cmd.itemIndex,
+				equipmentUid = r.equipment.uid,
+				price = r.price,
+			},
+		},
+	}
+end
+
 -- 受け取り箱（05章 ClaimInbox、D-164, D-176）：受け取れるものだけ受け取り、残りは受け取り箱に残す（期限なし）
 handlers.ClaimInbox = function(state, _cmd, ctx)
 	if #state.inbox == 0 then
@@ -1422,6 +1636,73 @@ end
 -- 休息ボーナスの残り秒（D-161）
 function Game.query.restBonus(state: any): number
 	return state.restBonusSeconds or 0
+end
+
+-- 今と次のマップイベント（D-152、06章 §12）。全員共通。next は予告の時間に入るまで nil
+--   { current = { eventSlot, kindId, kind, placeId, startAt, closeAt, open, closesIn }, next = { ..., startsIn }?, nextAt }
+function Game.query.mapEvent(now: number, master: any): any
+	return MapEvent.status(now, master)
+end
+
+-- 旅の商人の品（D-152）。その時間帯のプレイヤーごとの品ぞろえと価格・買ったか
+--   { eventSlot, open, items = { { baseId, rarity, grade, itemLevel, modifierId, modifierValue, price, bought } } }
+--   その時間帯が商人でなければ nil
+function Game.query.merchant(state: any, eventSlot: number, now: number, master: any): any
+	local ev = MapEvent.eventAt(eventSlot, master)
+	if ev.kind ~= "merchant" then
+		return nil
+	end
+	local bought = Merchant.boughtFor(state, eventSlot)
+	local items = {}
+	for i, g in Merchant.goods(state, eventSlot, master) do
+		local row = table.clone(g.item)
+		row.price = g.price
+		row.bought = bought[i] == true
+		table.insert(items, row)
+	end
+	return {
+		eventSlot = eventSlot,
+		open = MapEvent.check(eventSlot, "merchant", now, master) == nil,
+		items = items,
+	}
+end
+
+-- レイドボスの進み具合（D-152。自分専用）。その時間帯がレイドでなければ nil
+--   { eventSlot, hp, damage, defeated, parties（出発したパーティ）, arrived }。まだ誰も出発していなければ HP の見込みと damage = 0
+function Game.query.raid(state: any, eventSlot: number, master: any): any
+	if MapEvent.eventAt(eventSlot, master).kind ~= "raid" then
+		return nil
+	end
+	local r = Raid.stateFor(state, eventSlot)
+	if r then
+		return table.clone(r)
+	end
+	return {
+		eventSlot = eventSlot,
+		hp = Raid.hp(state, eventSlot, master),
+		damage = 0,
+		defeated = false,
+		parties = {},
+		arrived = 0,
+	}
+end
+
+-- レアダンジョンの行き先（D-152, D-171, D-185）：{ dungeonId（強さ）, pileKey（宝箱の山）, joined（出発済みのパーティ番号） }
+function Game.query.rareDungeon(state: any, eventSlot: number, master: any): any
+	local t = MapEvent.rareDungeonTarget(state, master)
+	local joined = {}
+	for k, v in state.rareDungeonSlots or {} do
+		if v == eventSlot then
+			table.insert(joined, tonumber(k))
+		end
+	end
+	table.sort(joined)
+	return { dungeonId = t.dungeonId, pileKey = t.pileKey, joined = joined }
+end
+
+-- レイドのパーティのダメージの見込み（出発したときに入るダメージ。D-152）
+function Game.query.raidDamage(state: any, partyIndex: number, master: any): number
+	return Raid.damage(Party.snapshots(state, partyIndex, master), master.K)
 end
 
 function Game.query.trainingQuote(state: any, uid: string, targetLevel: number, master: any)

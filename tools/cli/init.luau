@@ -98,6 +98,8 @@ local HELP = [[
   inbox                      受け取り箱の中身（D-164。受け取りは claim）
   quests                     今日・今週のクエストと進み具合（D-153）
   calendar                   ログインボーナスのカレンダー・今日のプレイ時間・休息ボーナス（D-154, D-155）
+  event                      今のマップイベントと予告（D-152。参加は eventgo）
+  merchant                   旅の商人の品（D-152。買うのは buy）
   candidates                 候補と面接の状況を表示
   expansions                 拡張の一覧（次の段階の条件と費用）
   trainquote <adv_uid> <Lv>  そのレベルまでのトレーニング費用の見積もり
@@ -139,8 +141,8 @@ local function handle(tokens: { string }): (boolean, any)
 				)} 秒`
 			)
 			return true, events
-		elseif not (c == "status" or c == "daily" or c == "help" or c == nil) then
-			-- 表示（status・daily・help）だけは許す
+		elseif not (c == "status" or c == "daily" or c == "event" or c == "help" or c == nil) then
+			-- 表示（status・daily・event・help）だけは許す。留守中はイベントに参加できない（D-161）
 			say("ログアウト中です（login でログイン）")
 			return false, events
 		end
@@ -193,6 +195,10 @@ local function handle(tokens: { string }): (boolean, any)
 		say(Text.quests(save, master))
 	elseif c == "calendar" then
 		say(Text.calendar(save, master))
+	elseif c == "event" then
+		say(Text.event(save, master))
+	elseif c == "merchant" then
+		say(Text.merchant(save, master))
 	elseif c == "candidates" then
 		say(Text.hiring(save, master))
 	elseif c == "expansions" then
@@ -205,6 +211,10 @@ local function handle(tokens: { string }): (boolean, any)
 		if cmd == nil then
 			say(`不明なコマンド: {c}（help で一覧）`)
 			return false, events
+		end
+		if (cmd.type == "DispatchEvent" or cmd.type == "BuyFromMerchant") and cmd.eventSlot == nil then
+			-- 時間帯を省いたら今の時間帯（D-152）
+			cmd.eventSlot = Game.query.mapEvent(save.clock, master).current.eventSlot
 		end
 		if cmd.type == "BulkSell" and #cmd.equipmentUids == 0 then
 			-- sellweak の対象を省いたら直前の開封結果（09章、D-167）

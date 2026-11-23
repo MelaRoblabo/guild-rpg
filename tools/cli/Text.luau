@@ -70,6 +70,10 @@ local ERRORS = {
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
 	INBOX_EMPTY = "受け取り箱は空です",
+	EVENT_NOT_ACTIVE = "そのイベントは今は出ていません（event で確認）",
+	EVENT_WINDOW_CLOSED = "そのイベントの受付は締め切られました（出発・購入できるのは出てから3分間）",
+	EVENT_ALREADY_JOINED = "そのパーティはこのイベントにもう参加しました（1パーティ1回まで）",
+	ALREADY_BOUGHT = "その品はもう買いました",
 }
 
 -- 宝箱の山の名前（普通の山はダンジョン名、特別な宝箱は種類の名前：D-166, D-171）
@@ -272,6 +276,68 @@ local function equipName(e: any, master: any): string
 	return `{mod}{base.name}{grade}［{RANK_NAME[e.rarity]}・IL{e.itemLevel or 1}］`
 end
 
+local EVENT_KIND_NAME = { rareDungeon = "レアダンジョン", raid = "レイドボス", merchant = "旅の商人" }
+
+-- 今と次のマップイベント（D-152）
+function Text.event(save: any, master: any): string
+	local q = Game.query.mapEvent(save.clock, master)
+	local c = q.current
+	local lines = {
+		`【マップイベント】今：{EVENT_KIND_NAME[c.kind]}（{c.placeId}、時間帯 {c.eventSlot}）{if c.open
+			then ` 受付中 残り {hms(c.closesIn)}`
+			else " 受付終了"}`,
+	}
+	if c.kind == "rareDungeon" then
+		local r = Game.query.rareDungeon(save.state, c.eventSlot, master)
+		local joined = if #r.joined > 0 then `（参加済み：パーティ{table.concat(r.joined, "・")}）` else ""
+		table.insert(
+			lines,
+			`  強さ：{master.dungeons[r.dungeonId].name} ／ 宝箱：{pileName(r.pileKey, master)}{joined}（eventgo <n>）`
+		)
+	elseif c.kind == "raid" then
+		local r = Game.query.raid(save.state, c.eventSlot, master)
+		table.insert(
+			lines,
+			`  HP {r.hp} ／ 入ったダメージ {r.damage}{if r.defeated then " 討伐済み" else ""}（出発 {#r.parties}・到着 {r.arrived}）（eventgo <n>）`
+		)
+		for i = 1, #save.state.parties do
+			table.insert(
+				lines,
+				`  パーティ{i}のダメージの見込み：{Game.query.raidDamage(save.state, i, master)}`
+			)
+		end
+	else
+		table.insert(lines, "  品は merchant で表示（buy <番号>）")
+	end
+	if q.next then
+		table.insert(
+			lines,
+			`【予告】次：{EVENT_KIND_NAME[q.next.kind]}（{q.next.placeId}） あと {hms(q.next.startsIn)}`
+		)
+	else
+		table.insert(lines, `次のイベントまで {hms(q.nextAt - save.clock)}（1分前に予告）`)
+	end
+	return table.concat(lines, "\n")
+end
+
+-- 旅の商人の品（D-152）
+function Text.merchant(save: any, master: any): string
+	local slot = Game.query.mapEvent(save.clock, master).current.eventSlot
+	local m = Game.query.merchant(save.state, slot, save.clock, master)
+	if m == nil then
+		return "今は旅の商人は出ていません（event で確認）"
+	end
+	local lines =
+		{ `【旅の商人】{if m.open then "受付中" else "受付終了"}（所持金 {save.state.gold}G）` }
+	for i, it in m.items do
+		table.insert(
+			lines,
+			`  {i}. {equipName(it, master)} {it.price}G{if it.bought then " ［購入済み］" else ""}`
+		)
+	end
+	return table.concat(lines, "\n")
+end
+
 local function partyStatus(save: any, i: number, master: any): string
 	local e = Game.query.expeditionOf(save.state, i)
 	if not e then
@@ -291,7 +357,10 @@ local function partyStatus(save: any, i: number, master: any): string
 	else
 		where = "帰還済み"
 	end
-	return `{d.name}を探索中：{where}（帰還まで {remain} 秒）`
+	if e.raidDamage then
+		return `レイドボスへ派遣中（ダメージ {e.raidDamage}、帰還まで {remain} 秒）`
+	end
+	return `{if e.chestPile then "レアダンジョン（" .. d.name .. "）" else d.name}を探索中：{where}（帰還まで {remain} 秒）`
 end
 
 function Text.status(save: any, master: any): string
@@ -560,6 +629,46 @@ function Text.events(events: { any }, save: any, master: any): string
 					.. (if e.interrupted then " ［途中で帰還］" else "")
 					.. (if e.dailyTraitId then ` ［日替わり：{traitText(e.dailyTraitId, master)}］` else "")
 					.. (if e.restBonus then " ［休息ボーナス］" else "")
+			)
+		elseif e.type == "EventDispatched" then
+			if e.kind == "raid" then
+				table.insert(
+					lines,
+					t
+						.. `パーティ{e.partyIndex}がレイドボスへ出発（ダメージ {e.damage} ／ HP {e.hp}、到着 {hms(
+							e.arriveAt - START_CLOCK
+						)}・帰還 {hms(e.returnAt - START_CLOCK)}）`
+				)
+			else
+				table.insert(
+					lines,
+					t
+						.. `パーティ{e.partyIndex}がレアダンジョン（強さ：{master.dungeons[e.dungeonId].name}）へ出発（宝箱は{pileName(
+							e.pileKey,
+							master
+						)}、帰還 {hms(e.returnAt - START_CLOCK)}）`
+				)
+			end
+		elseif e.type == "RaidHit" then
+			table.insert(
+				lines,
+				t
+					.. `パーティ{e.partyIndex}がレイドボスに {e.damage} ダメージ（合計 {e.total} / HP {e.hp}）{if e.defeated
+						then " 討伐済み"
+						else ""}`
+			)
+		elseif e.type == "RaidDefeated" then
+			table.insert(lines, t .. "レイドボスを討伐した！")
+		elseif e.type == "RaidReward" then
+			table.insert(lines, t .. "レイドの宝箱が受け取り箱に届いた")
+		elseif e.type == "RaidReturned" then
+			table.insert(lines, t .. `パーティ{e.partyIndex}がレイドから帰還`)
+		elseif e.type == "MerchantBought" then
+			local eq = save.state.equipment[e.equipmentUid]
+			table.insert(
+				lines,
+				t
+					.. `旅の商人から買った：{e.equipmentUid} {if eq then equipName(eq, master) else ""}（{e.price}G）`
 			)
 		elseif e.type == "LevelUp" then
 			table.insert(lines, t .. `{advName(save, e.uid)} が Lv{e.level} に上がった`)
