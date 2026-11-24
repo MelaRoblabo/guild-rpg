@@ -205,6 +205,13 @@ local function commitExpedition(state: any, e: any): any
 	e.uid = newUid(state, "ex")
 	state.expeditions[e.uid] = e
 	bump(state, "expeditions")
+	-- 最後の行き先（「同じ所へ再出発」の行き先：D-228）。マップイベントへの派遣は書かない
+	if e.eventSlot == nil and e.raidDamage == nil then
+		local party = state.parties[e.partyIndex]
+		if party then
+			party.lastDungeonId = e.dungeonId
+		end
+	end
 	if e.offline then
 		bump(state, "offlineExpeditions")
 	end

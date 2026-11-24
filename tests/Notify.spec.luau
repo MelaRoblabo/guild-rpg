@@ -241,8 +241,8 @@ return function(t)
 			s.adventurers[slots[1]].rebirthCount = 2
 			s.adventurers[slots[2]].rebirthCount = 1
 			Migration.migrate(s, master)
-			expect(s.version).toBe(11)
-			expect(Migration.CURRENT).toBe(11)
+			expect(s.version).toBe(Migration.CURRENT) -- v10 → 11 → 以降の版（v11 → 12 は ClientHub の D-228）
+			expect(Migration.CURRENT >= 11).toBeTruthy()
 			expect(s.stats.rebirths).toBe(3)
 		end)
 		it(

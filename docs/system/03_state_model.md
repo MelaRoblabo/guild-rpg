@@ -47,6 +47,7 @@ export type Party = {
 	index: number,                    -- 1〜（解放済みパーティ枠）
 	slots: { string },                -- 隊列1〜4の冒険者 uid（D-035）。空き枠は ""（JSON/DataStore で穴あき配列にしないため）
 	autoRepeat: { dungeonId: string }?, -- 自動再派遣の設定
+	lastDungeonId: string?,           -- 最後の行き先（普通の派遣で出発したときに書く。マップイベントへの派遣は書かない）。「同じ所へ再出発」の行き先（D-228）。version 12
 }
 
 export type Expedition = {
@@ -265,7 +266,15 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 
 新規のセーブも同じ初期値を持つ（`Game.newState`。`stats.rebirths` は最初の転生で 1 になる）。
 
-### version 11 → 12 以降
+### version 11 → 12（M8-2 の決定 D-228）　`Migration.CURRENT = 12`
+
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `parties[*].lastDungeonId` | 今いる普通の探索があればその行き先、なければ自動再派遣の行き先、どちらもなければ nil | D-228 |
+
+新規のセーブは nil（最初の派遣で書く）。
+
+### version 12 → 13 以降
 
 まだ足していない項目は今はない。次の段階で状態を足すときは、ここに表（項目・旧版からの変換・根拠・足す段階）を作ってから version を上げ、足した段階でこの表を「version n → n+1」の節に移す。
 

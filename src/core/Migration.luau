@@ -8,7 +8,7 @@ local ExclusiveGift = require("./ExclusiveGift")
 
 local Migration = {}
 
-Migration.CURRENT = 11
+Migration.CURRENT = 12
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -155,6 +155,24 @@ local STEPS: { [number]: (any, any) -> () } = {
 		state.settings = state.settings or {}
 		state.settings.notifyPrompt = state.settings.notifyPrompt or { firstReturn = false, loginDay2 = false }
 		state.version = 11
+	end,
+	-- v11 → v12（M8-2 の決定 D-228）
+	--   parties[*].lastDungeonId（最後の行き先。「同じ所へ再出発」の行き先）：今いる普通の探索があればその行き先、
+	--   なければ自動再派遣の行き先、どちらもなければ nil
+	[11] = function(state)
+		for _, party in state.parties or {} do
+			if party.lastDungeonId == nil then
+				for _, e in state.expeditions or {} do
+					if e.partyIndex == party.index and e.eventSlot == nil and e.raidDamage == nil then
+						party.lastDungeonId = e.dungeonId
+					end
+				end
+				if party.lastDungeonId == nil and party.autoRepeat then
+					party.lastDungeonId = party.autoRepeat.dungeonId
+				end
+			end
+		end
+		state.version = 12
 	end,
 }
 
