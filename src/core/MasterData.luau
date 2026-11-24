@@ -3,6 +3,7 @@
 -- 1つでも error があれば load は失敗する（起動しない）。
 
 local ListPrefs = require("./ListPrefs")
+local Preferences = require("./Preferences")
 local Types = require("./Types")
 
 type Issue = Types.ValidationIssue
@@ -804,6 +805,20 @@ local function validateLootAndStarter(c: Checker, d: any)
 			end
 		end
 		c:integer("StarterSet.autoSell.maxRarity", A.maxRarity, 1, rarityCount(d))
+	end
+	-- 設定の初期値（D-117・D-237 ③）
+	local PF = S.preferences
+	if type(PF) ~= "table" then
+		c:error("StarterSet.preferences", "テーブルが必要")
+	else
+		for _, key in Preferences.VOLUMES do
+			c:integer(`StarterSet.preferences.{key}`, PF[key], 0, d.Constants and d.Constants.volumeSteps or 0)
+		end
+		for _, key in Preferences.SWITCHES do
+			if type(PF[key]) ~= "boolean" then
+				c:error(`StarterSet.preferences.{key}`, "真偽値が必要")
+			end
+		end
 	end
 	-- 一覧の並べ方と一括売却の上限の初期値（D-117・D-231 ⑮）
 	local LP = S.listPrefs

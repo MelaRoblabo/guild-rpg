@@ -8,6 +8,7 @@
 
 local Game = require("./Game")
 local ListPrefs = require("./ListPrefs")
+local Preferences = require("./Preferences")
 
 local Protocol = {}
 
@@ -62,6 +63,17 @@ Protocol.CLIENT_COMMANDS = {
 	BuyExpansion = { expansionId = str(ID) },
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
 	AutoEquip = { partyIndex = int(1, 20) }, -- D-120・D-231 ⑨・D-235 ③
+	-- 設定（D-117・D-237 ③）。送った項目だけ変わる
+	SetSettings = (function()
+		local f: { [string]: Field } = {}
+		for _, k in Preferences.VOLUMES do
+			f[k] = int(0, 100, true)
+		end
+		for _, k in Preferences.SWITCHES do
+			f[k] = bool(true)
+		end
+		return f
+	end)(),
 	-- 一覧の並べ方と一括売却の上限（D-117・D-119・D-231 ⑮）。送った項目だけ変わる
 	SetListPrefs = {
 		advSort = enum(ListPrefs.ADV_SORTS, true),

@@ -249,4 +249,6 @@ return {
 	guildExpClearBonus = 5,
 	guildExpFirstClear = 50,
 	-- ギルドレベルの必要経験値と報酬は src/data/GuildLevels.luau（tools/sim/progression が生成：D-074）
+	-- 設定の音量の段（0〜volumeSteps。S-61、D-237 ③）
+	volumeSteps = 10,
 }

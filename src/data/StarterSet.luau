@@ -17,6 +17,16 @@ return {
 	autoSell = { enabled = true, maxRarity = 2, keepModified = true },
 	-- 一覧の並べ方と一括売却の上限の初期値（D-117・D-119・D-231 ⑮）。前回選んだものはサーバーに保存する
 	-- 冒険者の一覧は Lv の高い順、倉庫はレアリティの高い順。条件の一括売却の上限はレア
+	-- 設定の初期値（S-61、D-117・D-237 ③）：音量は 0〜volumeSteps
+	preferences = {
+		musicVolume = 8,
+		soundVolume = 8,
+		chestAnimation = true,
+		lessFlashing = false,
+		returnToast = true,
+		cutIns = true,
+		otherCarts = true,
+	},
 	listPrefs = { advSort = "level", advDesc = true, whSort = "rarity", whDesc = true, bulkSellMaxRarity = 3 },
 	adventurers = {
 		{

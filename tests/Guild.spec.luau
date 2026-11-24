@@ -122,6 +122,26 @@ return function(t)
 		end)
 	end)
 
+	describe("設定（D-117・D-237 ③）", function()
+		it("D-237 ③ 保存がなければ初期値、送った項目だけ変わる", function()
+			local s = Game.newState(master, 1, T0)
+			local p = Game.query.preferences(s, master)
+			expect(p.musicVolume).toBe(master.raw.StarterSet.preferences.musicVolume)
+			expect(p.chestAnimation).toBe(true)
+			expect(exec(s, { type = "SetSettings", musicVolume = 3, cutIns = false }).ok).toBe(true)
+			p = Game.query.preferences(s, master)
+			expect(p.musicVolume).toBe(3)
+			expect(p.cutIns).toBe(false)
+			expect(p.otherCarts).toBe(true)
+		end)
+		it("音量は 0〜volumeSteps", function()
+			local s = Game.newState(master, 1, T0)
+			expect(exec(s, { type = "SetSettings", soundVolume = master.K.volumeSteps + 1 }).error).toBe(
+				"INVALID_VOLUME"
+			)
+		end)
+	end)
+
 	describe("一覧の並べ方と一括売却の上限（D-117・D-231 ⑮）", function()
 		it(
 			"D-231 ⑮ 保存がなければ初期値（Lv の高い順・レアリティの高い順・一括売却の上限はレア）",

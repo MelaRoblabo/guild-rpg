@@ -33,6 +33,7 @@ local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
 local AutoEquip = require("./AutoEquip")
 local ListPrefs = require("./ListPrefs")
+local Preferences = require("./Preferences")
 local Training = require("./Training")
 local Visitor = require("./Visitor")
 
@@ -1351,6 +1352,15 @@ handlers.AutoEquip = function(state, cmd, ctx)
 	}
 end
 
+-- 設定（05章 SetSettings、D-117・D-237 ③）
+handlers.SetSettings = function(state, cmd, ctx)
+	local err = Preferences.set(state, cmd, ctx.master)
+	if err then
+		return fail(err)
+	end
+	return { ok = true, events = {} }
+end
+
 -- 一覧の並べ方と一括売却の上限（05章 SetListPrefs、D-117・D-119・D-231 ⑮）
 handlers.SetListPrefs = function(state, cmd, ctx)
 	local err = ListPrefs.set(state, cmd, ctx.master)
@@ -1794,6 +1804,11 @@ end
 -- 自動装備の提案（D-120・D-231 ⑨）：{ { advUid, slot, from, to } }。空なら付け替えるものがない
 function Game.query.autoEquipPlan(state: any, partyIndex: number, master: any): { any }
 	return AutoEquip.plan(state, partyIndex, master)
+end
+
+-- 設定（保存がなければ StarterSet.preferences の初期値。D-117・D-237 ③）
+function Game.query.preferences(state: any, master: any): any
+	return Preferences.get(state, master)
 end
 
 -- 一覧の並べ方と一括売却の上限（保存がなければ StarterSet.listPrefs の初期値。D-117・D-231 ⑮）
