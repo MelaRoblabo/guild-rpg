@@ -16,6 +16,7 @@ local EventMarker = require("../hub/EventMarker")
 local PickMode = require("../hub/PickMode")
 local LoginSequence = require("../hub/LoginSequence")
 local ReturnToast = require("../hub/ReturnToast")
+local WorldCarts = require("../hub/WorldCarts")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -150,6 +151,7 @@ local function buildMap(parent: Frame)
 	end
 	PickMode.changed:connect(showPickMode)
 	EventMarker.mount(mapContent) -- マップイベントの印（M8-6）
+	WorldCarts.mount(mapContent) -- 他のプレイヤーの馬車（M8-7、D-108・D-151）
 	-- 自分でスクロールしたら追うのをやめる（D-214 ⑧）
 	map.InputBegan:Connect(function(io: InputObject)
 		if io.UserInputType == Enum.UserInputType.Touch or io.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -497,6 +499,7 @@ end
 
 local function refreshMoving(view: any)
 	EventMarker.refresh(view)
+	WorldCarts.refresh(view)
 	if view == nil then
 		return
 	end
@@ -586,5 +589,6 @@ require("./event/Merchant")
 require("./login/LoginSummary")
 require("./login/CutIn")
 require("./login/LoginCalendar")
+require("./world/OtherParty")
 
 return Hub

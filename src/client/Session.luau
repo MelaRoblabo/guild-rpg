@@ -12,6 +12,7 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local commandRemote = remotes:WaitForChild("Command") :: RemoteFunction
 local stateRemote = remotes:WaitForChild("StateChanged") :: RemoteEvent
 local queryRemote = remotes:WaitForChild("Query") :: RemoteFunction
+local worldRemote = remotes:WaitForChild("WorldChanged") :: RemoteEvent
 
 local Session = {}
 
@@ -20,6 +21,10 @@ Session.seq = 0
 Session.changed = Signal.new() :: Signal.Signal<any>
 Session.events = Signal.new() :: Signal.Signal<string, { any }>
 Session.notice = Signal.new() :: Signal.Signal<string>
+-- 他のプレイヤーの公開情報（WorldChanged：11章 §6.1、D-121）。userId → { userId, guildLevel, parties }。
+-- 連番はなく、届いたものをそのまま上書きする（届かなくても自分のゲームには影響しない）
+Session.world = {} :: { [number]: any }
+Session.worldChanged = Signal.new() :: Signal.Signal<boolean>
 
 local syncing = false
 
@@ -72,6 +77,21 @@ function Session.resync()
 	syncing = false
 	Session.changed:fire(Session.view)
 end
+
+worldRemote.OnClientEvent:Connect(function(msg: any)
+	if type(msg) ~= "table" then
+		return
+	end
+	for _, info in msg.players or {} do
+		if type(info) == "table" and type(info.userId) == "number" then
+			Session.world[info.userId] = info
+		end
+	end
+	for _, userId in msg.removed or {} do
+		Session.world[userId] = nil
+	end
+	Session.worldChanged:fire(true)
+end)
 
 stateRemote.OnClientEvent:Connect(function(msg: any)
 	if #(msg.events or {}) > 0 then
