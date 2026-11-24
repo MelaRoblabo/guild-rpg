@@ -180,13 +180,13 @@ function HireCommon.statPanel(parent: Frame, candidate: any, roll: any, prev: an
 	return { frame = frame, content = content, rows = rows, footer = footer }
 end
 
--- 良い値（範囲の上から4分の1）・最大値（D-220 の S-21c。雇用の線は範囲の 75%）
+-- 良い値（範囲の statGoodRatio 以上）・最大値（D-220 の S-21c）
 function HireCommon.quality(key: string, value: number): string?
 	local r = master.K.hireStatRange[key]
 	if value >= r.max then
 		return "max"
 	end
-	if value >= r.min + (r.max - r.min) * 0.75 then
+	if value >= r.min + (r.max - r.min) * master.K.statGoodRatio then
 		return "good"
 	end
 	return nil

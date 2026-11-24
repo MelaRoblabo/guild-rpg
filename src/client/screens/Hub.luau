@@ -12,6 +12,7 @@ local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
+local RebirthCommon = require("./rebirth/RebirthCommon")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -407,12 +408,40 @@ local function buildEdges(parent: Frame)
 	})
 	for i, icon in { I.home, I.party, "▤" } do
 		local b = roundButton(icon, 66)
+		b.Name = ({ "Guild", "Adventurers", "Warehouse" })[i]
 		b.LayoutOrder = i
 		b.Parent = menu
 		if i == 1 then
 			-- ギルド（S-20 は M8-6）。それまでは雇用の受付（S-21a）を直接開く
 			b.Activated:Connect(function()
 				Nav.open("HireDesk")
+			end)
+		end
+		if i == 2 then
+			-- 冒険者（S-40・S-41 は M8-6）。それまでは転生（S-43）を直接開く：途中があれば続き（D-131）、
+			-- なければ上限レベルの冒険者（いなければ一番レベルの高い冒険者。押せない理由の札が出る）
+			b.Activated:Connect(function()
+				local view = Session.view
+				if view == nil then
+					return
+				end
+				local list = {}
+				for _, a in view.adventurers or {} do
+					table.insert(list, a)
+				end
+				table.sort(list, function(x, y)
+					local cx, cy = x.level >= x.levelCap, y.level >= y.levelCap
+					if cx ~= cy then
+						return cx
+					end
+					if x.level ~= y.level then
+						return x.level > y.level
+					end
+					return x.uid < y.uid
+				end)
+				local best = list[1]
+				local id, params = RebirthCommon.entry(view, best and best.uid)
+				Nav.open(id, params)
 			end)
 		end
 	end
@@ -516,5 +545,9 @@ require("./chest/ChestList")
 require("./chest/ChestOpening")
 require("./chest/ChestReveal")
 require("./chest/ChestResults")
+require("./rebirth/RebirthRitual")
+require("./rebirth/RebirthCharge")
+require("./rebirth/RebirthCompare")
+require("./rebirth/RebirthDone")
 
 return Hub
