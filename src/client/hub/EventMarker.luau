@@ -1,0 +1,185 @@
+--!strict
+-- マップイベントの印（D-152・D-208 ⑥・D-213 ⑫・D-215 ③・D-225 ⑥・D-234 ②）。メイン画面のマップの上に1つ。
+--   ① 予告（出る mapEventNoticeSeconds 前）：点線の丸の中に種類のアイコン（暗く）と、出るまでの時計。
+--   ② 出ている（mapEventWindowSeconds の間）：減っていく輪と種類のアイコン、残りの時計。押すと出発の面（レア・レイド）か商人の面。
+--   ③ 残りわずか（30秒から）：輪が点滅し、時計が警告の色。
+--   ④ 出発済み：輪の下にパーティの番号（レア・レイド）か、買った印（商人）。
+--   種類のアイコン：レアダンジョン＝宝石（門はパーティの「探索中」：D-234 ②）、レイド＝稲妻、商人＝カート。
+
+local Game = require("@game/ReplicatedStorage/Core/Game")
+local Components = require("../ui/Components")
+local Create = require("../ui/Create")
+local MapLayout = require("./MapLayout")
+local Nav = require("../ui/Nav")
+local Session = require("../Session")
+local Tokens = require("../ui/Tokens")
+local master = require("../Master")
+
+local C = Tokens.color
+local new = Create.new
+local CHILDREN = Create.Children
+
+local KIND_ICON = { rareDungeon = "◈", raid = "⚡", merchant = "🛒" }
+local ENDING_SECONDS = 30 -- 残りわずか（D-213 ⑫。仮。値は M8-FX でマスターデータへ）
+
+local EventMarker = {}
+
+local marker: TextButton? = nil
+local current: any = nil
+
+local function clock(s: number): string
+	s = math.max(0, math.floor(s))
+	return string.format("%d:%02d", s // 60, s % 60)
+end
+
+local function placeIndex(placeId: string): number
+	for i, p in master.mapEventPlaces do
+		if p.id == placeId then
+			return i
+		end
+	end
+	return 1
+end
+
+function EventMarker.mount(mapContent: Frame)
+	local m: TextButton = new("TextButton", {
+		Name = "MapEvent",
+		Text = "",
+		AutoButtonColor = false,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(96, 96),
+		BackgroundColor3 = C.ch16,
+		Visible = false,
+		ZIndex = 6,
+		[CHILDREN] = { Components.corner(48), Components.stroke(C.barFill, 6) },
+		Parent = mapContent,
+	})
+	local icon = Components.text({ text = "", size = 40, color = C.inkLight, font = Tokens.font.number })
+	icon.Name = "Icon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.ZIndex = 7
+	icon.Parent = m
+	local timer = Components.chip("🕒", "0:00", C.bronzeHi)
+	timer.Name = "Timer"
+	timer.AnchorPoint = Vector2.new(0, 1)
+	timer.Position = UDim2.fromScale(0.7, 0)
+	timer.ZIndex = 7
+	timer.Parent = m
+	local joined = Components.chip("", "", C.okGreen)
+	joined.Name = "Joined"
+	joined.AnchorPoint = Vector2.new(0.5, 0)
+	joined.Position = UDim2.new(0.5, 0, 1, 4)
+	joined.Visible = false
+	joined.ZIndex = 7
+	joined.Parent = m
+	m.Activated:Connect(function()
+		local ev = current
+		if ev == nil or not ev.open then
+			return
+		end
+		if ev.kind == "merchant" then
+			Nav.open("Merchant", { slot = ev.eventSlot })
+		else
+			Nav.open("EventDepart", { slot = ev.eventSlot })
+		end
+	end)
+	marker = m
+end
+
+local function setChip(chip: Frame, icon: string, text: string, color: Color3?)
+	local labels = {}
+	for _, c in chip:GetChildren() do
+		if c:IsA("TextLabel") then
+			table.insert(labels, c)
+		end
+	end
+	if labels[1] then
+		labels[1].Text = icon
+	end
+	if labels[2] then
+		labels[2].Text = text
+		labels[2].TextColor3 = color or C.inkLight
+	end
+end
+
+-- 毎フレーム近くで呼ぶ（Hub の refreshMoving から）
+function EventMarker.refresh(view: any)
+	local m = marker
+	if m == nil or view == nil then
+		return
+	end
+	local now = Session.now()
+	local st = Game.query.mapEvent(now, master)
+	local cur = st.current
+	local notice = false
+	local ev = nil
+	if cur and cur.open then
+		ev = cur
+	elseif st.next then
+		ev = st.next
+		notice = true
+	end
+	current = if notice then nil else ev
+	if ev == nil then
+		m.Visible = false
+		return
+	end
+	m.Visible = true
+	local p = MapLayout.eventPlace(placeIndex(ev.placeId))
+	m.Position = UDim2.fromOffset(p.x, p.y)
+	local icon = m:FindFirstChild("Icon") :: TextLabel
+	icon.Text = KIND_ICON[ev.kind] or "?"
+	icon.TextTransparency = if notice then 0.4 else 0
+	local stroke = m:FindFirstChildOfClass("UIStroke") :: UIStroke
+	local timer = m:FindFirstChild("Timer") :: Frame
+	local joinedChip = m:FindFirstChild("Joined") :: Frame
+	if notice then
+		stroke.Color = C.ch45
+		stroke.Thickness = 3
+		setChip(timer, "🕒", clock(ev.startsIn or 0))
+		joinedChip.Visible = false
+		return
+	end
+	local left = ev.closesIn or 0
+	local ending = left <= ENDING_SECONDS
+	-- 残りわずかは点滅（0.5秒ごと）
+	local blink = ending and (math.floor(now * 2) % 2 == 0)
+	stroke.Color = if ev.kind == "raid" then C.warnDark else C.barFill
+	stroke.Thickness = 6
+	stroke.Transparency = if blink then 0.7 else 0
+	setChip(timer, "🕒", clock(left), if ending then C.warnDark else nil)
+	-- 出発済み・買った印
+	local tag = nil
+	if ev.kind == "rareDungeon" then
+		local rd = Game.query.rareDungeon(view, ev.eventSlot, master)
+		if #rd.joined > 0 then
+			tag = "♟" .. table.concat(rd.joined, " ")
+		end
+	elseif ev.kind == "raid" then
+		local r = Game.query.raid(view, ev.eventSlot, master)
+		if r and #(r.parties or {}) > 0 then
+			tag = "♟" .. table.concat(r.parties, " ")
+		end
+	elseif ev.kind == "merchant" then
+		-- 品はサーバーで作るので、買った印は要約の merchant（その時間帯の買った品）から見る
+		local sale = view.merchant
+		local n = 0
+		if sale and sale.eventSlot == ev.eventSlot then
+			for _, b in sale.bought or {} do
+				if b then
+					n += 1
+				end
+			end
+		end
+		if n > 0 then
+			tag = "🛍"
+		end
+	end
+	joinedChip.Visible = tag ~= nil
+	if tag then
+		setChip(joinedChip, tag, "✓", C.okGreen)
+	end
+end
+
+return EventMarker

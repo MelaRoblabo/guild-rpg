@@ -20,6 +20,19 @@ function MapLayout.dungeon(index: number): Point
 	return { x = GUILD.x + STEP_X * index, y = ROWS_Y[((index - 1) % #ROWS_Y) + 1] }
 end
 
+-- マップイベントの場所（D-152・D-215 ③）。場所の位置はマップの絵を作るときに決める（MapEvents.places は id だけ）。
+-- それまではギルドの近く、ダンジョンのあいだに置く（ダンジョンの丸と重ならない。仮）
+local EVENT_PLACES: { Point } = {
+	{ x = GUILD.x + STEP_X * 0.5, y = 560 },
+	{ x = GUILD.x + STEP_X * 1.5, y = 380 },
+	{ x = GUILD.x + STEP_X * 2.5, y = 600 },
+	{ x = GUILD.x + STEP_X * 3.5, y = 240 },
+}
+
+function MapLayout.eventPlace(index: number): Point
+	return EVENT_PLACES[((index - 1) % #EVENT_PLACES) + 1]
+end
+
 -- マップ全体の幅（基準の単位）。画面より広くスクロールする（D-212）
 function MapLayout.width(dungeonCount: number): number
 	return GUILD.x + STEP_X * dungeonCount + MARGIN_RIGHT

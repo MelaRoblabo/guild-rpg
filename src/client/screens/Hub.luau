@@ -12,7 +12,9 @@ local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
+local EventMarker = require("../hub/EventMarker")
 local PickMode = require("../hub/PickMode")
+local ReturnToast = require("../hub/ReturnToast")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -146,6 +148,7 @@ local function buildMap(parent: Frame)
 		end
 	end
 	PickMode.changed:connect(showPickMode)
+	EventMarker.mount(mapContent) -- マップイベントの印（M8-6）
 	-- 自分でスクロールしたら追うのをやめる（D-214 ⑧）
 	map.InputBegan:Connect(function(io: InputObject)
 		if io.UserInputType == Enum.UserInputType.Touch or io.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -347,6 +350,9 @@ local function buildEdges(parent: Frame)
 	local quest = roundButton("✔", 66)
 	quest.LayoutOrder = 1
 	quest.Parent = topRight
+	quest.Activated:Connect(function()
+		Nav.open("Quests") -- D-233（M8-6）
+	end)
 	local gear = roundButton("⚙", 66)
 	gear.LayoutOrder = 2
 	gear.Parent = topRight
@@ -489,6 +495,7 @@ local function refreshStatic(view: any)
 end
 
 local function refreshMoving(view: any)
+	EventMarker.refresh(view)
 	if view == nil then
 		return
 	end
@@ -530,6 +537,7 @@ function Hub.mount()
 	buildMap(layer)
 	buildList(layer)
 	buildEdges(layer)
+	ReturnToast.mount() -- 帰還のトースト（11章 §5、M8-6）
 	Session.changed:connect(function(view)
 		refreshStatic(view)
 		refreshMoving(view)
@@ -570,5 +578,8 @@ require("./party/PartyMenu")
 require("./guild/Expand")
 require("./guild/Settings")
 require("./guild/Shop")
+require("./event/Quests")
+require("./event/EventDepart")
+require("./event/Merchant")
 
 return Hub
