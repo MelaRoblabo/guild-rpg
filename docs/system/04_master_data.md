@@ -90,7 +90,7 @@
 | `equipRarityMult` | 1.0 / 1.3 / 1.7 / 2.2 / 3.0 / 4.0（仮。レアリティの数だけ） | Q-020, D-085 |
 | `equipGradeCoef` / `equipTierMult` | 0.10 / 1.30（仮） | Q-020, D-069 |
 | `guildExpPerFloor` / `guildExpClearBonus` / `guildExpFirstClear` | 1 / 5 / 50（仮） | Q-017 |
-| `guildLevelMax` | 20（仮） | Q-017 |
+| `guildLevelMax` | 100（GuildLevels.luau の maxLevel。Q-017 の 20 は D-074 で変更：D-231 ④） | D-074, D-231 |
 | （宝箱の保管上限） | なし（旧 `chestStorageMax` 500 は廃止） | D-084 |
 | `chestBatchOpen` | 100（まとめて開く個数） | D-089 |
 | `chestEffectRate` | 0.10〜0.15（開封演出が入る割合の基準。普通のダンジョンだけ） | D-090, D-166 |
