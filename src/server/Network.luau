@@ -1,6 +1,8 @@
 --!strict
 -- 通信（11章 §4、D-101・D-103）
 --   Command（RemoteFunction）：コマンドを受けて検証 → advance → execute。Sync は全体と連番を返す
+--   Query（RemoteFunction）：読み取り専用の問い合わせ。状態の要約で隠している乱数の元（seed）から作るもの（旅の商人の品：D-152）を
+--     サーバーで計算して返す。状態は変えない
 --   StateChanged（RemoteEvent）：参加時は全体、以後は前回送った要約との差分と連番
 --   定期の時間経過：帰還・自動再派遣が起きたら差分を送る
 --   サーバーの都合で状態を変えたとき（紹介の報酬など：reason = "server"）も差分を送る
@@ -25,6 +27,20 @@ function Network.start(sessions: any)
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	local commandRemote = remotes:WaitForChild("Command") :: RemoteFunction
 	local stateRemote = remotes:WaitForChild("StateChanged") :: RemoteEvent
+	local queryRemote = remotes:WaitForChild("Query") :: RemoteFunction
+
+	-- 読み取り専用の問い合わせ（seed を渡さずに、seed から作るものだけを返す）
+	queryRemote.OnServerInvoke = function(player: Player, q: any): any
+		local session = sessions:get(player)
+		if session == nil or type(q) ~= "table" then
+			return nil
+		end
+		if q.kind == "merchant" and type(q.eventSlot) == "number" then
+			local ok, r = pcall(Game.query.merchant, session.state, q.eventSlot, os.time(), sessions.master)
+			return if ok then r else nil
+		end
+		return nil
+	end
 
 	-- 状態を通知する。load は全体、それ以外は差分（変化も events もなければ送らない）
 	local function push(session: any, reason: string, events: { any })

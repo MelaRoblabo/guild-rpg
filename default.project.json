@@ -8,6 +8,7 @@
       "Remotes": {
         "$className": "Folder",
         "Command": { "$className": "RemoteFunction" },
+        "Query": { "$className": "RemoteFunction" },
         "StateChanged": { "$className": "RemoteEvent" }
       }
     },

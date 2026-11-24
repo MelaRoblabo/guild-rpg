@@ -11,6 +11,7 @@ local Signal = require("./ui/Signal")
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local commandRemote = remotes:WaitForChild("Command") :: RemoteFunction
 local stateRemote = remotes:WaitForChild("StateChanged") :: RemoteEvent
+local queryRemote = remotes:WaitForChild("Query") :: RemoteFunction
 
 local Session = {}
 
@@ -24,6 +25,14 @@ local syncing = false
 
 function Session.now(): number
 	return math.floor(workspace:GetServerTimeNow())
+end
+
+-- 読み取り専用の問い合わせ（旅の商人の品など、seed から作るもの）。通信に失敗したら nil
+function Session.query(q: any): any?
+	local ok, r = pcall(function()
+		return queryRemote:InvokeServer(q)
+	end)
+	return if ok then r else nil
 end
 
 -- コマンドを送る。通信に失敗したら nil
