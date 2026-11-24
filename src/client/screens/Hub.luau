@@ -351,7 +351,16 @@ local function buildEdges(parent: Frame)
 	friend.Parent = parent
 
 	-- 右下：宝箱ボタン（唯一の金：D-225 ②）
-	local chest = Components.button({ kind = "gold", width = 260, icon = "▣", glyph = "A" })
+	local chest = Components.button({
+		kind = "gold",
+		width = 260,
+		icon = "▣",
+		glyph = "A",
+		name = "ChestButton",
+		onClick = function()
+			Nav.open("ChestList") -- S-30（D-164・D-223）
+		end,
+	})
 	chest.AnchorPoint = Vector2.new(1, 1)
 	chest.Position = UDim2.new(1, -40, 1, -24)
 	chest.ZIndex = 20
@@ -503,5 +512,9 @@ require("./hire/HirePostings")
 require("./hire/HireInterview")
 require("./hire/HireReroll")
 require("./hire/HireDone")
+require("./chest/ChestList")
+require("./chest/ChestOpening")
+require("./chest/ChestReveal")
+require("./chest/ChestResults")
 
 return Hub

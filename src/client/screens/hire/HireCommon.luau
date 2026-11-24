@@ -6,6 +6,7 @@
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Root = require("../../ui/Root")
+local Screen = require("../Screen")
 local Tokens = require("../../ui/Tokens")
 local master = require("../../Master")
 
@@ -23,24 +24,10 @@ HireCommon.STATS = {
 	{ key = "hp", label = "HP" },
 }
 
--- 画面いっぱいの場面（仮の絵：ギルドの室内の暖かい暗がり）
-function HireCommon.scene(name: string): Frame
-	return new("Frame", {
-		Name = name,
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		[CHILDREN] = { Components.gradient(C.ch17, C.ch05) },
-	})
-end
-
--- 右上の ×（画面いっぱいの画面は帯のすぐ下の右上：D-222）
-function HireCommon.closeTopRight(parent: Frame, onClick: () -> ())
-	local close = Components.closeButton(onClick)
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -40, 0, Root.bandBottom() + 12)
-	close.Parent = parent
-	return close
-end
+-- 場面・右上の ×・右下の並びは画面共通（../Screen）
+HireCommon.scene = Screen.scene
+HireCommon.closeTopRight = Screen.closeTopRight
+HireCommon.actionRow = Screen.actionRow
 
 -- 伸びやすさの ▲ の数（上位2つだけ：D-046・Guild UI）
 function HireCommon.growthMarks(jobId: string): { [string]: number }
@@ -203,29 +190,6 @@ function HireCommon.quality(key: string, value: number): string?
 		return "good"
 	end
 	return nil
-end
-
--- 右下の並び（右から順に置く）
-function HireCommon.actionRow(parent: Frame): Frame
-	return new("Frame", {
-		Name = "Actions",
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -40, 1, -24),
-		Size = UDim2.fromOffset(0, 85),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundTransparency = 1,
-		ZIndex = 20,
-		[CHILDREN] = {
-			new("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
-				VerticalAlignment = Enum.VerticalAlignment.Bottom,
-				Padding = UDim.new(0, 16),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-		},
-		Parent = parent,
-	})
 end
 
 return HireCommon
