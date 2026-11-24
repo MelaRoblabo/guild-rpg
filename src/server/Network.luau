@@ -39,6 +39,11 @@ function Network.start(sessions: any)
 			local ok, r = pcall(Game.query.merchant, session.state, q.eventSlot, os.time(), sessions.master)
 			return if ok then r else nil
 		end
+		-- レイドのボスの HP も seed から作る（D-152）。出発済みのダメージは要約の raid にある
+		if q.kind == "raid" and type(q.eventSlot) == "number" then
+			local ok, r = pcall(Game.query.raid, session.state, q.eventSlot, sessions.master)
+			return if ok then r else nil
+		end
 		return nil
 	end
 

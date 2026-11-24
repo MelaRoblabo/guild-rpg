@@ -105,6 +105,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local busy = false
 	local alive = true
 	local render: () -> ()
+	-- レイドの HP は seed から作るのでサーバーに問い合わせる（開いたときと出発のあと）。ダメージ・参加は要約の raid から
+	local raidQuery: any = nil
+	local function fetchRaid()
+		raidQuery = Session.query({ kind = "raid", eventSlot = slot })
+	end
 
 	render = function()
 		body:ClearAllChildren()
@@ -123,7 +128,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local raidInfo = nil
 		local target = nil
 		if raid then
-			raidInfo = Game.query.raid(view, slot, master)
+			if raidQuery == nil then
+				fetchRaid()
+			end
+			local live = view.raid
+			if live and live.eventSlot == slot then
+				raidInfo = live
+			else
+				raidInfo = raidQuery
+			end
 			joined = (raidInfo and raidInfo.parties) or {}
 		else
 			target = Game.query.rareDungeon(view, slot, master)
