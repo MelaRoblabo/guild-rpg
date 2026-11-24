@@ -34,6 +34,19 @@ function Session.send(command: any): any?
 	return if ok then r else nil
 end
 
+-- コマンドを送り、成功したら状態の差分が届くまで待つ（届いた状態で次の画面を作るため）。最大 2 秒
+function Session.sendAndWait(command: any): any?
+	local before = Session.seq
+	local r = Session.send(command)
+	if r and r.ok then
+		local deadline = os.clock() + 2
+		while Session.seq == before and os.clock() < deadline do
+			task.wait()
+		end
+	end
+	return r
+end
+
 function Session.resync()
 	if syncing then
 		return

@@ -16,7 +16,7 @@ local Components = {}
 -- 仮のアイコン（文字）。素材ができたら画像に差し替える（D-227 ②）
 Components.icon = {
 	-- Roblox の書体で出る記号だけを使う（↻・↶・✕ などは出ない：M8-1 の Studio で確認）
-	close = "✖",
+	close = "X", -- ✖ は絵文字で描かれ文字色が効かない
 	check = "✓",
 	reroll = "⇄",
 	undo = "⬅",
@@ -28,7 +28,7 @@ Components.icon = {
 	star = "★",
 	up = "▲",
 	down = "▼",
-	bell = "♪",
+	bell = "🔔",
 	search = "⊕",
 	stamp = "◎",
 }
@@ -254,6 +254,8 @@ export type ButtonProps = {
 	icon: string?,
 	label: string?, -- 語は Rebirth・Sell・Reroll・Choose・Cancel・Nice だけ（D-218・D-220・D-224）
 	cost: string?, -- 費用（ボタンの中のコインと数字）
+	costIcon: string?, -- 費用の札のアイコン（既定はコイン。"" で出さない）
+	name: string?, -- インスタンスの名前（確かめ用）
 	glyph: string?, -- ゲームパッドの印
 	onClick: (() -> ())?,
 }
@@ -274,7 +276,7 @@ function Components.button(p: ButtonProps): Frame
 	local radius = math.min(Tokens.radius.radiusBtn, h / 2)
 	local enabled = p.kind ~= "disabled"
 	local holder: Frame = new("Frame", {
-		Name = "Button",
+		Name = p.name or "Button",
 		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(w, h + lip),
 	})
@@ -348,16 +350,23 @@ function Components.button(p: ButtonProps): Frame
 					FillDirection = Enum.FillDirection.Horizontal,
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 					Padding = UDim.new(0, 6),
+					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
-				Components.text({
-					text = Components.icon.coin,
-					size = 21,
-					color = C.coinGold,
-					font = Tokens.font.number,
-				}),
-				Components.text({ text = p.cost, size = 23, color = C.inkLight, font = Tokens.font.number }),
 			},
 		})
+		if p.costIcon ~= "" then
+			local coin = Components.text({
+				text = p.costIcon or Components.icon.coin,
+				size = 21,
+				color = C.coinGold,
+				font = Tokens.font.number,
+			})
+			coin.LayoutOrder = 1
+			coin.Parent = pill
+		end
+		local amount = Components.text({ text = p.cost, size = 23, color = C.inkLight, font = Tokens.font.number })
+		amount.LayoutOrder = 2
+		amount.Parent = pill
 		add(pill)
 	end
 	if enabled then

@@ -400,6 +400,12 @@ local function buildEdges(parent: Frame)
 		local b = roundButton(icon, 66)
 		b.LayoutOrder = i
 		b.Parent = menu
+		if i == 1 then
+			-- ギルド（S-20 は M8-6）。それまでは雇用の受付（S-21a）を直接開く
+			b.Activated:Connect(function()
+				Nav.open("HireDesk")
+			end)
+		end
 	end
 end
 
@@ -492,5 +498,10 @@ end
 -- 画面の登録（パーティの面・ダンジョンの面）
 require("./PartyPanel")
 require("./DungeonPanel")
+require("./hire/HireDesk")
+require("./hire/HirePostings")
+require("./hire/HireInterview")
+require("./hire/HireReroll")
+require("./hire/HireDone")
 
 return Hub
