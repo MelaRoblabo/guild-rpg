@@ -417,6 +417,12 @@ local function buildEdges(parent: Frame)
 				Nav.open("HireDesk")
 			end)
 		end
+		if i == 3 then
+			-- 倉庫（S-50、M8-6）
+			b.Activated:Connect(function()
+				Nav.open("Warehouse")
+			end)
+		end
 		if i == 2 then
 			-- 冒険者（S-40・S-41 は M8-6）。それまでは転生（S-43）を直接開く：途中があれば続き（D-131）、
 			-- なければ上限レベルの冒険者（いなければ一番レベルの高い冒険者。押せない理由の札が出る）
@@ -549,5 +555,7 @@ require("./rebirth/RebirthRitual")
 require("./rebirth/RebirthCharge")
 require("./rebirth/RebirthCompare")
 require("./rebirth/RebirthDone")
+require("./warehouse/Warehouse")
+require("./warehouse/AutoSell")
 
 return Hub
