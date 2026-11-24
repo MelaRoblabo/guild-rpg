@@ -12,7 +12,6 @@ local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
-local RebirthCommon = require("./rebirth/RebirthCommon")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -424,30 +423,9 @@ local function buildEdges(parent: Frame)
 			end)
 		end
 		if i == 2 then
-			-- 冒険者（S-40・S-41 は M8-6）。それまでは転生（S-43）を直接開く：途中があれば続き（D-131）、
-			-- なければ上限レベルの冒険者（いなければ一番レベルの高い冒険者。押せない理由の札が出る）
+			-- 冒険者（S-40、M8-6）
 			b.Activated:Connect(function()
-				local view = Session.view
-				if view == nil then
-					return
-				end
-				local list = {}
-				for _, a in view.adventurers or {} do
-					table.insert(list, a)
-				end
-				table.sort(list, function(x, y)
-					local cx, cy = x.level >= x.levelCap, y.level >= y.levelCap
-					if cx ~= cy then
-						return cx
-					end
-					if x.level ~= y.level then
-						return x.level > y.level
-					end
-					return x.uid < y.uid
-				end)
-				local best = list[1]
-				local id, params = RebirthCommon.entry(view, best and best.uid)
-				Nav.open(id, params)
+				Nav.open("AdvList")
 			end)
 		end
 	end
@@ -557,5 +535,9 @@ require("./rebirth/RebirthCompare")
 require("./rebirth/RebirthDone")
 require("./warehouse/Warehouse")
 require("./warehouse/AutoSell")
+require("./adventurers/AdvList")
+require("./adventurers/AdvDetail")
+require("./adventurers/EquipSelect")
+require("./adventurers/LookChange")
 
 return Hub
