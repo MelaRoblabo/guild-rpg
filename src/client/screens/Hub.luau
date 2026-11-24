@@ -350,6 +350,9 @@ local function buildEdges(parent: Frame)
 	local gear = roundButton("⚙", 66)
 	gear.LayoutOrder = 2
 	gear.Parent = topRight
+	gear.Activated:Connect(function()
+		Nav.open("Settings") -- S-61（M8-6）
+	end)
 	local gold = Components.chip(I.coin, "0")
 	gold.LayoutOrder = 3
 	gold.ZIndex = 20
@@ -359,6 +362,15 @@ local function buildEdges(parent: Frame)
 			goldText = d
 		end
 	end
+	-- ゴールドを触るとショップ（S-60、D-213 ②）
+	-- （札の中に全面のボタンを置くと自動の幅が伸びるので、札そのものの入力で開く）
+	gold.Active = true
+	gold.InputEnded:Connect(function(input: InputObject)
+		local t = input.UserInputType
+		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+			Nav.open("Shop")
+		end
+	end)
 	-- ゴールドの下：フレンドボタン（D-213 ⑯）
 	local friend = roundButton("♟", 66)
 	friend.AnchorPoint = Vector2.new(1, 0)
@@ -555,5 +567,8 @@ require("./adventurers/AdvDetail")
 require("./adventurers/EquipSelect")
 require("./adventurers/LookChange")
 require("./party/PartyMenu")
+require("./guild/Expand")
+require("./guild/Settings")
+require("./guild/Shop")
 
 return Hub
