@@ -20,7 +20,7 @@ local new = Create.new
 local CHILDREN = Create.Children
 
 local KIND_ICON = { rareDungeon = "◈", raid = "⚡", merchant = "🛒" }
-local ENDING_SECONDS = 30 -- 残りわずか（D-213 ⑫。仮。値は M8-FX でマスターデータへ）
+local ENDING_SECONDS = master.K.mapEventEndingSeconds -- 残りわずか（D-213 ⑫・D-238 ③）
 
 local EventMarker = {}
 

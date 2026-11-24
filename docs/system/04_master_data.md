@@ -126,6 +126,10 @@
 | `raidHpMult` / `raidHpSpread` / `raidDamagePerAtk` | 式は 06章 §12 の仮の式のまま。値は M7b-6 で 3 / `{ min = 0.6, max = 1.4 }` / 1（1パーティでときどき・2パーティでたいてい・3パーティでほぼ倒せる。docs/reports/M7b6_balance.md） | D-152, D-179 |
 | `raidTravelSeconds` | レイドへの片道秒（30。M7b-6 で 60 から短くした：オンラインの価値 D-161）。`mapEventWindowSeconds + raidTravelSeconds ≤ mapEventIntervalSeconds` を検証（最後のダメージが次の時間帯より前に入る） | D-152 |
 | `volumeSteps` | 設定の音量の段（0〜10。S-61） | D-237 ③ |
+| `cutInSeconds` | 3（カットインが自動で次へ進むまで） | D-238 ③ |
+| `returnToastSeconds` | 5（帰還のトーストを出しておく時間） | D-238 ③ |
+| `returnToastGroupSeconds` | 0.6（この間に帰ったパーティは1つのトーストにまとめる） | D-238 ③ |
+| `mapEventEndingSeconds` | 30（マップイベントの「残りわずか」） | D-238 ③ |
 | `merchantItemCount` | `{ min = 3, max = 5 }`。品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン） | D-152, D-189 |
 | `merchantDungeonCount` | 2（品を引くダンジョン＝踏破済みのうち深い方からこの数。一番深いダンジョンとその1つ浅いダンジョン。06章 §12）。検証：1以上の整数 | D-202 |
 | `merchantRarityBias` | 12（品のレアリティの重み＝宝箱の表の重み × この値 ^ (rank − 2)。コモンは除く。「誰かの今の装備より良い品」が約15%になるよう自動プレイで合わせた。06章 §12）。検証：1以上 | D-204 |

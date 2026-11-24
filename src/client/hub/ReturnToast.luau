@@ -19,9 +19,9 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
--- 見せる時間とまとめる間（仮。値は M8-FX でマスターデータへ）
-local SHOW_SECONDS = 5
-local GROUP_SECONDS = 0.6
+-- 見せる時間とまとめる間（D-238 ③）
+local SHOW_SECONDS = master.K.returnToastSeconds
+local GROUP_SECONDS = master.K.returnToastGroupSeconds
 
 local ReturnToast = {}
 

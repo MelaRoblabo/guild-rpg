@@ -347,6 +347,10 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	c:number(p .. ".restBonusRate", k.restBonusRate, 0)
 	c:integer(p .. ".restBonusMaxSeconds", k.restBonusMaxSeconds, 0)
 	c:number(p .. ".restBonusExpMult", k.restBonusExpMult, 1)
+	c:number(p .. ".cutInSeconds", k.cutInSeconds, 0) -- D-238 ③
+	c:number(p .. ".returnToastSeconds", k.returnToastSeconds, 0)
+	c:number(p .. ".returnToastGroupSeconds", k.returnToastGroupSeconds, 0)
+	c:number(p .. ".mapEventEndingSeconds", k.mapEventEndingSeconds, 0)
 	c:probability(p .. ".pinchHpRatio", k.pinchHpRatio) -- D-229（見るための印。結果は変えない）
 	c:probability(p .. ".statGoodRatio", k.statGoodRatio) -- D-220・D-224
 	c:probability(p .. ".rebirthGreatRatio", k.rebirthGreatRatio) -- D-224

@@ -1,7 +1,7 @@
 --!strict
 -- カットイン（D-118・D-132：ログイン時は最大1回）。まとめの次に出す。
 --   - 暗幕80%の上に、斜めの暗い木の帯（-7°）と金の光。真ん中に丸い札、右に中身。
---   - ギルドLvアップ：札＝ギルドの旗、右＝「Lv 48 ▲」と上がった分の報酬（チケット ×12 など）。
+--   - ギルドLvアップ：札＝ギルドの印（⌂）、右＝「Lv 48 ▲」と上がった分の報酬（チケット ×12 など）。
 --   - ダンジョンの解放：札＝ダンジョンの番号（ローマ数字）、右＝ダンジョンの名前の旗。
 --   - どこを触っても次へ。触らなくても少しで次へ進む（止まる回数を減らす：D-218 ④）。設定でカットインがオフなら出さない（D-117）。
 
@@ -16,8 +16,10 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local SHOW_SECONDS = 3 -- 自動で次へ進むまで（仮。値は M8-FX でマスターデータへ）
+local SHOW_SECONDS = master.K.cutInSeconds -- 自動で次へ進むまで（D-238 ③）
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
+-- ギルドの印（茶の配色で描ける記号：D-238 ④）。マップのギルドと同じ ⌂。旗の記号（⚑⚐♜⛫）は Roblox の書体で出ない。専用の画像は M8-FX
+local FLAG = Components.icon.home
 local ITEM_ICON = { itm_slot_ticket = Components.icon.ticket }
 
 local function build(params: any?, _api: Nav.Api): Nav.Built
@@ -108,7 +110,7 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 		return p
 	end
 	if cut.kind == "guild" then
-		medalText("🏰", 96, C.bronzeHi, Tokens.font.number)
+		medalText(FLAG, 96, C.bronzeHi, Tokens.font.number)
 		plaque(1, "Lv " .. cut.level .. " " .. Components.icon.up, 40, C.lvOrange, Tokens.font.display).Name = "Level"
 		local ids = {}
 		for id in cut.rewards or {} do

@@ -251,4 +251,9 @@ return {
 	-- ギルドレベルの必要経験値と報酬は src/data/GuildLevels.luau（tools/sim/progression が生成：D-074）
 	-- 設定の音量の段（0〜volumeSteps。S-61、D-237 ③）
 	volumeSteps = 10,
+	-- 画面の演出の秒数（D-238 ③。見るための値で、ゲームの結果は変えない）
+	cutInSeconds = 3, -- カットインが自動で次へ進むまで（D-132）
+	returnToastSeconds = 5, -- 帰還のトーストを出しておく時間（11章 §5）
+	returnToastGroupSeconds = 0.6, -- この間に帰ったパーティは1つのトーストにまとめる（D-128）
+	mapEventEndingSeconds = 30, -- マップイベントの「残りわずか」（輪の点滅・警告の色：D-213 ⑫）
 }
