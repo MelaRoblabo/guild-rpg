@@ -10,20 +10,29 @@ return {
 	{
 		id = "mod_trapward",
 		name = "罠よけの",
+		nameEn = "Trapward",
 		effect = { kind = "flatStat", stat = "dex" },
 		range = { min = 2, max = 6 },
 	},
 	{
 		id = "mod_swift",
 		name = "俊足の",
+		nameEn = "Swift",
 		effect = { kind = "flatStat", stat = "agi" },
 		range = { min = 2, max = 6 },
 	},
 	{
 		id = "mod_exorcism",
 		name = "退魔の",
+		nameEn = "Exorcist",
 		effect = { kind = "atkVsTagPct", tag = "undead" },
 		range = { min = 0.05, max = 0.15 },
 	},
-	{ id = "mod_healing", name = "癒しの", effect = { kind = "healPct" }, range = { min = 0.05, max = 0.15 } },
+	{
+		id = "mod_healing",
+		name = "癒しの",
+		nameEn = "Healing",
+		effect = { kind = "healPct" },
+		range = { min = 0.05, max = 0.15 },
+	},
 }

@@ -70,7 +70,7 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 	name.Position = UDim2.fromOffset(74, 4)
 	name.Parent = head
 	local jobText = Components.text({
-		text = (if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.name else ""),
+		text = (if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.nameEn else ""),
 		size = 21,
 		color = C.inkDark,
 		font = Tokens.font.body,
@@ -122,7 +122,7 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 	for _, g in candidate.giftIds or {} do
 		local gift = master.gifts[g]
 		local t = Components.text({
-			text = "◆ " .. (if gift then gift.name else g),
+			text = "◆ " .. (if gift then gift.nameEn else g),
 			size = 21,
 			color = C.inkDark,
 			font = Tokens.font.bodyStrong,

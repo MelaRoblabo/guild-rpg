@@ -8,6 +8,7 @@ return {
 	{
 		id = "dng_graveyard",
 		name = "古い墓地",
+		nameEn = "Old Graveyard",
 		tier = 1,
 		floors = 7,
 		distance = 1.5,
@@ -34,6 +35,7 @@ return {
 	{
 		id = "dng_ruins",
 		name = "罠の遺跡",
+		nameEn = "Trapped Ruins",
 		tier = 2,
 		floors = 9,
 		distance = 2.1,
@@ -61,6 +63,7 @@ return {
 	{
 		id = "dng_tower",
 		name = "封印の塔",
+		nameEn = "Sealed Tower",
 		tier = 3,
 		floors = 11,
 		distance = 3.3,
@@ -87,6 +90,7 @@ return {
 	{
 		id = "dng_castle",
 		name = "騎士の古城",
+		nameEn = "Knight's Castle",
 		tier = 4,
 		floors = 13,
 		distance = 3.7,
@@ -113,6 +117,7 @@ return {
 	{
 		id = "dng_sunken_temple",
 		name = "水没神殿",
+		nameEn = "Sunken Temple",
 		tier = 5,
 		floors = 13,
 		distance = 4.5,
@@ -139,6 +144,7 @@ return {
 	{
 		id = "dng_mist_forest",
 		name = "霧の大森林",
+		nameEn = "Misty Forest",
 		tier = 6,
 		floors = 15,
 		distance = 5.1,
@@ -165,6 +171,7 @@ return {
 	{
 		id = "dng_labyrinth",
 		name = "地下大迷宮",
+		nameEn = "Underground Labyrinth",
 		tier = 7,
 		floors = 15,
 		distance = 5.8,
@@ -192,6 +199,7 @@ return {
 	{
 		id = "dng_abbey",
 		name = "呪われた修道院",
+		nameEn = "Cursed Abbey",
 		tier = 8,
 		floors = 17,
 		distance = 6.2,
@@ -218,6 +226,7 @@ return {
 	{
 		id = "dng_iron_fortress",
 		name = "鋼鉄の要塞",
+		nameEn = "Iron Fortress",
 		tier = 9,
 		floors = 17,
 		distance = 6.5,
@@ -244,6 +253,7 @@ return {
 	{
 		id = "dng_dragon_nest",
 		name = "竜の巣",
+		nameEn = "Dragon's Nest",
 		tier = 10,
 		floors = 19,
 		distance = 6.9,
@@ -270,6 +280,7 @@ return {
 	{
 		id = "dng_demon_gate",
 		name = "魔界の門",
+		nameEn = "Demon Gate",
 		tier = 11,
 		floors = 19,
 		distance = 10.6,
@@ -296,6 +307,7 @@ return {
 	{
 		id = "dng_sky_throne",
 		name = "天空の玉座",
+		nameEn = "Sky Throne",
 		tier = 12,
 		floors = 21,
 		distance = 11.2,

@@ -67,7 +67,7 @@ export type PileInfo = { pileKey: string, special: boolean, icon: string, name: 
 function ChestCommon.pileInfo(pileKey: string): PileInfo
 	local d = master.dungeons[pileKey]
 	if d then
-		return { pileKey = pileKey, special = false, icon = ChestCommon.icon.chest, name = d.name }
+		return { pileKey = pileKey, special = false, icon = ChestCommon.icon.chest, name = d.nameEn }
 	end
 	local rareOf = string.match(pileKey, "^special:rare:(.+)$")
 	if rareOf then
@@ -76,7 +76,7 @@ function ChestCommon.pileInfo(pileKey: string): PileInfo
 			pileKey = pileKey,
 			special = true,
 			icon = SPECIAL_ICON["special:rare"],
-			name = if rd then rd.name else "",
+			name = if rd then rd.nameEn else "",
 		}
 	end
 	return { pileKey = pileKey, special = true, icon = SPECIAL_ICON[pileKey] or ChestCommon.icon.chest, name = "" }
@@ -98,7 +98,7 @@ end
 function ChestCommon.itemName(item: any): string
 	local base = master.equipmentBases[item.baseId]
 	local mod = if item.modifierId then master.modifiers[item.modifierId] else nil
-	return (if mod then mod.name else "") .. (if base then base.name else item.baseId)
+	return (if mod then mod.nameEn .. " " else "") .. (if base then base.nameEn else item.baseId)
 end
 
 function ChestCommon.isBusy(view: any, advUid: string): boolean

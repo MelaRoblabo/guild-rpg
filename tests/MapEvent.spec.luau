@@ -709,6 +709,7 @@ return function(t)
 				table.insert(d.Gifts, {
 					id = "gift_test_ex_chest",
 					name = "テスト専用・宝箱",
+					nameEn = "Test Gift",
 					exclusive = true,
 					partyEffect = { kind = "chestMult", value = giftValue },
 				})

@@ -1337,6 +1337,63 @@ end
 -- 公開 API ----------------------------------------------------------------
 
 -- data（src/data の束）を検証し、問題の一覧を返す
+-- 英語名（D-231 ⑥・D-233 ①）：画面に出す固有名は英語。日本語の name は文書・デバッグ用に残す。
+-- 冒険者の名前（Names・StarterSet・Uniques の name）は保存される文字なので、英語そのものを name に持つ
+local NAME_EN_TABLES = {
+	"Dungeons",
+	"EquipmentBases",
+	"Expansions",
+	"Gifts",
+	"Items",
+	"Jobs",
+	"Modifiers",
+	"Rarities",
+	"Monsters",
+	"Quests",
+}
+local function validateEnglishNames(c: Checker, d: any)
+	for _, key in NAME_EN_TABLES do
+		local rows = d[key]
+		if type(rows) == "table" then
+			for i, row in rows do
+				local v = type(row) == "table" and row.nameEn
+				if type(v) ~= "string" or v == "" or string.find(v, "[^%w%s%p]") ~= nil then
+					c:error(
+						`{key}[{i}].nameEn`,
+						"英語名（ASCII の空でない文字列）が必要（D-231 ⑥）"
+					)
+				end
+			end
+		end
+	end
+	local function ascii(path: string, v: any)
+		if type(v) ~= "string" or v == "" or string.find(v, "[^%w%s%p]") ~= nil then
+			c:error(path, "冒険者の名前は英語（ASCII の空でない文字列）（D-231 ⑥）")
+		end
+	end
+	if type(d.Names) == "table" then
+		for g, list in d.Names do
+			if type(list) == "table" then
+				for i, v in list do
+					ascii(`Names.{g}[{i}]`, v)
+				end
+			end
+		end
+	end
+	for _, key in { "Uniques" } do
+		if type(d[key]) == "table" then
+			for i, row in d[key] do
+				ascii(`{key}[{i}].name`, type(row) == "table" and row.name)
+			end
+		end
+	end
+	if type(d.StarterSet) == "table" and type(d.StarterSet.adventurers) == "table" then
+		for i, row in d.StarterSet.adventurers do
+			ascii(`StarterSet.adventurers[{i}].name`, type(row) == "table" and row.name)
+		end
+	end
+end
+
 function MasterData.validate(data: any): { Issue }
 	local c = newChecker()
 	if type(data) ~= "table" then
@@ -1353,6 +1410,7 @@ function MasterData.validate(data: any): { Issue }
 	validateSpecialChests(c, data)
 	validateRewardSources(c, data)
 	validateMapEvents(c, data)
+	validateEnglishNames(c, data)
 	return c.issues
 end
 

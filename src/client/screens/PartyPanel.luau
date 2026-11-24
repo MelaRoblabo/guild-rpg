@@ -172,7 +172,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if s.state ~= "waiting" and s.dungeonId then
 			local d = master.dungeons[s.dungeonId]
 			local line = Components.text({
-				text = (if d then d.name else s.dungeonId),
+				text = (if d then d.nameEn else s.dungeonId),
 				size = 23,
 				color = C.inkDark,
 				font = Tokens.font.bodyStrong,

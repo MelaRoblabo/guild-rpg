@@ -30,12 +30,14 @@ local function withExclusive(d: any, opts: any?)
 	table.insert(d.Gifts, {
 		id = "gift_test_ex_chest",
 		name = "テスト専用・宝箱",
+		nameEn = "Test Gift",
 		exclusive = true,
 		partyEffect = { kind = "chestMult", value = o.chest or 2 },
 	})
 	table.insert(d.Gifts, {
 		id = "gift_test_ex_travel",
 		name = "テスト専用・移動",
+		nameEn = "Test Gift",
 		exclusive = true,
 		effect = { kind = "statPct", stat = "agi", value = 0.1 },
 		partyEffect = { kind = "travelMult", value = o.travel or 0.8 },
@@ -142,7 +144,7 @@ return function(t)
 				local m = Fixtures.master(function(d)
 					table.insert(d.Uniques, {
 						id = "uni_test_login",
-						name = "テストのログイン",
+						name = "Test Login",
 						gender = "f",
 						appearanceId = "uni_lyra",
 						jobId = "job_mage",
@@ -393,12 +395,14 @@ return function(t)
 				table.insert(d.Gifts, {
 					id = "gift_test_ex_chest2",
 					name = "テスト専用・宝箱2",
+					nameEn = "Test Gift",
 					exclusive = true,
 					partyEffect = { kind = "chestMult", value = 1.2 },
 				})
 				table.insert(d.Gifts, {
 					id = "gift_test_ex_travel2",
 					name = "テスト専用・移動2",
+					nameEn = "Test Gift",
 					exclusive = true,
 					partyEffect = { kind = "travelMult", value = 0.9 },
 				})

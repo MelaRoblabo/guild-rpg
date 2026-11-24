@@ -33,6 +33,7 @@ return {
 		id = "qst_daily_expeditions",
 		period = "daily",
 		kind = "expeditions",
+		nameEn = "Send expeditions", -- D-233 ①
 		amountPerParty = 10,
 		rewards = DAILY_REWARDS,
 	},
@@ -40,6 +41,7 @@ return {
 		id = "qst_daily_chests",
 		period = "daily",
 		kind = "chestsOpened",
+		nameEn = "Open chests", -- D-233 ①
 		amountPerParty = 10,
 		rewards = DAILY_REWARDS,
 	},
@@ -47,6 +49,7 @@ return {
 		id = "qst_daily_hires",
 		period = "daily",
 		kind = "hires",
+		nameEn = "Hire adventurers", -- D-233 ①
 		amountPerParty = 1,
 		rewards = DAILY_REWARDS,
 	},
@@ -54,6 +57,7 @@ return {
 		id = "qst_daily_trainings",
 		period = "daily",
 		kind = "trainings",
+		nameEn = "Train adventurers", -- D-233 ①
 		amountPerParty = 5,
 		rewards = DAILY_REWARDS,
 	},
@@ -61,6 +65,7 @@ return {
 		id = "qst_daily_clears",
 		period = "daily",
 		kind = "clears",
+		nameEn = "Clear dungeons", -- D-233 ①
 		amountPerParty = 5,
 		rewards = DAILY_REWARDS,
 	},
@@ -69,6 +74,7 @@ return {
 		id = "qst_weekly_expeditions",
 		period = "weekly",
 		kind = "expeditions",
+		nameEn = "Send expeditions", -- D-233 ①
 		amountPerParty = 50,
 		rewards = WEEKLY_REWARDS,
 	},
@@ -76,6 +82,7 @@ return {
 		id = "qst_weekly_chests",
 		period = "weekly",
 		kind = "chestsOpened",
+		nameEn = "Open chests", -- D-233 ①
 		amountPerParty = 50,
 		rewards = WEEKLY_REWARDS,
 	},
@@ -83,6 +90,7 @@ return {
 		id = "qst_weekly_hires",
 		period = "weekly",
 		kind = "hires",
+		nameEn = "Hire adventurers", -- D-233 ①
 		amountPerParty = 3,
 		rewards = WEEKLY_REWARDS,
 	},
@@ -90,6 +98,7 @@ return {
 		id = "qst_weekly_trainings",
 		period = "weekly",
 		kind = "trainings",
+		nameEn = "Train adventurers", -- D-233 ①
 		amountPerParty = 25,
 		rewards = WEEKLY_REWARDS,
 	},
@@ -97,6 +106,7 @@ return {
 		id = "qst_weekly_clears",
 		period = "weekly",
 		kind = "clears",
+		nameEn = "Clear dungeons", -- D-233 ①
 		amountPerParty = 25,
 		rewards = WEEKLY_REWARDS,
 	},
@@ -104,6 +114,7 @@ return {
 		id = "qst_weekly_rebirths",
 		period = "weekly",
 		kind = "rebirths",
+		nameEn = "Rebirth", -- D-233 ①
 		amountPerParty = 1,
 		rewards = WEEKLY_REWARDS,
 	},

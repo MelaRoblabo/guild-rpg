@@ -144,10 +144,10 @@ function HireCommon.statPanel(parent: Frame, candidate: any, roll: any, prev: an
 		l.ZIndex = 9
 		l.Parent = t
 	end
-	tag((if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.name else candidate.jobId))
+	tag((if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.nameEn else candidate.jobId))
 	for _, g in candidate.giftIds or {} do
 		local gift = master.gifts[g]
-		tag(if gift then gift.name else g)
+		tag(if gift then gift.nameEn else g)
 	end
 
 	local range = master.K.hireStatRange

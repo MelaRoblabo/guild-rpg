@@ -9,7 +9,7 @@
 return {
 	{
 		id = "uni_garrett",
-		name = "老兵ガレット",
+		name = "Old Garrett",
 		gender = "m",
 		appearanceId = "uni_garrett",
 		jobId = "job_warrior",
@@ -20,7 +20,7 @@ return {
 	},
 	{
 		id = "uni_lyra",
-		name = "星読みのライラ",
+		name = "Stargazer Lyra",
 		gender = "f",
 		appearanceId = "uni_lyra",
 		jobId = "job_mage",
@@ -31,7 +31,7 @@ return {
 	},
 	{
 		id = "uni_bran",
-		name = "白銀のブラン",
+		name = "Silver Bran",
 		gender = "m",
 		appearanceId = "uni_bran",
 		jobId = "job_knight",

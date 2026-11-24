@@ -17,7 +17,7 @@ return {
 	autoSell = { enabled = true, maxRarity = 2, keepModified = true },
 	adventurers = {
 		{
-			name = "アルド",
+			name = "Aldo",
 			gender = "m",
 			appearanceId = "chr_m_nor_phy_01",
 			jobId = "job_warrior",
@@ -26,7 +26,7 @@ return {
 			equipment = { weapon = "eq_wpn_sword", armor = "eq_arm_chainmail", sub = "eq_sub_buckler" },
 		},
 		{
-			name = "リン",
+			name = "Lin",
 			gender = "f",
 			appearanceId = "chr_f_nor_phy_01",
 			jobId = "job_thief",
@@ -35,7 +35,7 @@ return {
 			equipment = { weapon = "eq_wpn_dagger", armor = "eq_arm_leather", sub = "eq_sub_ring_wind" },
 		},
 		{
-			name = "セオ",
+			name = "Theo",
 			gender = "m",
 			appearanceId = "chr_m_nor_mag_01",
 			jobId = "job_mage",
@@ -44,7 +44,7 @@ return {
 			equipment = { weapon = "eq_wpn_staff", armor = "eq_arm_robe", sub = "eq_sub_ring_wisdom" },
 		},
 		{
-			name = "ミラ",
+			name = "Mira",
 			gender = "f",
 			appearanceId = "chr_f_nor_mag_01",
 			jobId = "job_priest",

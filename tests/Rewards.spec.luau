@@ -65,7 +65,7 @@ return function(t)
 			for i = 1, n do
 				table.insert(d.Uniques, {
 					id = `uni_test_login_{i}`,
-					name = `ログイン{i}`,
+					name = `Login {i}`,
 					gender = "f",
 					appearanceId = `uni_test_login_{i}`,
 					jobId = "job_mage",

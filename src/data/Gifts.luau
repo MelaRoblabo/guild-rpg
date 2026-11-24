@@ -10,21 +10,47 @@
 -- weight: 抽選の重み（雇用・転生時のギフト抽選）
 
 return {
-	{ id = "gift_swift", name = "俊足", weight = 1, effect = { kind = "statPct", stat = "agi", value = 0.25 } },
-	{ id = "gift_lucky", name = "幸運", weight = 1, effect = { kind = "lucky" } },
+	{
+		id = "gift_swift",
+		name = "俊足",
+		nameEn = "Swift",
+		weight = 1,
+		effect = { kind = "statPct", stat = "agi", value = 0.25 },
+	},
+	{ id = "gift_lucky", name = "幸運", nameEn = "Lucky", weight = 1, effect = { kind = "lucky" } },
 	{
 		id = "gift_exorcist",
 		name = "退魔の才",
+		nameEn = "Exorcist",
 		weight = 1,
 		effect = { kind = "atkVsTagPct", tag = "undead", value = 0.30 },
 	},
-	{ id = "gift_sturdy", name = "頑健", weight = 1, effect = { kind = "statPct", stat = "hp", value = 0.25 } },
+	{
+		id = "gift_sturdy",
+		name = "頑健",
+		nameEn = "Sturdy",
+		weight = 1,
+		effect = { kind = "statPct", stat = "hp", value = 0.25 },
+	},
 	{
 		id = "gift_guide",
 		name = "道案内",
+		nameEn = "Pathfinder",
 		weight = 1,
 		effect = { kind = "travelMult", terrainTag = "outdoor", value = 0.7 },
 	},
-	{ id = "gift_trapsense", name = "罠師の勘", weight = 1, effect = { kind = "trapDexMult", value = 3 } },
-	{ id = "gift_glutton", name = "大食らい", weight = 1, effect = { kind = "expPct", value = 0.25 } },
+	{
+		id = "gift_trapsense",
+		name = "罠師の勘",
+		nameEn = "Trap Sense",
+		weight = 1,
+		effect = { kind = "trapDexMult", value = 3 },
+	},
+	{
+		id = "gift_glutton",
+		name = "大食らい",
+		nameEn = "Glutton",
+		weight = 1,
+		effect = { kind = "expPct", value = 0.25 },
+	},
 }

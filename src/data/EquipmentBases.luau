@@ -13,6 +13,7 @@ return {
 	{
 		id = "eq_wpn_sword",
 		name = "ロングソード",
+		nameEn = "Longsword",
 		slot = "weapon",
 		kind = "sword",
 		minRarity = 1,
@@ -22,6 +23,7 @@ return {
 	{
 		id = "eq_wpn_dagger",
 		name = "ダガー",
+		nameEn = "Dagger",
 		slot = "weapon",
 		kind = "dagger",
 		minRarity = 1,
@@ -31,17 +33,28 @@ return {
 	{
 		id = "eq_wpn_staff",
 		name = "オークの杖",
+		nameEn = "Oak Staff",
 		slot = "weapon",
 		kind = "staff",
 		minRarity = 1,
 		sellPrice = 20,
 		atk = 6,
 	},
-	{ id = "eq_wpn_mace", name = "メイス", slot = "weapon", kind = "mace", minRarity = 1, sellPrice = 18, atk = 5 },
+	{
+		id = "eq_wpn_mace",
+		name = "メイス",
+		nameEn = "Mace",
+		slot = "weapon",
+		kind = "mace",
+		minRarity = 1,
+		sellPrice = 18,
+		atk = 5,
+	},
 	-- 防具
 	{
 		id = "eq_arm_chainmail",
 		name = "チェインメイル",
+		nameEn = "Chainmail",
 		slot = "armor",
 		kind = "heavy_armor",
 		minRarity = 1,
@@ -52,6 +65,7 @@ return {
 	{
 		id = "eq_arm_leather",
 		name = "レザーアーマー",
+		nameEn = "Leather Armor",
 		slot = "armor",
 		kind = "light_armor",
 		minRarity = 1,
@@ -62,6 +76,7 @@ return {
 	{
 		id = "eq_arm_robe",
 		name = "ローブ",
+		nameEn = "Robe",
 		slot = "armor",
 		kind = "robe",
 		minRarity = 1,
@@ -72,6 +87,7 @@ return {
 	{
 		id = "eq_arm_vestment",
 		name = "法衣",
+		nameEn = "Vestment",
 		slot = "armor",
 		kind = "vestment",
 		minRarity = 1,
@@ -83,6 +99,7 @@ return {
 	{
 		id = "eq_sub_buckler",
 		name = "バックラー",
+		nameEn = "Buckler",
 		slot = "sub",
 		kind = "shield",
 		minRarity = 1,
@@ -92,6 +109,7 @@ return {
 	{
 		id = "eq_sub_ring_power",
 		name = "力の指輪",
+		nameEn = "Ring of Power",
 		slot = "sub",
 		kind = "accessory",
 		minRarity = 1,
@@ -101,6 +119,7 @@ return {
 	{
 		id = "eq_sub_ring_wisdom",
 		name = "知恵の指輪",
+		nameEn = "Ring of Wisdom",
 		slot = "sub",
 		kind = "accessory",
 		minRarity = 1,
@@ -110,6 +129,7 @@ return {
 	{
 		id = "eq_sub_ring_wind",
 		name = "風の指輪",
+		nameEn = "Ring of Wind",
 		slot = "sub",
 		kind = "accessory",
 		minRarity = 1,
@@ -119,6 +139,7 @@ return {
 	{
 		id = "eq_sub_amulet_learning",
 		name = "修練の護符",
+		nameEn = "Amulet of Learning",
 		slot = "sub",
 		kind = "accessory",
 		minRarity = 1,

@@ -6,10 +6,10 @@
 -- リリース時はミシック（6）が最上位。
 
 return {
-	{ id = "rar_common", rank = 1, name = "コモン" },
-	{ id = "rar_uncommon", rank = 2, name = "アンコモン" },
-	{ id = "rar_rare", rank = 3, name = "レア" },
-	{ id = "rar_epic", rank = 4, name = "エピック" },
-	{ id = "rar_legend", rank = 5, name = "レジェンド" },
-	{ id = "rar_mythic", rank = 6, name = "ミシック" },
+	{ id = "rar_common", rank = 1, name = "コモン", nameEn = "Common" },
+	{ id = "rar_uncommon", rank = 2, name = "アンコモン", nameEn = "Uncommon" },
+	{ id = "rar_rare", rank = 3, name = "レア", nameEn = "Rare" },
+	{ id = "rar_epic", rank = 4, name = "エピック", nameEn = "Epic" },
+	{ id = "rar_legend", rank = 5, name = "レジェンド", nameEn = "Legendary" },
+	{ id = "rar_mythic", rank = 6, name = "ミシック", nameEn = "Mythic" },
 }

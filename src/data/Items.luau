@@ -4,22 +4,31 @@
 -- 探索ログの報酬（アイテムイベント）が参照するため M1 で最小セットを用意する
 
 return {
-	{ id = "itm_slot_ticket", name = "ステータススロットチケット", kind = "ticket", sellPrice = 0 },
+	{
+		id = "itm_slot_ticket",
+		name = "ステータススロットチケット",
+		nameEn = "Stat Slot Ticket",
+		kind = "ticket",
+		sellPrice = 0,
+	},
 	{
 		id = "itm_potion_appearance_change",
 		name = "見た目変更ポーション",
+		nameEn = "Look Change Potion",
 		kind = "potion_appearance_change",
 		sellPrice = 0,
 	},
 	{
 		id = "itm_potion_appearance_keep",
 		name = "見た目維持ポーション",
+		nameEn = "Look Keep Potion",
 		kind = "potion_appearance_keep",
 		sellPrice = 0,
 	},
 	{
 		id = "itm_potion_job_warrior",
 		name = "転職ポーション（戦士）",
+		nameEn = "Job Potion (Warrior)",
 		kind = "potion_job",
 		jobId = "job_warrior",
 		sellPrice = 0,
@@ -27,6 +36,7 @@ return {
 	{
 		id = "itm_potion_job_thief",
 		name = "転職ポーション（盗賊）",
+		nameEn = "Job Potion (Thief)",
 		kind = "potion_job",
 		jobId = "job_thief",
 		sellPrice = 0,
@@ -34,6 +44,7 @@ return {
 	{
 		id = "itm_potion_job_mage",
 		name = "転職ポーション（魔法使い）",
+		nameEn = "Job Potion (Mage)",
 		kind = "potion_job",
 		jobId = "job_mage",
 		sellPrice = 0,
@@ -41,6 +52,7 @@ return {
 	{
 		id = "itm_potion_job_priest",
 		name = "転職ポーション（僧侶）",
+		nameEn = "Job Potion (Priest)",
 		kind = "potion_job",
 		jobId = "job_priest",
 		sellPrice = 0,
@@ -48,6 +60,7 @@ return {
 	{
 		id = "itm_potion_job_knight",
 		name = "転職ポーション（ナイト）",
+		nameEn = "Job Potion (Knight)",
 		kind = "potion_job",
 		jobId = "job_knight",
 		sellPrice = 0,
@@ -55,6 +68,7 @@ return {
 	{
 		id = "itm_potion_job_ninja",
 		name = "転職ポーション（忍者）",
+		nameEn = "Job Potion (Ninja)",
 		kind = "potion_job",
 		jobId = "job_ninja",
 		sellPrice = 0,
@@ -62,6 +76,7 @@ return {
 	{
 		id = "itm_potion_job_sage",
 		name = "転職ポーション（賢者）",
+		nameEn = "Job Potion (Sage)",
 		kind = "potion_job",
 		jobId = "job_sage",
 		sellPrice = 0,
@@ -69,21 +84,34 @@ return {
 	{
 		id = "itm_potion_job_bishop",
 		name = "転職ポーション（司祭）",
+		nameEn = "Job Potion (Bishop)",
 		kind = "potion_job",
 		jobId = "job_bishop",
 		sellPrice = 0,
 	},
 	-- 売却用（仮）
-	{ id = "itm_bone_fragment", name = "古びた骨片", kind = "sellable", sellPrice = 12 },
-	{ id = "itm_old_gear", name = "古代の歯車", kind = "sellable", sellPrice = 18 },
-	{ id = "itm_magic_shard", name = "魔力の欠片", kind = "sellable", sellPrice = 24 },
-	{ id = "itm_knight_crest", name = "騎士の紋章", kind = "sellable", sellPrice = 32 },
-	{ id = "itm_tide_pearl", name = "潮の真珠", kind = "sellable", sellPrice = 50 },
-	{ id = "itm_amber_sap", name = "琥珀の樹液", kind = "sellable", sellPrice = 70 },
-	{ id = "itm_labyrinth_coin", name = "迷宮金貨", kind = "sellable", sellPrice = 100 },
-	{ id = "itm_holy_relic", name = "聖遺物の欠片", kind = "sellable", sellPrice = 140 },
-	{ id = "itm_steel_cog", name = "鋼鉄の歯車", kind = "sellable", sellPrice = 200 },
-	{ id = "itm_dragon_scale", name = "竜の鱗", kind = "sellable", sellPrice = 290 },
-	{ id = "itm_demon_horn", name = "魔族の角", kind = "sellable", sellPrice = 420 },
-	{ id = "itm_sky_feather", name = "天空の羽根", kind = "sellable", sellPrice = 600 },
+	{
+		id = "itm_bone_fragment",
+		name = "古びた骨片",
+		nameEn = "Old Bone Fragment",
+		kind = "sellable",
+		sellPrice = 12,
+	},
+	{ id = "itm_old_gear", name = "古代の歯車", nameEn = "Ancient Gear", kind = "sellable", sellPrice = 18 },
+	{ id = "itm_magic_shard", name = "魔力の欠片", nameEn = "Mana Shard", kind = "sellable", sellPrice = 24 },
+	{ id = "itm_knight_crest", name = "騎士の紋章", nameEn = "Knight's Crest", kind = "sellable", sellPrice = 32 },
+	{ id = "itm_tide_pearl", name = "潮の真珠", nameEn = "Tide Pearl", kind = "sellable", sellPrice = 50 },
+	{ id = "itm_amber_sap", name = "琥珀の樹液", nameEn = "Amber Sap", kind = "sellable", sellPrice = 70 },
+	{ id = "itm_labyrinth_coin", name = "迷宮金貨", nameEn = "Labyrinth Coin", kind = "sellable", sellPrice = 100 },
+	{
+		id = "itm_holy_relic",
+		name = "聖遺物の欠片",
+		nameEn = "Holy Relic Shard",
+		kind = "sellable",
+		sellPrice = 140,
+	},
+	{ id = "itm_steel_cog", name = "鋼鉄の歯車", nameEn = "Steel Cog", kind = "sellable", sellPrice = 200 },
+	{ id = "itm_dragon_scale", name = "竜の鱗", nameEn = "Dragon Scale", kind = "sellable", sellPrice = 290 },
+	{ id = "itm_demon_horn", name = "魔族の角", nameEn = "Demon Horn", kind = "sellable", sellPrice = 420 },
+	{ id = "itm_sky_feather", name = "天空の羽根", nameEn = "Sky Feather", kind = "sellable", sellPrice = 600 },
 }

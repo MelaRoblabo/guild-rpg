@@ -7,6 +7,9 @@
 - `src/data/<Name>.luau` が Luau のテーブルを `return` する。RobloxでもLuneでもそのまま読める。
 - 1ファイル1種類。行は配列、各行は一意の `id`（snake_case、接頭辞付き）を持つ。
 - 公開後は `id` を変えない（セーブデータが参照するため）。
+- 画面に出す名前は英語（D-231 ⑥・D-233 ①）。`Dungeons`・`EquipmentBases`・`Expansions`・`Gifts`・`Items`・`Jobs`・`Modifiers`・`Rarities`・`Monsters`・`Quests` の各行に `nameEn`（英語名）を持つ。日本語の `name` は文書・デバッグ用に残す（`Quests` は `name` なし）。修飾語の `nameEn` は品の名前の頭に付ける語（例：Trapward Mace）。
+- 冒険者の名前は保存される文字なので、`Names`・`StarterSet` の `name`・`Uniques` の `name` は英語そのものを持つ（日本語は持たない）。
+- 他の5言語（日本語を含む）は M9 の前に足す（D-231 ⑥）。
 
 | ファイル | 内容 | 接頭辞 |
 | --- | --- | --- |
@@ -42,6 +45,7 @@
 - 演出率（D-090）の 10〜15% の検査は普通のダンジョンの `chestRarityWeights` だけ。特別な宝箱は `SpecialChests` の行ごとの基準で検査する（D-166）。レアダンジョンの山は、相当するダンジョンの表をレアダンジョン用の基準（20〜30%）で検査する（D-171）。12ダンジョンすべてが `chestEffectMinRarity`（10〜15%）と `rareChestEffectMinRarity`（20〜30%）の両方を持ち、両方の範囲に収まることを検査する（D-188）。
 - 専用ギフト（`exclusive = true`）は、持ち主のユニークが1人だけ参照している（D-165）。ログインボーナス用のユニーク（`acquire = "login"`）は今週の訪問者の候補に入らない（D-155, D-158）。
 - 必須項目が揃っている。数値の範囲（確率は 0〜1、レアリティは 1〜5 など）。
+- 英語名（D-231 ⑥）：上の表の行に `nameEn` があり、冒険者の名前とあわせて ASCII の空でない文字列である。
 - 見た目は 16 カテゴリ × 15 種が揃っている（コンテンツが揃うまでは警告に留めるフラグを持つ）。
 
 ## 3. 定数（Constants.luau）の初期値
@@ -207,7 +211,7 @@
 
 ## 9. クエストのお題（Quests.luau、D-153）
 
-各行：`id, period（daily / weekly）, kind, amountPerParty, rewards`。
+各行：`id, period（daily / weekly）, kind, nameEn（画面に出す短い英語。D-233 ①）, amountPerParty, rewards`。
 
 **報酬の形（rewards）**：クエスト・ログインボーナス・プレイ時間・全部達成のボーナスで共通。受け取り箱に入る（D-164）。
 

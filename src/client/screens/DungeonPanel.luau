@@ -51,7 +51,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local panel, content = Components.panel({
 		size = UDim2.fromOffset(PANEL_W, PANEL_H),
 		position = UDim2.fromOffset(x, band + 80),
-		title = if d then d.name else dungeonId,
+		title = if d then d.nameEn else dungeonId,
 	})
 	panel.Parent = frame
 	local close = Components.closeButton(api.close)

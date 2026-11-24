@@ -93,7 +93,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			chip.ZIndex = 12
 			chip.Parent = frame
 			if gift then
-				chip:SetAttribute("GiftName", gift.name)
+				chip:SetAttribute("GiftName", gift.nameEn)
 			end
 		end
 		local train = Components.button({

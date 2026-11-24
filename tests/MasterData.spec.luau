@@ -72,7 +72,7 @@ return function(t)
 		end)
 		it("D-085 レアリティを増やしたら倍率の表も伸ばす必要がある", function()
 			local d = clone(Data)
-			table.insert(d.Rarities, { id = "rar_test", rank = #d.Rarities + 1, name = "テスト" })
+			table.insert(d.Rarities, { id = "rar_test", rank = #d.Rarities + 1, name = "テスト", nameEn = "Test" })
 			expect(#errorsOf(d) > 0).toBeTruthy()
 			table.insert(d.Constants.equipRarityMult, 5)
 			table.insert(d.Constants.sellRarityMult, 20)
@@ -98,6 +98,18 @@ return function(t)
 			expect(function()
 				MasterData.load(d)
 			end).toThrow("hireStatRange.str")
+		end)
+		it("D-231 ⑥ 英語名が欠けている・日本語のままだと失敗", function()
+			local d = clone(Data)
+			d.Jobs[1].nameEn = nil
+			d.Names.m[1] = "アルド"
+			local errs = errorsOf(d)
+			local paths = {}
+			for _, e in errs do
+				paths[e.path] = true
+			end
+			expect(paths["Jobs[1].nameEn"]).toBe(true)
+			expect(paths["Names.m[1]"]).toBe(true)
 		end)
 		it("必須の定数が欠けると失敗", function()
 			local d = clone(Data)

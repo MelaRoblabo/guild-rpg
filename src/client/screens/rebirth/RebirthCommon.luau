@@ -258,7 +258,7 @@ function RebirthCommon.statPanel(
 	})
 	local tags = Components.chip(
 		if job and job.attackType == "magic" then "◈" else "⚔",
-		(if job then job.name else adv.jobId)
+		(if job then job.nameEn else adv.jobId)
 			.. "   "
 			.. RebirthCommon.icon.rebirth
 			.. " "

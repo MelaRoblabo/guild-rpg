@@ -9,6 +9,7 @@ return {
 	{
 		id = "job_warrior",
 		name = "戦士",
+		nameEn = "Warrior",
 		line = "warrior",
 		attackType = "physical",
 		isRare = false,
@@ -21,6 +22,7 @@ return {
 	{
 		id = "job_thief",
 		name = "盗賊",
+		nameEn = "Thief",
 		line = "scout",
 		attackType = "physical",
 		isRare = false,
@@ -33,6 +35,7 @@ return {
 	{
 		id = "job_mage",
 		name = "魔法使い",
+		nameEn = "Mage",
 		line = "mage",
 		attackType = "magic",
 		isRare = false,
@@ -45,6 +48,7 @@ return {
 	{
 		id = "job_priest",
 		name = "僧侶",
+		nameEn = "Priest",
 		line = "support",
 		attackType = "magic",
 		isRare = false,
@@ -57,6 +61,7 @@ return {
 	{
 		id = "job_knight",
 		name = "ナイト",
+		nameEn = "Knight",
 		line = "warrior",
 		attackType = "physical",
 		isRare = true,
@@ -69,6 +74,7 @@ return {
 	{
 		id = "job_ninja",
 		name = "忍者",
+		nameEn = "Ninja",
 		line = "scout",
 		attackType = "physical",
 		isRare = true,
@@ -81,6 +87,7 @@ return {
 	{
 		id = "job_sage",
 		name = "賢者",
+		nameEn = "Sage",
 		line = "mage",
 		attackType = "magic",
 		isRare = true,
@@ -93,6 +100,7 @@ return {
 	{
 		id = "job_bishop",
 		name = "司祭",
+		nameEn = "Bishop",
 		line = "support",
 		attackType = "magic",
 		isRare = true,

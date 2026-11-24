@@ -9,6 +9,7 @@ return {
 	{
 		id = "exp_party",
 		name = "パーティ枠",
+		nameEn = "Party Slot",
 		kind = "partySlots",
 		steps = {
 			{ value = 2, guildLevel = 1, gold = 3000, requiresClear = "dng_ruins" },
@@ -20,6 +21,7 @@ return {
 	{
 		id = "exp_candidate",
 		name = "雇用候補枠",
+		nameEn = "Candidate Slot",
 		kind = "candidateSlots",
 		steps = {
 			{ value = 4, guildLevel = 10, gold = 10000 },
@@ -30,6 +32,7 @@ return {
 	{
 		id = "exp_roster",
 		name = "所属枠",
+		nameEn = "Roster Slot",
 		kind = "rosterSize",
 		steps = {
 			{ value = 12, guildLevel = 3, gold = 2000 },
@@ -45,6 +48,7 @@ return {
 	{
 		id = "exp_warehouse",
 		name = "倉庫",
+		nameEn = "Warehouse",
 		kind = "warehouseSize",
 		steps = {
 			{ value = 400, guildLevel = 5, gold = 10000 }, -- D-091：解錠技術の廃止分を上乗せ
@@ -59,6 +63,7 @@ return {
 	{
 		id = "exp_training",
 		name = "トレーニング場",
+		nameEn = "Training Grounds",
 		kind = "trainingLevel",
 		steps = {
 			-- D-091：解錠技術（D-088、廃止）の費用を上乗せ
