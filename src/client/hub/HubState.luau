@@ -1,0 +1,58 @@
+--!strict
+-- メイン画面とその上の面（パーティの面・ダンジョンの面）が共有する状態と計算。
+
+local Expedition = require("@game/ReplicatedStorage/Core/Expedition")
+local Game = require("@game/ReplicatedStorage/Core/Game")
+local PartyStatus = require("./PartyStatus")
+local Session = require("../Session")
+local master = require("../Master")
+
+local HubState = {}
+
+-- 選んでいるパーティ（カメラが追う：D-212）
+HubState.selected = nil :: number?
+HubState.following = false
+-- パーティごとの最後の行き先（「同じ所へ再出発」の行き先。状態に残らないので、見えた探索から覚える）
+HubState.lastDungeon = {} :: { [number]: string }
+
+function HubState.dungeonIndex(id: string?): number?
+	if id == nil then
+		return nil
+	end
+	for i, d in master.dungeonList do
+		if d.id == id then
+			return i
+		end
+	end
+	return nil
+end
+
+-- そのパーティの状態（今何をしているか・ピンチ：D-212）
+function HubState.status(view: any, partyIndex: number): PartyStatus.Status
+	local e = Game.query.expeditionOf(view, partyIndex)
+	local maxHp = {}
+	local ok, snaps = pcall(Game.query.partySnapshots, view, partyIndex, master)
+	if ok and type(snaps) == "table" then
+		for i, s in snaps do
+			maxHp[i] = s.maxHp or 0
+		end
+	end
+	return PartyStatus.compute(e, Session.now(), Expedition.progressAt, maxHp, master.K.pinchHpRatio)
+end
+
+-- 3桁ごとのカンマ
+function HubState.formatNumber(n: number): string
+	local s = tostring(math.floor(n))
+	local sign = ""
+	if string.sub(s, 1, 1) == "-" then
+		sign, s = "-", string.sub(s, 2)
+	end
+	local out = ""
+	while #s > 3 do
+		out = "," .. string.sub(s, -3) .. out
+		s = string.sub(s, 1, -4)
+	end
+	return sign .. s .. out
+end
+
+return HubState

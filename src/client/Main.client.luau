@@ -1,10 +1,13 @@
 --!strict
--- クライアントの入口：デバッグ用の簡易画面（11章 §5、M7）。見た目は作らない（UI は M8）。
--- 状態の一覧・テキスト版と同じ書式の入力欄・結果のログ。
+-- クライアントの入口（11章 §5、D-227）。
+--   - M8 の画面：メイン画面（Hub）を土台に置き、ほかの画面は Nav で重ねる。
+--   - デバッグ画面（M7）：状態の一覧・テキスト版と同じ書式の入力欄・結果のログ。F1 で表示を切り替える（最初は隠す）。
+--   - F2：部品の見本（Gallery）を開く／閉じる。
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 -- 本番で複製が遅れても失敗しないように、読み込みを待ってから require する（11章 §1）
 if not game:IsLoaded() then
@@ -12,26 +15,23 @@ if not game:IsLoaded() then
 end
 ReplicatedStorage:WaitForChild("Core")
 ReplicatedStorage:WaitForChild("Data")
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
-local commandRemote = remotes:WaitForChild("Command") :: RemoteFunction
-local stateRemote = remotes:WaitForChild("StateChanged") :: RemoteEvent
+ReplicatedStorage:WaitForChild("Remotes")
 
 local CommandText = require("@game/ReplicatedStorage/Core/CommandText")
-local Data = require("@game/ReplicatedStorage/Data")
 local Game = require("@game/ReplicatedStorage/Core/Game")
-local MasterData = require("@game/ReplicatedStorage/Core/MasterData")
-local Protocol = require("@game/ReplicatedStorage/Core/Protocol")
 local DebugView = require("./DebugView")
+local master = require("./Master")
 local NotificationPrompt = require("./NotificationPrompt")
+local Session = require("./Session")
 
-local master = MasterData.load(Data)
-
--- 画面 ----------------------------------------------------------------------
+-- デバッグ画面 ----------------------------------------------------------------
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DebugScreen"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.DisplayOrder = 50
+gui.Enabled = false
 
 local function textBox(name: string, parent: Instance, pos: UDim2, size: UDim2): TextLabel
 	local frame = Instance.new("ScrollingFrame")
@@ -81,30 +81,6 @@ input.Parent = gui
 
 gui.Parent = (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 
--- M8 の画面（D-227）。M8-1 は部品の見本だけ。F1 でデバッグ画面の表示を切り替え、F2 で部品の見本を開く
-local UserInputService = game:GetService("UserInputService")
-local Nav = require("./ui/Nav")
-local Root = require("./ui/Root")
-require("./screens/Gallery")
-Root.mount()
-
-UserInputService.InputBegan:Connect(function(io: InputObject, processed: boolean)
-	if processed then
-		return
-	end
-	if io.KeyCode == Enum.KeyCode.F1 then
-		gui.Enabled = not gui.Enabled
-	elseif io.KeyCode == Enum.KeyCode.F2 then
-		if Nav.depth() == 0 then
-			Nav.open("Gallery")
-		else
-			Nav.home()
-		end
-	end
-end)
-
--- ログ ----------------------------------------------------------------------
-
 local logLines: { string } = {}
 local MAX_LOG = 200
 
@@ -128,24 +104,6 @@ local function logEvents(events: { any }?)
 	end
 end
 
--- 状態（D-103：起動時に全体、以後は差分） --------------------------------------
-
-local view: any = nil
-local seq = 0
-local syncing = false
-
-local function now(): number
-	return math.floor(workspace:GetServerTimeNow())
-end
-
--- 通知の許可の画面を出した記録を送る（D-196。NotificationPrompt.onView から呼ぶ）
-local function sendCommand(command: any): any?
-	local ok, r = pcall(function()
-		return commandRemote:InvokeServer(command)
-	end)
-	return if ok then r else nil
-end
-
 local function onPromptResult(stage: string, shown: boolean)
 	log(
 		`通知の許可の画面（{stage}）：{if shown
@@ -154,59 +112,23 @@ local function onPromptResult(stage: string, shown: boolean)
 	)
 end
 
-local function render()
+local function renderDebug()
+	local view = Session.view
 	if view then
-		stateLabel.Text = DebugView.render(view, master, now())
+		stateLabel.Text = DebugView.render(view, master, Session.now())
 		-- 初めての帰還・ログインボーナス2日目に通知の許可の画面を出す（D-196 ③）
-		NotificationPrompt.onView(view, sendCommand, onPromptResult)
+		NotificationPrompt.onView(view, Session.send, onPromptResult)
 	else
 		stateLabel.Text = "読み込み中…"
 	end
 end
 
-local function resync()
-	if syncing then
-		return
-	end
-	syncing = true
-	while true do
-		local ok, r = pcall(function()
-			return commandRemote:InvokeServer({ type = "Sync" })
-		end)
-		if ok and r and r.ok and r.view then
-			view, seq = r.view, r.seq
-			break
-		end
-		task.wait(0.5)
-	end
-	syncing = false
-	render()
-end
-
-stateRemote.OnClientEvent:Connect(function(msg: any)
-	if #(msg.events or {}) > 0 then
-		log(`[{msg.reason}]`)
-		logEvents(msg.events)
-	end
-	if syncing then
-		return -- 取り直しの結果に含まれる
-	end
-	if msg.reason == "load" then
-		view, seq = msg.view, msg.seq
-	elseif view == nil or msg.seq <= seq then
-		return
-	elseif msg.baseSeq ~= seq then
-		log("（通知の取りこぼし。全体を取り直します）")
-		task.spawn(resync)
-		return
-	else
-		Protocol.applyPatch(view, msg.patch)
-		seq = msg.seq
-	end
-	render()
+Session.changed:connect(renderDebug)
+Session.events:connect(function(reason, events)
+	log(`[{reason}]`)
+	logEvents(events)
 end)
-
--- 入力 ----------------------------------------------------------------------
+Session.notice:connect(log)
 
 local HELP = "使えるコマンド\n  help / sync（全体を取り直す）\n"
 	.. "  notify                     通知の許可の画面を出す（D-181。設定画面に置くものの仮）\n"
@@ -222,7 +144,7 @@ local function submit(line: string)
 		log(HELP)
 		return
 	elseif line == "sync" then
-		task.spawn(resync)
+		task.spawn(Session.resync)
 		return
 	elseif line == "notify" then
 		local shown = NotificationPrompt.prompt(function()
@@ -242,13 +164,11 @@ local function submit(line: string)
 	end
 	-- eventgo・buy で時間帯を省いたら、今の時間帯で埋める（テキスト版と同じ：D-152）
 	if (command.type == "DispatchEvent" or command.type == "BuyFromMerchant") and command.eventSlot == nil then
-		command.eventSlot = Game.query.mapEvent(now(), master).current.eventSlot
+		command.eventSlot = Game.query.mapEvent(Session.now(), master).current.eventSlot
 	end
-	local ok, r = pcall(function()
-		return commandRemote:InvokeServer(command)
-	end)
-	if not ok then
-		log("NG 通信エラー: " .. tostring(r))
+	local r = Session.send(command)
+	if r == nil then
+		log("NG 通信エラー")
 	elseif r.ok then
 		log("OK")
 	else
@@ -268,13 +188,40 @@ input.FocusLost:Connect(function(enterPressed: boolean)
 	end
 end)
 
-render()
-task.spawn(resync)
+-- M8 の画面 --------------------------------------------------------------------
+
+local Nav = require("./ui/Nav")
+local Root = require("./ui/Root")
+require("./screens/Gallery")
+local Hub = require("./screens/Hub")
+
+Root.mount()
+Hub.mount()
+
+UserInputService.InputBegan:Connect(function(io: InputObject, processed: boolean)
+	if processed then
+		return
+	end
+	if io.KeyCode == Enum.KeyCode.F1 then
+		gui.Enabled = not gui.Enabled
+	elseif io.KeyCode == Enum.KeyCode.F2 then
+		if Nav.depth() == 0 then
+			Nav.open("Gallery")
+		else
+			Nav.home()
+		end
+	end
+end)
+
+renderDebug()
+task.spawn(Session.resync)
 
 -- 探索の進み具合（残り秒数など）を更新する
 task.spawn(function()
 	while true do
 		task.wait(1)
-		render()
+		if gui.Enabled then
+			renderDebug()
+		end
 	end
 end)
