@@ -157,8 +157,9 @@ function EventMarker.refresh(view: any)
 			tag = "♟" .. table.concat(rd.joined, " ")
 		end
 	elseif ev.kind == "raid" then
-		local r = Game.query.raid(view, ev.eventSlot, master)
-		if r and #(r.parties or {}) > 0 then
+		-- HP は seed から作るので端末では計算しない。参加したパーティは要約の raid（その時間帯の分）から見る
+		local r = view.raid
+		if r and r.eventSlot == ev.eventSlot and #(r.parties or {}) > 0 then
 			tag = "♟" .. table.concat(r.parties, " ")
 		end
 	elseif ev.kind == "merchant" then
