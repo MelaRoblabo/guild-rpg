@@ -961,7 +961,7 @@ function Text.rebirth(save: any, _master: any): string
 		return table.concat(parts, " ") .. ` ／ 加算合計 {total}`
 	end
 	local lines = {
-		`{advName(save, r.adventurerUid)} の転生 ／ 新しい見た目：{r.newAppearanceId}`,
+		`{advName(save, r.adventurerUid)} の転生（見た目は確定の後に選ぶ：D-230）`,
 		"表示：転生後の値(＋加算分/加算の上限)",
 	}
 	if r.previousBonus then

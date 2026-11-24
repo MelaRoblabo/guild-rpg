@@ -61,7 +61,10 @@ function Rebirth.apply(adv: any, session: any, bonus: Types.StatBlock, rng: Rng.
 	adv.level = 1
 	adv.exp = 0
 	adv.levelCap = math.min(adv.levelCap + K.levelCapPerRebirth, K.levelCapMax)
-	adv.appearanceId = session.newAppearanceId
+	-- 見た目は確定の後に引き直す（Game.RebirthChoose、D-230）。旧版の途中のセッションは始めたときに決めた見た目
+	if session.newAppearanceId then
+		adv.appearanceId = session.newAppearanceId
+	end
 	-- D-024：2・4・6回目の転生でギフトを1つ追加（未所持から抽選、最大4）
 	if table.find(K.rebirthGiftAddAt, adv.rebirthCount) and #adv.giftIds < K.giftMax then
 		local pool = {}

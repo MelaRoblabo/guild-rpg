@@ -103,6 +103,7 @@ function Game.newState(master: any, seed: number, now: number): any
 		clearedDungeons = {},
 		hireSession = nil,
 		rebirthSession = nil,
+		rebirthAppearance = nil, -- 転生の見た目の選択（確定の後の1回だけ：D-230）
 		-- D-167：自動売却は最初からオン。notifyPrompt：通知の許可の画面を出した記録（D-196・D-117。version 11）
 		settings = { autoSell = table.clone(S.autoSell), notifyPrompt = Notify.newPromptState() },
 		stats = {},
@@ -1014,21 +1015,9 @@ handlers.RebirthStart = function(state, cmd, ctx)
 		return fail("NOT_ENOUGH_GOLD")
 	end
 	local rng = takeRng(state)
-	local newAppearanceId = adv.appearanceId
-	if adv.uniqueId then
-		if cmd.useKeepPotion then
-			return fail("UNIQUE_APPEARANCE_FIXED") -- ユニークは見た目固定。ポーションを無駄にさせない
-		end
-	elseif cmd.useKeepPotion then
-		if (state.items.itm_potion_appearance_keep or 0) < 1 then
-			return fail("NO_POTION")
-		end
-		state.items.itm_potion_appearance_keep -= 1
-	else
-		-- 通常転生：性別固定で見た目を引き直す（D-051）
-		local outfit = Appearance.outfitClassOf(adv.jobId, master)
-		newAppearanceId = Appearance.roll(adv.gender, outfit, rng, master, adv.appearanceId).appearanceId
-	end
+	-- D-230：見た目は始めるときに決めない（確定の後、S-43d で1回だけ選ぶ）。
+	-- 前の転生の見た目の選択が残っていれば、新しい見た目のまま閉じる
+	state.rebirthAppearance = nil
 	state.gold -= cost
 	bump(state, "goldSpentOnRebirth", cost)
 	state.rebirthSession = {
@@ -1038,7 +1027,6 @@ handlers.RebirthStart = function(state, cmd, ctx)
 		previousBonus = nil,
 		currentBonus = Rebirth.rollBonus(adv.baseStats, adv.rebirthCount + 1, rng, master),
 		freeRerollsLeft = master.K.rebirthFreeRerolls,
-		newAppearanceId = newAppearanceId,
 	}
 	return { ok = true, events = { { type = "RebirthStarted", at = ctx.now, uid = adv.uid, cost = cost } } }
 end
@@ -1078,8 +1066,22 @@ handlers.RebirthChoose = function(state, cmd, ctx)
 		return fail("INVALID_CHOICE")
 	end
 	local adv = state.adventurers[r.adventurerUid]
+	local previousAppearanceId = adv.appearanceId
 	local giftId = Rebirth.apply(adv, r, bonus, takeRng(state), ctx.master)
 	state.rebirthSession = nil
+	-- D-051・D-230：確定の後に、性別を固定して見た目を引き直す（ユニークは固定）。
+	-- 見た目維持ポーションで前の見た目に戻すかは RebirthAppearanceChoose で1回だけ選ぶ。
+	-- 旧版の途中のセッション（始めるときに見た目を決めていた）は、その見た目のまま（Rebirth.apply）
+	if r.newAppearanceId == nil and not adv.uniqueId then
+		local outfit = Appearance.outfitClassOf(adv.jobId, ctx.master)
+		adv.appearanceId =
+			Appearance.roll(adv.gender, outfit, takeRng(state), ctx.master, previousAppearanceId).appearanceId
+		state.rebirthAppearance = {
+			adventurerUid = adv.uid,
+			previousId = previousAppearanceId,
+			currentId = adv.appearanceId,
+		}
+	end
 	bump(state, "rebirths") -- 転生回数の累計（解雇で戻らない）。紹介の進み具合もこれで数える（D-195）
 	local events: { any } = {
 		{
@@ -1089,10 +1091,48 @@ handlers.RebirthChoose = function(state, cmd, ctx)
 			rebirthCount = adv.rebirthCount,
 			levelCap = adv.levelCap,
 			giftAdded = giftId,
+			appearanceId = adv.appearanceId,
+			previousAppearanceId = if state.rebirthAppearance then previousAppearanceId else nil,
 		},
 	}
 	Quest.count(state, "rebirths", 1, ctx.now, ctx.master, rngTaker(state), events) -- D-153（ウィークリーだけ）
 	return { ok = true, events = events }
+end
+
+-- 転生の見た目（D-230）：確定の後の1回だけ。"current"＝新しい見た目のまま、
+-- "previous"＝見た目維持ポーションを1個使って前の見た目に戻す
+handlers.RebirthAppearanceChoose = function(state, cmd, ctx)
+	local a = state.rebirthAppearance
+	if not a then
+		return fail("NO_SESSION")
+	end
+	local adv = state.adventurers[a.adventurerUid]
+	if not adv then
+		state.rebirthAppearance = nil -- 解雇された
+		return fail("ADVENTURER_NOT_FOUND")
+	end
+	if cmd.which == "previous" then
+		if (state.items.itm_potion_appearance_keep or 0) < 1 then
+			return fail("NO_POTION")
+		end
+		state.items.itm_potion_appearance_keep -= 1
+		adv.appearanceId = a.previousId
+	elseif cmd.which ~= "current" then
+		return fail("INVALID_CHOICE")
+	end
+	state.rebirthAppearance = nil
+	return {
+		ok = true,
+		events = {
+			{
+				type = "RebirthAppearanceChosen",
+				at = ctx.now,
+				uid = adv.uid,
+				appearanceId = adv.appearanceId,
+				kept = cmd.which == "previous",
+			},
+		},
+	}
 end
 
 -- 転職（03章 §4） --------------------------------------------------------

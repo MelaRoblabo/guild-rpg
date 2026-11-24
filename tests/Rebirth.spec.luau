@@ -56,28 +56,74 @@ return function(t)
 			expect(exec(s, { type = "RebirthStart", adventurerUid = uid }).error).toBe("MAX_REBIRTH")
 		end)
 		it(
-			"D-051 通常転生は性別を固定して見た目を引き直す（直前と同じは出ない）",
+			"D-051 D-230 通常転生は確定の後に、性別を固定して見た目を引き直す（直前と同じは出ない）",
 			function()
 				for seed = 1, 30 do
 					local s, uid, adv = atCap(seed)
+					local before = adv.appearanceId
 					exec(s, { type = "RebirthStart", adventurerUid = uid })
-					local newId = s.rebirthSession.newAppearanceId
-					expect(newId ~= adv.appearanceId).toBeTruthy()
+					expect(s.adventurers[uid].appearanceId).toBe(before) -- 始めるときは変わらない
+					exec(s, { type = "RebirthChoose", which = "current" })
+					local newId = s.adventurers[uid].appearanceId
+					expect(newId ~= before).toBeTruthy()
 					expect(master.appearances[newId].gender).toBe(adv.gender)
 					expect(master.appearances[newId].outfitClass).toBe(master.jobs[adv.jobId].outfitClass)
+					expect(s.rebirthAppearance).toEqual({ adventurerUid = uid, previousId = before, currentId = newId })
 				end
 			end
 		)
-		it("見た目維持ポーションを使うと姿を維持し、ポーションを1個消費", function()
+		it(
+			"D-230 見た目維持ポーションを使うと前の姿に戻し、ポーションを1個消費",
+			function()
+				local s, uid, adv = atCap()
+				local before = adv.appearanceId
+				exec(s, { type = "RebirthStart", adventurerUid = uid })
+				exec(s, { type = "RebirthChoose", which = "current" })
+				expect(exec(s, { type = "RebirthAppearanceChoose", which = "previous" }).error).toBe("NO_POTION")
+				s.items.itm_potion_appearance_keep = 1
+				expect(exec(s, { type = "RebirthAppearanceChoose", which = "previous" }).ok).toBeTruthy()
+				expect(s.adventurers[uid].appearanceId).toBe(before)
+				expect(s.items.itm_potion_appearance_keep).toBe(0)
+				expect(s.rebirthAppearance).toBe(nil)
+			end
+		)
+		it(
+			"D-230 新しい姿のまま決めるとポーションを使わない。選べるのは1回だけ",
+			function()
+				local s, uid = atCap()
+				s.items.itm_potion_appearance_keep = 1
+				exec(s, { type = "RebirthStart", adventurerUid = uid })
+				exec(s, { type = "RebirthChoose", which = "current" })
+				local newId = s.adventurers[uid].appearanceId
+				expect(exec(s, { type = "RebirthAppearanceChoose", which = "current" }).ok).toBeTruthy()
+				expect(s.adventurers[uid].appearanceId).toBe(newId)
+				expect(s.items.itm_potion_appearance_keep).toBe(1)
+				expect(exec(s, { type = "RebirthAppearanceChoose", which = "previous" }).error).toBe("NO_SESSION")
+			end
+		)
+		it("D-230 選ばないまま次の転生を始めると、新しい姿のまま閉じる", function()
 			local s, uid, adv = atCap()
-			expect(exec(s, { type = "RebirthStart", adventurerUid = uid, useKeepPotion = true }).error).toBe(
-				"NO_POTION"
-			)
-			s.items.itm_potion_appearance_keep = 1
-			expect(exec(s, { type = "RebirthStart", adventurerUid = uid, useKeepPotion = true }).ok).toBeTruthy()
-			expect(s.rebirthSession.newAppearanceId).toBe(adv.appearanceId)
-			expect(s.items.itm_potion_appearance_keep).toBe(0)
+			exec(s, { type = "RebirthStart", adventurerUid = uid })
+			exec(s, { type = "RebirthChoose", which = "current" })
+			local newId = s.adventurers[uid].appearanceId
+			adv = s.adventurers[uid]
+			adv.level = adv.levelCap
+			exec(s, { type = "RebirthStart", adventurerUid = uid })
+			expect(s.rebirthAppearance).toBe(nil)
+			expect(s.adventurers[uid].appearanceId).toBe(newId)
 		end)
+		it(
+			"D-230 旧版の途中のセッション（見た目を決め済み）はその見た目で確定し、選ぶ段はない",
+			function()
+				local s, uid = atCap()
+				exec(s, { type = "RebirthStart", adventurerUid = uid })
+				s.rebirthSession.newAppearanceId = s.adventurers[uid].appearanceId -- 旧版で維持ポーションを使った状態
+				local kept = s.adventurers[uid].appearanceId
+				exec(s, { type = "RebirthChoose", which = "current" })
+				expect(s.adventurers[uid].appearanceId).toBe(kept)
+				expect(s.rebirthAppearance).toBe(nil)
+			end
+		)
 		it("転生の途中はそのパーティを派遣できない", function()
 			local s, uid = atCap()
 			exec(s, { type = "RebirthStart", adventurerUid = uid })
@@ -159,14 +205,14 @@ return function(t)
 			for k, v in r.inherited do
 				expected[k] = v + r.currentBonus[k]
 			end
-			local newApp = r.newAppearanceId
-			expect(exec(s, { type = "RebirthChoose", which = "current" }).ok).toBeTruthy()
+			local res = exec(s, { type = "RebirthChoose", which = "current" })
+			expect(res.ok).toBeTruthy()
 			adv = s.adventurers[uid]
 			expect(adv.level).toBe(1)
 			expect(adv.levelCap).toBe(K.levelCapInitial + K.levelCapPerRebirth)
 			expect(adv.rebirthCount).toBe(1)
 			expect(adv.baseStats).toEqual(expected)
-			expect(adv.appearanceId).toBe(newApp)
+			expect((res.events :: any)[1].appearanceId).toBe(adv.appearanceId)
 			expect(s.rebirthSession).toBe(nil)
 		end)
 		it("D-024 2回目の転生でギフトが1つ増える（1回目は増えない）", function()
@@ -186,7 +232,7 @@ return function(t)
 		it("D-071 転生後は周回の倍率で必要経験値が変わる", function()
 			expect(Formulas.expToNext(10, K, 3)).toBe(math.floor(100 * 10 ^ 1.5 * K.expCycleMult[4]))
 		end)
-		it("ユニークは見た目が固定（維持ポーションは使えない）", function()
+		it("D-230 ユニークは見た目が固定（確定しても変わらず、選ぶ段もない）", function()
 			local s = Game.newState(master, 1, T0)
 			local uid = s.parties[1].slots[1]
 			local adv = s.adventurers[uid]
@@ -195,11 +241,12 @@ return function(t)
 			adv.level = adv.levelCap
 			s.gold = 10 ^ 9
 			s.items.itm_potion_appearance_keep = 1
-			expect(exec(s, { type = "RebirthStart", adventurerUid = uid, useKeepPotion = true }).error).toBe(
-				"UNIQUE_APPEARANCE_FIXED"
-			)
 			exec(s, { type = "RebirthStart", adventurerUid = uid })
-			expect(s.rebirthSession.newAppearanceId).toBe("uni_garrett")
+			exec(s, { type = "RebirthChoose", which = "current" })
+			expect(s.adventurers[uid].appearanceId).toBe("uni_garrett")
+			expect(s.rebirthAppearance).toBe(nil)
+			expect(exec(s, { type = "RebirthAppearanceChoose", which = "previous" }).error).toBe("NO_SESSION")
+			expect(s.items.itm_potion_appearance_keep).toBe(1)
 		end)
 	end)
 

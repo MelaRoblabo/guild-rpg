@@ -26,9 +26,10 @@ CommandText.HELP = [[
   cancel                     雇用をやめる（雇用費は戻らない）
   rename <adv_uid> <名前>    名前を変える
   dismiss <adv_uid>          解雇する
-  rebirth <adv_uid> [keep]   転生を始める（keep：見た目維持ポーションを使う）
+  rebirth <adv_uid>          転生を始める（見た目は確定の後に選ぶ）
   rb-reroll                  転生スロットを引き直す（今回が「前回」になり、それより前は消える）
-  rb-choose <prev|cur>       転生スロットの結果を確定する
+  rb-choose <prev|cur>       転生スロットの結果を確定する（新しい見た目を引く）
+  rb-look <prev|cur>         転生の見た目を選ぶ（prev＝見た目維持ポーションで前の姿、cur＝新しい姿）
   jobchange <adv_uid> <job_id>   転職ポーションで転職する
   looks <adv_uid>            見た目変更ポーションを使う
   looks-choose <prev|cur>    見た目を選ぶ（prev＝今の姿、cur＝新しい姿）
@@ -107,11 +108,13 @@ function CommandText.fromTokens(tokens: { string }): any?
 	elseif c == "dismiss" then
 		return { type = "Dismiss", adventurerUid = tokens[2] }
 	elseif c == "rebirth" then
-		return { type = "RebirthStart", adventurerUid = tokens[2], useKeepPotion = tokens[3] == "keep" }
+		return { type = "RebirthStart", adventurerUid = tokens[2] }
 	elseif c == "rb-reroll" then
 		return { type = "RebirthReroll" }
 	elseif c == "rb-choose" then
 		return { type = "RebirthChoose", which = which(tokens[2]) }
+	elseif c == "rb-look" then
+		return { type = "RebirthAppearanceChoose", which = which(tokens[2]) } -- D-230
 	elseif c == "jobchange" then
 		return { type = "ChangeJob", adventurerUid = tokens[2], jobId = tokens[3] }
 	elseif c == "looks" then

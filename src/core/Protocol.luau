@@ -51,9 +51,10 @@ Protocol.CLIENT_COMMANDS = {
 	HireCancel = {},
 	Rename = { adventurerUid = str(ID), name = str(64) },
 	Dismiss = { adventurerUid = str(ID) },
-	RebirthStart = { adventurerUid = str(ID), useKeepPotion = bool(true) },
+	RebirthStart = { adventurerUid = str(ID) }, -- 見た目は確定の後に選ぶ（D-230）
 	RebirthReroll = {},
 	RebirthChoose = { which = WHICH },
+	RebirthAppearanceChoose = { which = WHICH }, -- D-230
 	ChangeJob = { adventurerUid = str(ID), jobId = str(ID) },
 	ChangeAppearance = { adventurerUid = str(ID) },
 	ChangeAppearanceChoose = { which = WHICH },

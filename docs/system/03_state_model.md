@@ -106,7 +106,7 @@ export type RebirthSession = {       -- 転生スロット中の状態
 	previousBonus: StatBlock?,
 	currentBonus: StatBlock,
 	freeRerollsLeft: number,
-	newAppearanceId: string,
+	newAppearanceId: string?,         -- 旧版の途中のセッションだけ（始めるときに見た目を決めていた）。今は持たない（D-230）
 }
 
 export type PlayerState = {
@@ -130,6 +130,7 @@ export type PlayerState = {
 	clearedDungeons: { [string]: boolean },   -- 初回踏破の判定
 	hireSession: HireSession?,
 	rebirthSession: RebirthSession?,
+	rebirthAppearance: { adventurerUid: string, previousId: string, currentId: string }?, -- 転生の確定の後、見た目を選ぶ間（D-230。次の RebirthStart で新しい見た目のまま閉じる）
 	appearanceSession: { adventurerUid: string, previousId: string, currentId: string }?, -- 見た目変更ポーションの選択中
 	settings: {
 		autoSell: { enabled: boolean, maxRarity: number, keepModified: boolean },

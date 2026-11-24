@@ -32,9 +32,10 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M3 | `HireCancel` | — | 雇用を中止（雇用費は戻らない） | — | 02章 |
 | M3 | `Rename` | adventurerUid, name | 名前変更（ユニーク不可） | UNIQUE_CANNOT_RENAME | 02章 |
 | M3 | `Dismiss` | adventurerUid | 冒険者を解雇（保護中・探索中は不可） | ADVENTURER_LOCKED | Q-020 |
-| M4 | `RebirthStart` | adventurerUid, useKeepPotion | 転生費用を払い、見た目を決めて転生を開始 | LEVEL_NOT_AT_CAP, NOT_ENOUGH_GOLD | 07章, D-080 |
+| M4 | `RebirthStart` | adventurerUid | 転生費用を払って転生を開始（見た目は確定の後に選ぶ：D-230） | LEVEL_NOT_AT_CAP, NOT_ENOUGH_GOLD | 07章, D-080, D-230 |
 | M4 | `RebirthReroll` | — | 加算分の引き直し（HireReroll と同じく直前の結果だけ残す） | NO_TICKET | 07章, D-086 |
-| M4 | `RebirthChoose` | "previous" / "current" | 結果を確定 | — | 07章 |
+| M4 | `RebirthChoose` | "previous" / "current" | 結果を確定し、新しい見た目を引く（ユニークは固定） | — | 07章, D-230 |
+| M8 | `RebirthAppearanceChoose` | "previous" / "current" | 転生の見た目を選ぶ（current＝新しい見た目、previous＝見た目維持ポーションを1個使って前の見た目）。確定の後の1回だけ | NO_SESSION, NO_POTION | D-230 |
 | M4 | `ChangeJob` | adventurerUid, jobId | 転職ポーションを使う | NO_POTION, UNIQUE_JOB_RESTRICTED | 03章 |
 | M4 | `ChangeAppearance` | adventurerUid | 見た目変更ポーションで抽選 | NO_POTION, UNIQUE_CANNOT_CHANGE | 07章 |
 | M4 | `ChangeAppearanceChoose` | "previous" / "current" | 見た目を選ぶ（どちらでも1個消費） | — | 07章 |
