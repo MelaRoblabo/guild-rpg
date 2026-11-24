@@ -431,10 +431,6 @@ local function refreshStatic(view: any)
 			numeral.TextTransparency = if unlocked then 0 else 0.6
 		end
 	end
-	-- 行き先を覚える（Go 用）
-	for _, e in view.expeditions or {} do
-		HubState.lastDungeon[e.partyIndex] = e.dungeonId
-	end
 end
 
 local function refreshMoving(view: any)

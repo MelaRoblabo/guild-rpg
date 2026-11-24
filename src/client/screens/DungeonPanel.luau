@@ -91,7 +91,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				if r and r.ok then
 					HubState.selected = partyIndex
 					HubState.following = true
-					HubState.lastDungeon[partyIndex] = dungeonId
 					api.close()
 				end
 			end

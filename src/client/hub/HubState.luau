@@ -12,8 +12,6 @@ local HubState = {}
 -- 選んでいるパーティ（カメラが追う：D-212）
 HubState.selected = nil :: number?
 HubState.following = false
--- パーティごとの最後の行き先（「同じ所へ再出発」の行き先。状態に残らないので、見えた探索から覚える）
-HubState.lastDungeon = {} :: { [number]: string }
 
 function HubState.dungeonIndex(id: string?): number?
 	if id == nil then

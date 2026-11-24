@@ -145,7 +145,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			.. ":"
 			.. tostring(party.autoRepeat and party.autoRepeat.dungeonId)
 			.. ":"
-			.. tostring(HubState.lastDungeon[partyIndex])
+			.. tostring(party.lastDungeonId)
 		if s.hp then
 			key ..= ":" .. table.concat(s.hp, ",")
 		end
@@ -205,7 +205,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local menu = Components.button({ kind = "brown", width = 120, height = 66, icon = "▤", glyph = "X" })
 			menu.LayoutOrder = 1
 			menu.Parent = actions
-			local dest = HubState.lastDungeon[partyIndex]
+			local dest = party.lastDungeonId -- 最後の行き先（D-228）
 			local go = Components.button({
 				kind = if dest then "gold" else "disabled",
 				width = 200,
