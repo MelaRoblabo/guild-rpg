@@ -345,6 +345,7 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	c:number(p .. ".restBonusRate", k.restBonusRate, 0)
 	c:integer(p .. ".restBonusMaxSeconds", k.restBonusMaxSeconds, 0)
 	c:number(p .. ".restBonusExpMult", k.restBonusExpMult, 1)
+	c:probability(p .. ".pinchHpRatio", k.pinchHpRatio) -- D-229（見るための印。結果は変えない）
 
 	-- 日替わりの特性（D-156）
 	if c:array(p .. ".dailyTraitBands", k.dailyTraitBands) then

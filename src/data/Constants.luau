@@ -180,6 +180,7 @@ return {
 	restBonusRate = 0.5, -- 留守にした時間の半分を貯める（仮。M7b-6）
 	restBonusMaxSeconds = 14400, -- 上限4時間
 	restBonusExpMult = 2, -- 帰還時の経験値の倍率（仮。M7b-6）
+	pinchHpRatio = 0.3, -- ピンチの印：探索の今の時点で、メンバーの HP の合計／最大 HP の合計がこれより低い（仮。D-229）
 
 	-- 日替わりの特性（D-156。06章 §16）
 	dailyTraitBands = { -- 難度（ダンジョンの tier）の帯。帯ごとに毎日1つのダンジョンに特性が当たる
