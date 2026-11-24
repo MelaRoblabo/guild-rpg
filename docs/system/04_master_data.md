@@ -99,6 +99,8 @@
 | `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（D-161。M7b-6 の自動プレイで変えていない） | D-161 |
 | `restBonusExpMult` | 2（D-161。M7b-6 の自動プレイで変えていない） | D-161 |
 | `pinchHpRatio` | 0.3（ピンチの印：探索の今の時点で、メンバーの HP の合計／最大 HP の合計がこれより低い。見るための印で結果は変えない。仮） | D-212, D-229 |
+| `statGoodRatio` | 0.75（能力の「良い値」の演出の線。雇用は範囲、転生は加算分の上限に対する割合。見せ方だけ） | D-220, D-224 |
+| `rebirthGreatRatio` | 0.9（転生の加算分の特別な演出の線。上限に対する割合） | D-224, 07章 |
 | `dailyTraitBands` | `{ min = 1, max = 4 }`, `{ min = 5, max = 8 }`, `{ min = 9, max = 12 }`（難度＝ダンジョンの tier の帯） | D-156 |
 | `calendarSeed` | 20260101（日替わり・今週の訪問者・マップイベント・クエストのお題の共通の乱数の元。値は任意の固定値） | D-156, D-158, D-152, D-153 |
 | `questDailyCount` / `questWeeklyCount` | 3 / 4（ウィークリーは 3〜5 のうち仮。M7b-6） | D-153 |
