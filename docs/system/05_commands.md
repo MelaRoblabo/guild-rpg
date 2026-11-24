@@ -41,6 +41,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M4 | `ChangeAppearanceChoose` | "previous" / "current" | 見た目を選ぶ（どちらでも1個消費） | — | 07章 |
 | M5 | `BuyExpansion` | expansionId | 拡張を購入（パーティ枠・雇用候補枠・所属枠・倉庫・トレーニング場） | NOT_ENOUGH_GOLD, GUILD_LEVEL_TOO_LOW, DUNGEON_NOT_CLEARED | 08章, D-075, D-077 |
 | M5 | `SetAutoSell` | enabled, maxRarity, keepModified? | 自動売却の設定（初期値はオン：D-167） | — | 06章, D-167 |
+| M8 | `SetListPrefs` | advSort?, advDesc?, whSort?, whDesc?, bulkSellMaxRarity? | 一覧の並べ方（冒険者 S-40：level・attack・maxHp・hired・rebirths、倉庫 S-50：rarity・power・sell・new。desc＝高い順）と、条件の一括売却の前回の上限を `settings.listPrefs` に保存する。送った項目だけ変わる。保存がなければ `StarterSet.listPrefs` の初期値（冒険者は Lv の高い順、倉庫はレアリティの高い順、一括売却の上限はレア）。`Game.query.listPrefs` で読む。イベントなし | INVALID_SORT, INVALID_RARITY | D-117, D-119, D-231 ⑮ |
 | M5b | `Train` | adventurerUid, sessions | トレーニング。最大 sessions 回、1回ごとに費用を払って経験値を得る。上限レベルかゴールド切れで止まる（払った回数分だけ行う）。クエストの「トレーニング」は行った回数で数える（D-191） | TRAINING_CAP, NOT_ENOUGH_GOLD, ADVENTURER_ON_EXPEDITION, ADVENTURER_IN_REBIRTH, INVALID_COUNT | D-076, D-077 |
 | M7b | `BulkSell` | equipmentUids（開封結果に出た装備） | 開封結果のうち「今の装備より弱い」もの（06章 §17）を全部売る。修飾語つきも弱ければ売る（D-207）。保護中・装備中・商人で買ったもの・補助は対象外。確認は出さない（ボタンに売る数と合計額：`Game.query.bulkSellPreview`）。倉庫からの一括売却（D-120、確認あり）はこのコマンドではなく `Sell` で売る | NOTHING_TO_SELL | D-167, D-175, D-207 |
 | M7b | `ClaimInbox` | — | 受け取り箱の中身をまとめて受け取る（ゴールド・アイテム・宝箱の山・ユニーク）。受け取れないもの（所属枠・倉庫がいっぱいなど）は受け取り箱に残す（期限なし）。結果は `InboxClaimed`（gold・items・宝箱の山ごとの数・残った件数・blocked）と、加入したユニークごとの `UniqueJoined`。受け取れるものが無くても失敗にはしない | INBOX_EMPTY | D-164, D-176 |

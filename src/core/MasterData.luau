@@ -2,6 +2,7 @@
 -- マスターデータの検証と読み込み（docs/system/04_master_data.md §2）
 -- 1つでも error があれば load は失敗する（起動しない）。
 
+local ListPrefs = require("./ListPrefs")
 local Types = require("./Types")
 
 type Issue = Types.ValidationIssue
@@ -803,6 +804,24 @@ local function validateLootAndStarter(c: Checker, d: any)
 			end
 		end
 		c:integer("StarterSet.autoSell.maxRarity", A.maxRarity, 1, rarityCount(d))
+	end
+	-- 一覧の並べ方と一括売却の上限の初期値（D-117・D-231 ⑮）
+	local LP = S.listPrefs
+	if type(LP) ~= "table" then
+		c:error("StarterSet.listPrefs", "テーブルが必要")
+	else
+		if table.find(ListPrefs.ADV_SORTS, LP.advSort) == nil then
+			c:error("StarterSet.listPrefs.advSort", "並べ替えの種類が不正")
+		end
+		if table.find(ListPrefs.WH_SORTS, LP.whSort) == nil then
+			c:error("StarterSet.listPrefs.whSort", "並べ替えの種類が不正")
+		end
+		for _, key in { "advDesc", "whDesc" } do
+			if type(LP[key]) ~= "boolean" then
+				c:error(`StarterSet.listPrefs.{key}`, "真偽値が必要")
+			end
+		end
+		c:integer("StarterSet.listPrefs.bulkSellMaxRarity", LP.bulkSellMaxRarity, 1, rarityCount(d))
 	end
 	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
 	if c:array("StarterSet.adventurers", S.adventurers) then

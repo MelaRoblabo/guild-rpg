@@ -15,6 +15,9 @@ return {
 	-- 自動売却の初期値（D-167）：最初からオン。コモン・アンコモンを売り、修飾語つきは残す
 	-- 売却用アイテム（素材）はこの設定にかかわらず常に自動で売る（D-167）
 	autoSell = { enabled = true, maxRarity = 2, keepModified = true },
+	-- 一覧の並べ方と一括売却の上限の初期値（D-117・D-119・D-231 ⑮）。前回選んだものはサーバーに保存する
+	-- 冒険者の一覧は Lv の高い順、倉庫はレアリティの高い順。条件の一括売却の上限はレア
+	listPrefs = { advSort = "level", advDesc = true, whSort = "rarity", whDesc = true, bulkSellMaxRarity = 3 },
 	adventurers = {
 		{
 			name = "Aldo",

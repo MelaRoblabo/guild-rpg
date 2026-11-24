@@ -7,6 +7,7 @@
 -- Roblox API は使わない（サーバーとクライアントの両方、Lune のテストで使う）。
 
 local Game = require("./Game")
+local ListPrefs = require("./ListPrefs")
 
 local Protocol = {}
 
@@ -60,6 +61,14 @@ Protocol.CLIENT_COMMANDS = {
 	ChangeAppearanceChoose = { which = WHICH },
 	BuyExpansion = { expansionId = str(ID) },
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
+	-- 一覧の並べ方と一括売却の上限（D-117・D-119・D-231 ⑮）。送った項目だけ変わる
+	SetListPrefs = {
+		advSort = enum(ListPrefs.ADV_SORTS, true),
+		advDesc = bool(true),
+		whSort = enum(ListPrefs.WH_SORTS, true),
+		whDesc = bool(true),
+		bulkSellMaxRarity = int(1, 100, true),
+	},
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
 	ClaimInbox = {}, -- D-164
 	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）

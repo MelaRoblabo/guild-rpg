@@ -31,6 +31,7 @@ local Quest = require("./Quest")
 local Raid = require("./Raid")
 local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
+local ListPrefs = require("./ListPrefs")
 local Training = require("./Training")
 local Visitor = require("./Visitor")
 
@@ -1329,6 +1330,15 @@ handlers.SetAutoSell = function(state, cmd, ctx)
 	return { ok = true, events = {} }
 end
 
+-- 一覧の並べ方と一括売却の上限（05章 SetListPrefs、D-117・D-119・D-231 ⑮）
+handlers.SetListPrefs = function(state, cmd, ctx)
+	local err = ListPrefs.set(state, cmd, ctx.master)
+	if err then
+		return fail(err)
+	end
+	return { ok = true, events = {} }
+end
+
 -- 通知の許可の画面を出した記録（05章 MarkNotifyPrompt、D-196・D-117）。クライアントが出したあとに送る
 handlers.MarkNotifyPrompt = function(state, cmd, ctx)
 	local err = Notify.markPrompted(state, cmd.stage)
@@ -1760,6 +1770,11 @@ function Game.query.playtime(state: any, master: any): any
 end
 
 -- 休息ボーナスの残り秒（D-161）
+-- 一覧の並べ方と一括売却の上限（保存がなければ StarterSet.listPrefs の初期値。D-117・D-231 ⑮）
+function Game.query.listPrefs(state: any, master: any): any
+	return ListPrefs.get(state, master)
+end
+
 function Game.query.restBonus(state: any): number
 	return state.restBonusSeconds or 0
 end
