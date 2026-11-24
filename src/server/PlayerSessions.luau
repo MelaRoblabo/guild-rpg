@@ -34,6 +34,7 @@ export type Session = {
 	lastView: any, -- 最後に送った要約（差分の元：D-103）
 	commandTimes: { number }, -- 直近1秒に受けたコマンドの時刻（送りすぎの制限）
 	busy: boolean, -- コマンド・時間経過の処理中
+	lastWorld: any?, -- 他のプレイヤーへ最後に送った公開情報（WorldChanged、11章 §6.1）
 	-- 紹介の届け物を書く処理（11章 §3.7、Referral）
 	referralBusy: boolean?, -- 書いている途中
 	referralRetryAt: number?, -- 書けなかったとき、次に試す時刻（箱がいっぱいなら math.huge：次のログインまで試さない。D-197）

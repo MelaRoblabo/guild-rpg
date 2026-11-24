@@ -283,13 +283,15 @@ patch = {
   - 誰かが出発・帰還したとき（オフライン分の帰還を含む）、そのプレイヤー分を全員へ。
   - 退出したとき、そのプレイヤーを消す知らせを全員へ。
 - 自分自身の分は送らない（自分の馬車は自分の状態から描く）。
+- 送る形は `{ players = { 公開情報, ... } }`（参加時のまとめ・変わった人の分）と `{ removed = { userId } }`（退出）。公開情報は `World.publicInfo`（src/core、Lune でテスト）で作り、前に送ったものと同じなら送らない（`World.same`）。クライアントは `Session.world` に上書きする。
+- クライアントは自分の馬車より小さく薄く、線の少し下にずらして描く。重なる馬車は「＋N」にまとめる（D-127）。設定の「他プレイヤーの馬車」がオフなら描かない（D-117）。
 
 ### 6.2 タップしたときの詳細：`Inspect` コマンド
 
 - `Command` で `{ type = "Inspect", userId, partyIndex }` を送ると、そのパーティのメンバーの `name`・`jobId`・`level`・`appearanceId` とギルドLvを返す。状態は変えない（`Game.execute` を通さない読み取り専用）。回数制限（§4.4）の対象にする。
 - 相手が同じサーバーにいない、パーティが探索中でない場合は `NOT_FOUND`。
 - プレイヤー名とアバターアイコンは、クライアントが Roblox の API（`Players:GetNameFromUserIdAsync`・`Players:GetUserThumbnailAsync`）で取る。サーバーからは送らない。
-- 返す中身を作る処理は `src/core` に置き、Lune でテストする（隠す情報を含めない）。
+- 返す中身を作る処理は `src/core` に置き、Lune でテストする（隠す情報を含めない）。→ `World.inspect`。形の検証は `Protocol.READ_COMMANDS`（Game のコマンドの表 `CLIENT_COMMANDS` とは分ける）。
 
 ## 7. 確認方法（M7 の完了条件）
 

@@ -90,6 +90,11 @@ Protocol.CLIENT_COMMANDS = {
 	MarkNotifyPrompt = { stage = enum({ "firstReturn", "loginDay2" }) }, -- D-196。通知の許可の画面を出した記録
 } :: { [string]: { [string]: Field } }
 
+-- 読み取り専用のコマンド（状態を変えない。Game.execute を通さず、サーバーが答える。回数制限の対象：11章（システム）§6.2）
+Protocol.READ_COMMANDS = {
+	Inspect = { userId = int(1, 2 ^ 53), partyIndex = int(1, 20) }, -- D-108・D-121。他のプレイヤーの馬車の詳細
+} :: { [string]: { [string]: Field } }
+
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）
 Protocol.SERVER_ONLY = { GrantPurchase = true, GrantReferral = true }
 
@@ -139,7 +144,7 @@ function Protocol.validateCommand(command: any): (boolean, string?)
 	if type(command) ~= "table" or type(command.type) ~= "string" then
 		return false, "コマンドの形が不正"
 	end
-	local schema = Protocol.CLIENT_COMMANDS[command.type]
+	local schema = Protocol.CLIENT_COMMANDS[command.type] or Protocol.READ_COMMANDS[command.type]
 	if schema == nil then
 		return false, `受け付けないコマンド: {command.type}`
 	end

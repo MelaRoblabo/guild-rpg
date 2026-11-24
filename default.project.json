@@ -9,7 +9,8 @@
         "$className": "Folder",
         "Command": { "$className": "RemoteFunction" },
         "Query": { "$className": "RemoteFunction" },
-        "StateChanged": { "$className": "RemoteEvent" }
+        "StateChanged": { "$className": "RemoteEvent" },
+        "WorldChanged": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

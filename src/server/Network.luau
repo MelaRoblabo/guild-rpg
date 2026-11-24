@@ -6,11 +6,18 @@
 --   StateChanged（RemoteEvent）：参加時は全体、以後は前回送った要約との差分と連番
 --   定期の時間経過：帰還・自動再派遣が起きたら差分を送る
 --   サーバーの都合で状態を変えたとき（紹介の報酬など：reason = "server"）も差分を送る
+--   WorldChanged（RemoteEvent）：他のプレイヤーの馬車の公開情報（11章 §6.1、D-121）。StateChanged と混ぜず、連番なしで上書き。
+--     { players = { 公開情報 } } か { removed = { userId } }。参加したプレイヤーへ他の全員分、変わったらその人の分を全員へ、
+--     退出したら消す知らせを全員へ。自分の分は送らない
+--   Inspect（Command の読み取り専用コマンド）：他のプレイヤーのパーティの詳細（11章 §6.2）。状態は変えない
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Players = game:GetService("Players")
+
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Protocol = require("@game/ReplicatedStorage/Core/Protocol")
+local World = require("@game/ReplicatedStorage/Core/World")
 local Config = require("./Config")
 
 local Network = {}
@@ -28,6 +35,21 @@ function Network.start(sessions: any)
 	local commandRemote = remotes:WaitForChild("Command") :: RemoteFunction
 	local stateRemote = remotes:WaitForChild("StateChanged") :: RemoteEvent
 	local queryRemote = remotes:WaitForChild("Query") :: RemoteFunction
+	local worldRemote = remotes:WaitForChild("WorldChanged") :: RemoteEvent
+
+	-- 他のプレイヤーの馬車（11章 §6.1）。公開情報が前に送ったものと変わったときだけ、本人以外の全員へ送る
+	local function shareWorld(session: any, force: boolean?)
+		local info = World.publicInfo(session.state, session.userId, os.time())
+		if not force and World.same(session.lastWorld, info) then
+			return
+		end
+		session.lastWorld = info
+		for _, other in sessions.sessions do
+			if other ~= session and other.player and other.player.Parent then
+				worldRemote:FireClient(other.player, { players = { info } })
+			end
+		end
+	end
 
 	-- 読み取り専用の問い合わせ（seed を渡さずに、seed から作るものだけを返す）
 	queryRemote.OnServerInvoke = function(player: Player, q: any): any
@@ -49,6 +71,9 @@ function Network.start(sessions: any)
 
 	-- 状態を通知する。load は全体、それ以外は差分（変化も events もなければ送らない）
 	local function push(session: any, reason: string, events: { any })
+		if reason ~= "load" and #events > 0 then
+			task.defer(shareWorld, session) -- 出発・帰還で馬車が変わる
+		end
 		local view = Protocol.view(session.state, sessions.master)
 		local redacted = Protocol.redactEvents(events)
 		if reason == "load" or session.lastView == nil then
@@ -82,7 +107,25 @@ function Network.start(sessions: any)
 
 	sessions.onLoaded = function(session: any, offlineEvents: { any })
 		push(session, "load", offlineEvents)
+		-- 参加したプレイヤーへ他の全員分をまとめて1回。本人の分は全員へ
+		local others = {}
+		for _, other in sessions.sessions do
+			if other ~= session then
+				table.insert(others, other.lastWorld or World.publicInfo(other.state, other.userId, os.time()))
+			end
+		end
+		if #others > 0 then
+			worldRemote:FireClient(session.player, { players = others })
+		end
+		shareWorld(session, true)
 	end
+	Players.PlayerRemoving:Connect(function(player: Player)
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				worldRemote:FireClient(other, { removed = { player.UserId } })
+			end
+		end
+	end)
 	sessions.onChanged = function(session: any, events: { any })
 		push(session, "server", events)
 	end
@@ -118,6 +161,16 @@ function Network.start(sessions: any)
 		local valid, reason = Protocol.validateCommand(command)
 		if not valid then
 			return { ok = false, error = "BAD_REQUEST", detail = reason }
+		end
+		-- 読み取り専用：他のプレイヤーのパーティの詳細（11章 §6.2）。相手が同じサーバーにいない・探索中でないなら NOT_FOUND
+		if command.type == "Inspect" then
+			local target = Players:GetPlayerByUserId(command.userId)
+			local other = if target then sessions:get(target) else nil
+			local detail = if other then World.inspect(other.state, command.partyIndex, os.time()) else nil
+			if detail == nil then
+				return { ok = false, error = "NOT_FOUND" }
+			end
+			return { ok = true, detail = detail }
 		end
 
 		-- 1人のコマンドは1つずつ処理する（11章 §4.4）
