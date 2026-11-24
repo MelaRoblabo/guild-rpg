@@ -3,11 +3,18 @@
 --   - 羊皮紙の面、題の札＝パーティの番号、× は面の右上の角、後ろの暗幕は 50%（D-225 ③）。
 --   - 待機：同じ所へ再出発（Go、金）と Menu（茶。S-12 は M8-6）。探索中：フロアの進みと自動再派遣のスイッチだけ（D-214 ⑥）。
 --   - 移動中・帰還中：残り時間。メンバーの HP は探索中だけ（戦闘不能は暗くする：D-214 ⑤）。
+--   - S-11 探索ウィンドウ（D-213 ⑦・D-236）：出発してから帰るまで、面の上に一枚絵の枠（高さ160）を出す。
+--     戦闘はモンスター（仮の名前）と HP の棒、与えたダメージは出た瞬間だけ白い数字（クリティカルは大きく黄色）、回復は緑。
+--     イベントはイベントの絵と HP の増減の数字。右上に確保した宝箱、下の端にフロアの印。帰り道は馬車・残り時間・持ち帰る宝箱。
 
+local Game = require("@game/ReplicatedStorage/Core/Game")
+local Party = require("@game/ReplicatedStorage/Core/Party")
+local TweenService = game:GetService("TweenService")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
 local Nav = require("../ui/Nav")
+local Replay = require("../party/Replay")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -20,16 +27,19 @@ local CHILDREN = Create.Children
 
 local PANEL_W = 420
 local PANEL_H = 470
+local PANEL_H_EXPLORE = 554 -- 探索ウィンドウ（一枚絵の枠つき）
+local SCENE_H = 160
+local EVENT_GLYPH = { chest = "▣", item = "🎟", trap = "⚠", fountain = "✚", none = "…" }
 
 local function clock(seconds: number): string
 	local s = math.max(0, math.floor(seconds))
 	return string.format("%d:%02d", s // 60, s % 60)
 end
 
-local function memberRow(adv: any, hp: number?, maxHp: number?): Frame
+local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, compact: boolean?): Frame
 	local row: Frame = new("Frame", {
 		Name = "Member",
-		Size = UDim2.new(1, 0, 0, 56),
+		Size = UDim2.new(1, 0, 0, if compact then 46 else 56), -- 探索中は一枚絵の枠のぶん低く
 		BackgroundColor3 = C.ch75,
 		[CHILDREN] = {
 			Components.corner(6),
@@ -70,10 +80,22 @@ local function memberRow(adv: any, hp: number?, maxHp: number?): Frame
 		})
 		new("Frame", {
 			Size = UDim2.fromScale(math.clamp(hp / maxHp, 0, 1), 1),
-			BackgroundColor3 = if down then C.warn else C.barFill,
+			BackgroundColor3 = if down then C.warn elseif hp / maxHp < 0.3 then C.dangerRed else C.barFill,
 			[CHILDREN] = { Components.corner(6) },
 			Parent = track,
 		})
+	end
+	if delta and delta ~= 0 then
+		-- 回復・罠・泉の増減（D-236 ②③）
+		local d = Components.text({
+			text = (if delta > 0 then "+" else "") .. delta,
+			size = 23,
+			color = if delta > 0 then C.up else C.warnDark,
+			font = Tokens.font.number,
+			stroke = delta < 0,
+		})
+		d.LayoutOrder = 5
+		d.Parent = row
 	end
 	return row
 end
@@ -97,6 +119,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	close.Position = UDim2.fromOffset(196 + PANEL_W - 12, band + 40 + 12)
 	close.Parent = frame
 
+	-- S-11 の一枚絵の枠（出発してから帰るまで）
+	local scene: Frame = new("Frame", {
+		Name = "Scene",
+		Size = UDim2.new(1, 0, 0, SCENE_H),
+		BackgroundColor3 = C.ch13,
+		Visible = false,
+		ClipsDescendants = true,
+		[CHILDREN] = { Components.corner(8), Components.stroke(C.ch16, 2) },
+		Parent = content,
+	})
 	local body: Frame = new("Frame", {
 		Name = "Body",
 		Size = UDim2.fromScale(1, 1),
@@ -122,6 +154,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	})
 
 	local lastKey = ""
+	local replay: Replay.State? = nil -- 今の再生（探索中だけ）
 	local function render(view: any)
 		if view == nil then
 			return
@@ -149,6 +182,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if s.hp then
 			key ..= ":" .. table.concat(s.hp, ",")
 		end
+		local rp = replay
+		if rp then
+			key ..= ":" .. rp.phase .. ":" .. table.concat(rp.hp, ",") .. ":" .. tostring(rp.turn) .. ":" .. #rp.deltas
+		end
+		local exploring = s.state ~= "waiting"
+		scene.Visible = exploring
+		body.Position = UDim2.fromOffset(0, if exploring then SCENE_H + 10 else 0)
+		body.Size = UDim2.new(1, 0, 1, if exploring then -(SCENE_H + 10) else 0)
+		panel.Size = UDim2.fromOffset(PANEL_W, if exploring then PANEL_H_EXPLORE else PANEL_H)
 		if key == lastKey then
 			return
 		end
@@ -194,8 +236,25 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		for _, uid in party.slots do
 			if uid ~= "" and view.adventurers[uid] then
 				memberIdx += 1
-				local hp = if s.state == "exploring" and s.hp then s.hp[memberIdx] else nil
-				local row = memberRow(view.adventurers[uid], hp, maxHp[memberIdx])
+				local hp = if rp and rp.phase ~= "outbound"
+					then rp.hp[memberIdx]
+					elseif s.state == "exploring" and s.hp then s.hp[memberIdx]
+					else nil
+				local delta = nil
+				if rp and rp.phase == "floor" then
+					for _, d in rp.deltas do
+						if d.index == memberIdx then
+							delta = d.amount
+						end
+					end
+					local _, mySlot = Party.find(view, uid)
+					for _, a in rp.actions do
+						if a.kind == "heal" and a.target == mySlot then
+							delta = a.amount
+						end
+					end
+				end
+				local row = memberRow(view.adventurers[uid], hp, maxHp[memberIdx], delta, exploring)
 				order += 1
 				row.LayoutOrder = order
 				row.Parent = body
@@ -235,33 +294,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			go.LayoutOrder = 2
 			go.Parent = actions
 		else
-			-- 探索中：フロアの進み（丸）。移動中・帰還中：残り時間
-			if s.state == "exploring" and s.floors then
-				local dots: Frame = new("Frame", {
-					Name = "Floors",
-					LayoutOrder = order + 1,
-					Size = UDim2.new(1, 0, 0, 24),
-					BackgroundTransparency = 1,
-					[CHILDREN] = {
-						new("UIListLayout", {
-							FillDirection = Enum.FillDirection.Horizontal,
-							Padding = UDim.new(0, 6),
-						}),
-					},
-					Parent = body,
-				})
-				for f = 1, s.floors do
-					new("Frame", {
-						Size = UDim2.fromOffset(20, 20),
-						BackgroundColor3 = if f < (s.floorIndex or 0)
-							then C.barFill
-							elseif f == s.floorIndex then C.ctaGold
-							else C.ch50,
-						[CHILDREN] = { Components.corner(10), Components.stroke(C.ch16, 2) },
-						Parent = dots,
-					})
-				end
-			end
 			-- 自動再派遣のスイッチ（D-125・D-214 ⑥）
 			local on = party.autoRepeat ~= nil
 			local toggle = Components.button({
@@ -283,23 +315,149 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		end
 	end
 
-	-- 残り時間の札（移動中・帰還中）は毎秒更新
-	local remain = Components.text({ text = "", size = 25, color = C.inkDark, font = Tokens.font.number })
-	remain.AnchorPoint = Vector2.new(0, 1)
-	remain.Position = UDim2.new(0, 0, 1, -20)
-	remain.Parent = content
+	-- 一枚絵の枠の中身（再生に合わせて 0.25 秒ごと）
+	local slotsOf: { [string]: { slots: { number }, maxHp: { number } } } = {}
+	local lastTurn = ""
+	local function popup(text: string, size: number, color: Color3)
+		local t = Components.text({ text = text, size = size, color = color, font = Tokens.font.number, stroke = true })
+		t.Name = "Popup"
+		t.AnchorPoint = Vector2.new(0.5, 0.5)
+		t.Position = UDim2.fromScale(0.5, 0.45)
+		t.ZIndex = 10
+		t.Parent = scene
+		TweenService:Create(t, TweenInfo.new(0.8), { Position = UDim2.fromScale(0.5, 0.2), TextTransparency = 1 })
+			:Play()
+		task.delay(0.85, function()
+			t:Destroy()
+		end)
+	end
+	local function drawScene(view: any)
+		local e = Game.query.expeditionOf(view, partyIndex)
+		if e == nil or e.log == nil then
+			replay = nil
+			return
+		end
+		local info = slotsOf[e.uid]
+		if info == nil then
+			local slots, mh = {}, {}
+			local snaps = Game.query.partySnapshots(view, partyIndex, master)
+			for i, uid in e.memberUids do
+				local _, slot = Party.find(view, uid)
+				slots[i] = slot or i
+				mh[i] = if snaps[i] then snaps[i].maxHp else 1
+			end
+			info = { slots = slots, maxHp = mh }
+			slotsOf[e.uid] = info
+		end
+		local st = Replay.at(e.log, info.slots, info.maxHp, Session.now(), master.K)
+		replay = st
+		for _, c in scene:GetChildren() do
+			if c.Name ~= "Popup" and not c:IsA("UICorner") and not c:IsA("UIStroke") then
+				c:Destroy()
+			end
+		end
+		local function center(text: string, size: number, color: Color3, y: number)
+			local t = Components.text({ text = text, size = size, color = color, font = Tokens.font.display })
+			t.AnchorPoint = Vector2.new(0.5, 0.5)
+			t.Position = UDim2.fromScale(0.5, y)
+			t.Parent = scene
+		end
+		local function chestPill()
+			local p = Components.chip("▣", tostring(st.chests), C.bronzeHi)
+			p.AnchorPoint = Vector2.new(1, 0)
+			p.Position = UDim2.new(1, -6, 0, 6)
+			p.Parent = scene
+		end
+		if st.phase ~= "floor" then
+			-- 移動中・帰り道：馬車と残り時間（帰り道は持ち帰る宝箱も：D-236 ④）
+			local toGo = if st.phase == "outbound"
+				then e.departAt + e.log.travelSeconds - Session.now()
+				else st.remaining
+			center(if st.phase == "outbound" then "▶" else "◀", 40, C.inkLight, 0.4)
+			center(clock(toGo), 30, C.inkLight, 0.72)
+			if st.phase ~= "outbound" then
+				chestPill()
+			end
+			return
+		end
+		-- フロア：戦闘はモンスターと HP の棒、イベントはイベントの絵
+		local d = master.dungeons[e.dungeonId]
+		if st.kind == "battle" then
+			local mon = if st.monsterId then master.monsters[st.monsterId] else nil
+			center(if mon then mon.nameEn else "?", 25, C.inkLight, 0.5)
+			local track: Frame = new("Frame", {
+				Name = "MonsterHp",
+				Position = UDim2.fromOffset(12, 12),
+				Size = UDim2.new(1, -120, 0, 16),
+				BackgroundColor3 = C.barTrack,
+				[CHILDREN] = { Components.corner(6) },
+				Parent = scene,
+			})
+			new("Frame", {
+				Size = UDim2.fromScale(st.monsterRatio or 1, 1),
+				BackgroundColor3 = C.warnDark,
+				[CHILDREN] = { Components.corner(6) },
+				Parent = track,
+			})
+			-- 与えたダメージは出た瞬間だけ（D-236 ②）
+			local key = tostring(st.floorIndex) .. ":" .. tostring(st.turn)
+			if key ~= lastTurn then
+				lastTurn = key
+				local total, crit = 0, false
+				for _, a in st.actions do
+					if a.kind == "attack" then
+						total += a.amount
+						crit = crit or a.crit == true
+					end
+				end
+				if total > 0 then
+					popup(tostring(total), if crit then 44 else 30, if crit then C.numHi else C.inkWhite)
+				end
+			end
+		else
+			center(EVENT_GLYPH[st.event or "none"] or "…", 48, C.inkLight, 0.5)
+		end
+		chestPill()
+		-- フロアの印（済み＝青銅、今＝光る。偶数＝イベントは角、最後＝大きな丸＝ボス）
+		local marks: Frame = new("Frame", {
+			Name = "Floors",
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -8),
+			Size = UDim2.new(1, -16, 0, 18),
+			BackgroundTransparency = 1,
+			[CHILDREN] = {
+				new("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, 4),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+			},
+			Parent = scene,
+		})
+		local total = if d then d.floors else st.floors
+		for f = 1, total do
+			local boss = f == total
+			new("Frame", {
+				Name = "F" .. f,
+				LayoutOrder = f,
+				Size = UDim2.fromOffset(if boss then 16 else 12, if boss then 16 else 12),
+				BackgroundColor3 = if f < (st.floor or 0) then C.bronze elseif f == st.floor then C.numHi else C.ch16,
+				[CHILDREN] = { Components.corner(if f % 2 == 0 and not boss then 2 else 8) },
+				Parent = marks,
+			})
+		end
+	end
 	local alive = true
 	task.spawn(function()
 		while alive do
 			local view = Session.view
 			if view then
-				local s = HubState.status(view, partyIndex)
-				remain.Text = if (s.state == "moving" or s.state == "returning") and s.returnAt
-					then clock(s.returnAt - Session.now())
-					else ""
+				drawScene(view)
 				render(view)
 			end
-			task.wait(0.5)
+			task.wait(0.25)
 		end
 	end)
 	local conn = Session.changed:connect(render)
