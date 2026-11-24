@@ -12,6 +12,7 @@ local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
+local PickMode = require("../hub/PickMode")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -132,6 +133,19 @@ local function buildMap(parent: Frame)
 		end)
 		markers[d.id] = m
 	end
+	-- 行き先を選ぶ形（D-231 ⑦）：選べるダンジョンは琥珀の輪
+	local function showPickMode()
+		local view = Session.view
+		for id, mk in markers do
+			local stroke = mk:FindFirstChildOfClass("UIStroke")
+			local open = view ~= nil and view.unlockedDungeons ~= nil and view.unlockedDungeons[id] == true
+			if stroke then
+				stroke.Color = if PickMode.partyIndex and open then C.selAmber else C.bronze
+				stroke.Thickness = if PickMode.partyIndex and open then 5 else 3
+			end
+		end
+	end
+	PickMode.changed:connect(showPickMode)
 	-- 自分でスクロールしたら追うのをやめる（D-214 ⑧）
 	map.InputBegan:Connect(function(io: InputObject)
 		if io.UserInputType == Enum.UserInputType.Touch or io.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -277,6 +291,7 @@ local function rowFor(partyIndex: number)
 		-- 触るとカメラが寄って追い、パーティの面を開く（D-212）
 		HubState.selected = partyIndex
 		HubState.following = true
+		PickMode.stop() -- 行き先を選ぶのをやめる
 		Nav.open("PartyPanel", { partyIndex = partyIndex })
 	end)
 	r = { button = button, glyph = glyph, pinch = pinch, ring = ring }
