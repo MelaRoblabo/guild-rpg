@@ -202,7 +202,17 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 		end
 		if s.state == "waiting" then
-			local menu = Components.button({ kind = "brown", width = 120, height = 66, icon = "▤", glyph = "X" })
+			local menu = Components.button({
+				kind = "brown",
+				width = 120,
+				height = 66,
+				icon = "▤",
+				name = "Menu",
+				glyph = "X",
+				onClick = function()
+					api.open("PartyMenu", { partyIndex = partyIndex }) -- S-12（M8-6）
+				end,
+			})
 			menu.LayoutOrder = 1
 			menu.Parent = actions
 			local dest = party.lastDungeonId -- 最後の行き先（D-228）

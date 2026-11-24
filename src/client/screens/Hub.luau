@@ -539,5 +539,6 @@ require("./adventurers/AdvList")
 require("./adventurers/AdvDetail")
 require("./adventurers/EquipSelect")
 require("./adventurers/LookChange")
+require("./party/PartyMenu")
 
 return Hub
