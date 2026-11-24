@@ -61,6 +61,7 @@ Protocol.CLIENT_COMMANDS = {
 	ChangeAppearanceChoose = { which = WHICH },
 	BuyExpansion = { expansionId = str(ID) },
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
+	AutoEquip = { partyIndex = int(1, 20) }, -- D-120・D-231 ⑨・D-235 ③
 	-- 一覧の並べ方と一括売却の上限（D-117・D-119・D-231 ⑮）。送った項目だけ変わる
 	SetListPrefs = {
 		advSort = enum(ListPrefs.ADV_SORTS, true),

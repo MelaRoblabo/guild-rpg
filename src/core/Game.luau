@@ -31,6 +31,7 @@ local Quest = require("./Quest")
 local Raid = require("./Raid")
 local Rebirth = require("./Rebirth")
 local Rng = require("./Rng")
+local AutoEquip = require("./AutoEquip")
 local ListPrefs = require("./ListPrefs")
 local Training = require("./Training")
 local Visitor = require("./Visitor")
@@ -1330,6 +1331,26 @@ handlers.SetAutoSell = function(state, cmd, ctx)
 	return { ok = true, events = {} }
 end
 
+-- 自動装備（05章 AutoEquip、D-120・D-231 ⑨・D-235 ③）。提案（Game.query.autoEquipPlan）と同じ計算で付け替える
+handlers.AutoEquip = function(state, cmd, ctx)
+	local party = state.parties[cmd.partyIndex]
+	if party == nil then
+		return fail("PARTY_NOT_FOUND")
+	end
+	if Party.isBusy(state, cmd.partyIndex) then
+		return fail("PARTY_BUSY")
+	end
+	local changes = AutoEquip.plan(state, cmd.partyIndex, ctx.master)
+	if #changes == 0 then
+		return fail("NOTHING_TO_CHANGE")
+	end
+	local n = AutoEquip.apply(state, changes, ctx.master)
+	return {
+		ok = true,
+		events = { { type = "AutoEquipped", at = ctx.now, partyIndex = cmd.partyIndex, changes = n } },
+	}
+end
+
 -- 一覧の並べ方と一括売却の上限（05章 SetListPrefs、D-117・D-119・D-231 ⑮）
 handlers.SetListPrefs = function(state, cmd, ctx)
 	local err = ListPrefs.set(state, cmd, ctx.master)
@@ -1770,6 +1791,11 @@ function Game.query.playtime(state: any, master: any): any
 end
 
 -- 休息ボーナスの残り秒（D-161）
+-- 自動装備の提案（D-120・D-231 ⑨）：{ { advUid, slot, from, to } }。空なら付け替えるものがない
+function Game.query.autoEquipPlan(state: any, partyIndex: number, master: any): { any }
+	return AutoEquip.plan(state, partyIndex, master)
+end
+
 -- 一覧の並べ方と一括売却の上限（保存がなければ StarterSet.listPrefs の初期値。D-117・D-231 ⑮）
 function Game.query.listPrefs(state: any, master: any): any
 	return ListPrefs.get(state, master)
