@@ -1,0 +1,96 @@
+--!strict
+-- クライアントの純粋なモジュール（M8-1）：拡大縮小の計算と画面の重ね方
+local Layout = require("../src/client/ui/Layout")
+local NavStack = require("../src/client/ui/NavStack")
+
+local NO_INSETS = { top = 0, bottom = 0, left = 0, right = 0 }
+
+return function(t)
+	local describe, it, expect = t.describe, t.it, t.expect
+
+	describe("D-210 拡大縮小（Layout.compute）", function()
+		it("D-210 基準の画面 1280×720 はそのままの大きさ", function()
+			local f = Layout.compute(1280, 720, NO_INSETS, 58, 106)
+			expect(f.scale).toBe(1)
+			expect(f.width).toBe(1280)
+			expect(f.height).toBe(720)
+			expect(f.clamped).toBe(false)
+		end)
+		it(
+			"D-210 iPhone 11（896×414pt、切り欠き左右48・ホームバー21）は約0.546倍で、押せる最小が36pt",
+			function()
+				local f = Layout.compute(896, 414, { top = 0, bottom = 21, left = 48, right = 48 }, 58, 106)
+				expect(math.abs(f.scale - 393 / 720) < 1e-9).toBe(true)
+				expect(Layout.toPoints(f, 66) >= 36 - 1e-9).toBe(true)
+				expect(f.clamped).toBe(false)
+			end
+		)
+		it(
+			"D-221 横長の端末では高さで縮め、余った横幅を画面の幅に回す（面は引き伸ばさない）",
+			function()
+				local f = Layout.compute(896, 414, { top = 0, bottom = 21, left = 48, right = 48 }, 58, 106)
+				expect(math.abs(f.height - 720) < 1e-9).toBe(true)
+				expect(f.width > 1280).toBe(true)
+			end
+		)
+		it("D-221 縦長寄りの端末（4:3）では幅で縮め、余った高さを回す", function()
+			local f = Layout.compute(1024, 768, NO_INSETS, 58, 106)
+			expect(f.scale).toBe(0.8)
+			expect(f.width).toBe(1280)
+			expect(f.height).toBe(960)
+		end)
+		it(
+			"D-210 対象外の小さい端末でも、押せる最小 36pt を下回らない（下限で止める）",
+			function()
+				local f = Layout.compute(667, 375, NO_INSETS, 58, 106)
+				expect(f.scale).toBe(Layout.minScale())
+				expect(f.clamped).toBe(true)
+			end
+		)
+		it("D-219 Roblox の帯が基準の 106 より高い端末では、その高さを使う", function()
+			local f = Layout.compute(1280, 720, NO_INSETS, 120, 106)
+			expect(f.topBand).toBe(120)
+			local g = Layout.compute(1280, 720, NO_INSETS, 58, 106)
+			expect(g.topBand).toBe(106)
+		end)
+	end)
+
+	describe("D-134 画面の重ね方（NavStack）", function()
+		it("D-134 × で一段ずつ閉じ、最後はメイン画面", function()
+			local s = NavStack.new()
+			s:push("Hire")
+			s:push("Adventurer")
+			expect((s:top() :: any).id).toBe("Adventurer")
+			expect((s:pop() :: any).id).toBe("Adventurer")
+			expect((s:top() :: any).id).toBe("Hire")
+			s:pop()
+			expect(s:top()).toBe(nil)
+			expect(s:pop()).toBe(nil)
+		end)
+		it("D-134 重ねるのは最大3段。4段目を開くと一番下を閉じる", function()
+			local s = NavStack.new()
+			s:push("A")
+			s:push("B")
+			s:push("C")
+			local out = s:push("D")
+			expect((out :: any).id).toBe("A")
+			expect(s:depth()).toBe(3)
+		end)
+		it("D-220 流れの中で進むときは置き換え（段数は増えない）", function()
+			local s = NavStack.new()
+			s:push("HireDesk")
+			s:replace("HirePostings")
+			expect(s:depth()).toBe(1)
+			expect((s:top() :: any).id).toBe("HirePostings")
+		end)
+		it("D-134 ホームで全部閉じてメインへ", function()
+			local s = NavStack.new()
+			s:push("A")
+			s:push("B")
+			local closed = s:home()
+			expect(#closed).toBe(2)
+			expect(closed[1].id).toBe("B")
+			expect(s:depth()).toBe(0)
+		end)
+	end)
+end

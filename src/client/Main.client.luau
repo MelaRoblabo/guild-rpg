@@ -81,6 +81,28 @@ input.Parent = gui
 
 gui.Parent = (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 
+-- M8 の画面（D-227）。M8-1 は部品の見本だけ。F1 でデバッグ画面の表示を切り替え、F2 で部品の見本を開く
+local UserInputService = game:GetService("UserInputService")
+local Nav = require("./ui/Nav")
+local Root = require("./ui/Root")
+require("./screens/Gallery")
+Root.mount()
+
+UserInputService.InputBegan:Connect(function(io: InputObject, processed: boolean)
+	if processed then
+		return
+	end
+	if io.KeyCode == Enum.KeyCode.F1 then
+		gui.Enabled = not gui.Enabled
+	elseif io.KeyCode == Enum.KeyCode.F2 then
+		if Nav.depth() == 0 then
+			Nav.open("Gallery")
+		else
+			Nav.home()
+		end
+	end
+end)
+
 -- ログ ----------------------------------------------------------------------
 
 local logLines: { string } = {}
