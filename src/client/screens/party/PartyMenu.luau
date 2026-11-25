@@ -9,6 +9,8 @@
 --   - 右下：金＝行き先を選ぶ（地図 → マップで選ぶ → S-15 の面で Go：D-231 ⑦）。茶＝自動装備（より良い装備があるときは緑の ▲：D-216）。
 --   - 自動装備は押すとすぐ決めず、変わるカードの差（▲▼）を見せる。金の Equip で決め、茶の Cancel でやめる（D-231 ⑨・D-235 ③）。
 
+local TweenService = game:GetService("TweenService")
+
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Party = require("@game/ReplicatedStorage/Core/Party")
@@ -71,6 +73,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		Parent = frame,
 	})
 	local pickSlot: number? = nil -- 入れ替えで選んでいる隊列
+	-- 雇ったばかりの人（採用の画面の Party から開いたとき：D-246 ③）。控えの列を最初から出して光らせる
+	local newcomer: string? = (params :: any).newcomer
+	local pickAdv: string? = nil -- 控えの列で先に選んだ人（次に押した隊列へ入れる）
 	local equipMode = false -- 自動装備の差を見せている
 	local busy = false
 	local render: () -> ()
@@ -126,7 +131,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local uid = party.slots[slot]
 			local adv = view.adventurers[uid]
 			local selected = pickSlot == slot
-			local target = pickSlot ~= nil and not selected
+			local target = (pickSlot ~= nil and not selected) or pickAdv ~= nil
 			local card: Frame = new("Frame", {
 				Name = "Card" .. slot,
 				LayoutOrder = slot,
@@ -182,6 +187,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			face.Activated:Connect(function()
 				if equipMode or busy then
+					return
+				end
+				if pickAdv ~= nil then
+					-- 控えの列で先に選んだ人を、押した隊列へ入れる（D-246 ③）
+					local a = pickAdv
+					pickAdv = nil
+					newcomer = nil
+					send({ type = "SetPartySlot", partyIndex = partyIndex, slot = slot, adventurerUid = a })
+					render()
 					return
 				end
 				if pickSlot == nil then
@@ -358,8 +372,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 		end
 
+		-- 雇ったばかりの人がまだどのパーティにもいなければ、控えの列を最初から出す（D-246 ③）
+		if newcomer ~= nil and (view.adventurers[newcomer] == nil or Party.find(view, newcomer) ~= nil) then
+			newcomer = nil
+		end
 		-- 入れ替えで選んでいる間：下の一覧（このパーティ以外の冒険者。左端は外す）
-		if pickSlot ~= nil then
+		if pickSlot ~= nil or pickAdv ~= nil or newcomer ~= nil then
 			local strip: Frame = new("Frame", {
 				Name = "Others",
 				AnchorPoint = Vector2.new(0, 1),
@@ -388,13 +406,28 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				Parent = strip,
 			})
 			local function put(uid: string)
+				if pickSlot == nil then
+					-- 隊列をまだ選んでいない：空きがあればそこへ入れ、なければこの人を選んで隊列を待つ
+					local emptySlot = table.find(party.slots, Party.EMPTY)
+					if emptySlot and uid ~= Party.EMPTY then
+						newcomer = nil
+						pickAdv = nil
+						send({ type = "SetPartySlot", partyIndex = partyIndex, slot = emptySlot, adventurerUid = uid })
+					else
+						pickAdv = if pickAdv == uid then nil else uid
+					end
+					render()
+					return
+				end
 				local s = pickSlot :: number
 				pickSlot = nil
+				newcomer = nil
 				send({ type = "SetPartySlot", partyIndex = partyIndex, slot = s, adventurerUid = uid })
 				render()
 			end
 			local empty: TextButton = new("TextButton", {
 				Name = "LeaveEmpty",
+				Visible = pickSlot ~= nil, -- 外すのは隊列を選んでいるときだけ
 				LayoutOrder = 0,
 				Text = "○",
 				TextSize = 28,
@@ -429,21 +462,37 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end)
 			for i, o in others do
 				local free = o.p == nil
+				-- 控えのコマ：名前と Lv（D-246 ③）。ほかのパーティの人は番号つきで沈める
+				local lit = o.uid == newcomer or o.uid == pickAdv
 				local b: TextButton = new("TextButton", {
 					Name = "Adv_" .. o.uid,
 					LayoutOrder = i,
-					Text = if free then I.party else I.party .. o.p,
+					Text = (if free then "" else I.party .. o.p .. " ") .. o.adv.name .. "\nLv " .. o.adv.level,
 					TextSize = 21,
-					FontFace = Tokens.font.number,
+					FontFace = Tokens.font.display,
 					TextColor3 = C.inkLight,
 					TextTransparency = if free then 0 else 0.5,
 					AutoButtonColor = false,
 					Active = free,
-					Size = UDim2.fromOffset(74, 66),
+					Size = UDim2.fromOffset(150, 66),
 					BackgroundColor3 = if free then C.ch28 else C.ch13,
-					[CHILDREN] = { Components.corner(12) },
+					[CHILDREN] = {
+						Components.corner(12),
+						Components.stroke(if lit then C.selAmber else C.ch28, if lit then 4 else 2),
+					},
 					Parent = scroll,
 				})
+				if o.uid == newcomer and pickAdv == nil then
+					-- 雇ったばかりの人は縁が脈打つ（誘導の輪と同じ琥珀）
+					local stroke = b:FindFirstChildOfClass("UIStroke")
+					if stroke then
+						TweenService:Create(
+							stroke,
+							TweenInfo.new(0.55, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+							{ Thickness = 7 }
+						):Play()
+					end
+				end
 				if free then
 					b.Activated:Connect(function()
 						if not busy then

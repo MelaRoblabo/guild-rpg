@@ -4,6 +4,7 @@
 
 local TweenService = game:GetService("TweenService")
 
+local Party = require("@game/ReplicatedStorage/Core/Party")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local HireCommon = require("./HireCommon")
@@ -83,8 +84,20 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		name = "Party",
 		glyph = "A",
 		onClick = function()
-			-- パーティ編成（S-12）は M8-6。それまではメイン画面へ戻る
+			-- パーティ編成（S-12）を開き、控えの列で雇った人を光らせる（D-226 ③・D-246 ③）。
+			-- 待機のパーティがなければメイン画面へ
+			local v = Session.view
+			local target: number? = nil
+			for _, p in (v and v.parties) or {} do
+				if not Party.isBusy(v, p.index) then
+					target = p.index
+					break
+				end
+			end
 			api.home()
+			if target then
+				Nav.open("PartyMenu", { partyIndex = target, newcomer = uid })
+			end
 		end,
 	})
 	party.LayoutOrder = 2
