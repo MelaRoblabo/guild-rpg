@@ -13,6 +13,7 @@ local TweenService = game:GetService("TweenService")
 local ChestCommon = require("./ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
@@ -76,6 +77,9 @@ local function itemCard(parent: Frame, item: any, x: number, band: number, onPin
 	g.AutomaticSize = Enum.AutomaticSize.None
 	g.Size = UDim2.fromScale(1, 1)
 	g.Parent = art
+	if Art.put(art, Art.equip(item), { inset = 8 }) then
+		g.Visible = false -- 品の絵（D-254）
+	end
 	local pin: TextButton = new("TextButton", {
 		Name = "Pin",
 		Text = "",

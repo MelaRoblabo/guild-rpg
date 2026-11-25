@@ -12,6 +12,7 @@ local Party = require("@game/ReplicatedStorage/Core/Party")
 local TweenService = game:GetService("TweenService")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
+local Art = require("../ui/Art")
 local Portrait = require("../ui/Portrait")
 local HubState = require("../hub/HubState")
 local LevelUpMarks = require("../hub/LevelUpMarks")
@@ -419,14 +420,45 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local st = Replay.at(e.log, info.slots, info.maxHp, Session.now(), master.K)
 		replay = st
 		for _, c in scene:GetChildren() do
-			if c.Name ~= "Popup" and not c:IsA("UICorner") and not c:IsA("UIStroke") then
+			if
+				c.Name ~= "Popup"
+				and c.Name ~= "Bg"
+				and c.Name ~= "Monster"
+				and not c:IsA("UICorner")
+				and not c:IsA("UIStroke")
+			then
 				c:Destroy()
 			end
 		end
-		local function center(text: string, size: number, color: Color3, y: number)
+		-- ダンジョンの中だけ、そのダンジョンの背景（15章 §9。文字が読めるよう少し沈める）
+		if not (st.phase == "floor" and st.kind == "battle") then
+			local m = scene:FindFirstChild("Monster")
+			if m then
+				m:Destroy()
+			end
+		end
+		local bgImage = if st.phase == "floor" then Art.background(e.dungeonId) else nil
+		local bg = scene:FindFirstChild("Bg") :: ImageLabel?
+		if bgImage then
+			if bg == nil then
+				local made = Art.put(
+					scene,
+					bgImage,
+					{ scaleType = Enum.ScaleType.Crop, transparency = 0.35, zIndex = scene.ZIndex }
+				)
+				if made then
+					made.Name = "Bg"
+				end
+			elseif bg.Image ~= bgImage then
+				bg.Image = bgImage
+			end
+		elseif bg then
+			bg:Destroy()
+		end
+		local function center(text: string, size: number, color: Color3, y: number, x: number?)
 			local t = Components.text({ text = text, size = size, color = color, font = Tokens.font.display })
 			t.AnchorPoint = Vector2.new(0.5, 0.5)
-			t.Position = UDim2.fromScale(0.5, y)
+			t.Position = UDim2.fromScale(x or 0.5, y)
 			t.Parent = scene
 		end
 		local function chestPill()
@@ -458,13 +490,36 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local d = master.dungeons[e.dungeonId]
 		if st.kind == "battle" then
 			local mon = if st.monsterId then master.monsters[st.monsterId] else nil
-			center(if mon then mon.nameEn else "?", 25, C.inkLight, 0.45)
+			-- モンスターの絵（右寄せ。足元を下にそろえる：15章 §9）
+			-- （0.25 秒ごとに作り直すと読み込みが間に合わないので、同じ絵は残して差し替える）
+			local monImage = Art.monster(st.monsterId)
+			local monLabel = scene:FindFirstChild("Monster") :: ImageLabel?
+			if monImage and monLabel == nil then
+				new("ImageLabel", {
+					Name = "Monster",
+					Image = monImage,
+					BackgroundTransparency = 1,
+					AnchorPoint = Vector2.new(1, 1),
+					Position = UDim2.fromScale(0.98, 1),
+					Size = UDim2.fromScale(0.4, 0.74), -- 右上の宝箱の数にかからない高さ
+					ScaleType = Enum.ScaleType.Fit,
+					ZIndex = scene.ZIndex + 1,
+					Parent = scene,
+				})
+			elseif monImage and monLabel then
+				monLabel.Image = monImage
+			elseif monLabel then
+				monLabel:Destroy()
+			end
+			-- 絵があるときは名前と HP の棒を左へ寄せる（絵と重ねない）
+			local cx = if monImage then 0.36 else 0.5
+			center(if mon then mon.nameEn else "?", 25, C.inkLight, 0.45, cx)
 			-- 敵の HP の棒は名前のすぐ下（数字なし：D-236 ①・D-249 ③）
 			local track: Frame = new("Frame", {
 				Name = "MonsterHp",
 				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.fromScale(0.5, 0.58),
-				Size = UDim2.new(0.6, 0, 0, 18),
+				Position = UDim2.fromScale(cx, 0.58),
+				Size = UDim2.new(if monImage then 0.5 else 0.6, 0, 0, 18),
 				BackgroundColor3 = C.barTrack,
 				[CHILDREN] = { Components.corner(6) },
 				Parent = scene,

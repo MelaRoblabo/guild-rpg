@@ -13,6 +13,7 @@ local AdvCommon = require("./AdvCommon")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local EquipChoice = require("../../adventurers/EquipChoice")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
@@ -186,7 +187,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end)
 			return r
 		end
-		local function well(parent: GuiObject, icon: string, rarity: number?, grade: number?, dashed: boolean)
+		local function well(
+			parent: GuiObject,
+			icon: string,
+			rarity: number?,
+			grade: number?,
+			dashed: boolean,
+			image: string?
+		)
 			local w: Frame = new("Frame", {
 				Name = "Icon",
 				Position = UDim2.fromOffset(8, 7),
@@ -208,6 +216,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			t.AnchorPoint = Vector2.new(0.5, 0.5)
 			t.Position = UDim2.fromScale(0.5, 0.5)
 			t.Parent = w
+			if Art.put(w, image, { inset = 4 }) then
+				t.Visible = false -- 品の絵（D-254）
+			end
 			if grade and grade > 0 then
 				local g = Components.text({
 					text = "+" .. grade,
@@ -247,7 +258,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		for i, c in list do
 			local item = view.equipment[c.uid]
 			local r = row(1 + i, c.uid, pick == c.uid)
-			well(r, I[tab], item.rarity, item.grade, false)
+			well(r, I[tab], item.rarity, item.grade, false, Art.equip(item))
 			local vals: Frame = new("Frame", {
 				Name = "Values",
 				Position = UDim2.fromOffset(86, 0),

@@ -6,6 +6,7 @@ local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local Tokens = require("../../ui/Tokens")
 local master = require("../../Master")
 
@@ -141,6 +142,7 @@ end
 export type TileProps = {
 	name: string,
 	icon: string,
+	image: string?, -- 品の絵（あれば記号の代わりに出す：15章 §4）
 	rarity: number?,
 	grade: number?,
 	count: number?,
@@ -171,6 +173,9 @@ function WarehouseCommon.tile(p: TileProps): TextButton
 	ic.Position = UDim2.fromScale(0.5, 0.5)
 	ic.ZIndex = 9
 	ic.Parent = b
+	if Art.put(b, p.image, { inset = 10, zIndex = 9 }) then
+		ic.Visible = false
+	end
 	if p.rarity then
 		badge(b, ChestCommon.rarityShape(p.rarity), rar, C.inkWhite, UDim2.fromOffset(4, 4), 10)
 	end

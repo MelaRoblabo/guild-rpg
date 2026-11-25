@@ -11,6 +11,7 @@ local Game = require("@game/ReplicatedStorage/Core/Game")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local HubState = require("../../hub/HubState")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
@@ -279,6 +280,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				WarehouseCommon.tile({
 					name = "Item_" .. uid,
 					icon = I[if base then base.slot else "weapon"] or I.weapon,
+					image = Art.equip(item),
 					rarity = item.rarity,
 					grade = item.grade,
 					modifier = item.modifierId ~= nil,
@@ -434,6 +436,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					local t = WarehouseCommon.tile({
 						name = "Stacked" .. k,
 						icon = I[tab],
+						image = Art.equip(item),
 						rarity = item.rarity,
 						order = k,
 						onClick = function() end,
@@ -492,6 +495,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				WarehouseCommon.tile({
 					name = "Item_" .. r.itemId,
 					icon = if def and def.kind == "ticket" then I.items else I.potion,
+					image = Art.item(r.itemId),
 					count = r.count,
 					selected = itemPick == r.itemId,
 					order = i,

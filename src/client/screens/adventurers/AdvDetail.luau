@@ -17,6 +17,7 @@ local AdvCommon = require("./AdvCommon")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local HireCommon = require("../hire/HireCommon")
 local HubState = require("../../hub/HubState")
 local Nav = require("../../ui/Nav")
@@ -377,6 +378,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			ic.AnchorPoint = Vector2.new(0.5, 0.5)
 			ic.Position = UDim2.fromScale(0.5, 0.5)
 			ic.Parent = well
+			if Art.put(well, Art.equip(item), { inset = 4 }) then
+				ic.Visible = false -- 付けている品の絵（D-254）
+			end
 			if item then
 				if item.grade > 0 then
 					local g = Components.text({

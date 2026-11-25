@@ -9,6 +9,7 @@ local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
 local Party = require("@game/ReplicatedStorage/Core/Party")
 local Chest = require("@game/ReplicatedStorage/Core/Chest")
+local EquipmentLook = require("@game/ReplicatedStorage/Core/EquipmentLook")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Portrait = require("../../ui/Portrait")
@@ -105,9 +106,8 @@ end
 
 -- 品の名前（修飾語＋装備名。グレードは別に出す）
 function ChestCommon.itemName(item: any): string
-	local base = master.equipmentBases[item.baseId]
 	local mod = if item.modifierId then master.modifiers[item.modifierId] else nil
-	return (if mod then mod.nameEn .. " " else "") .. (if base then base.nameEn else item.baseId)
+	return (if mod then mod.nameEn .. " " else "") .. EquipmentLook.nameEn(item, master) -- 段とレアリティの名前（D-254）
 end
 
 function ChestCommon.isBusy(view: any, advUid: string): boolean

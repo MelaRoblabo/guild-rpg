@@ -18,6 +18,7 @@ local AdvCommon = require("../adventurers/AdvCommon")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local Portrait = require("../../ui/Portrait")
 local Nav = require("../../ui/Nav")
 local PickMode = require("../../hub/PickMode")
@@ -367,6 +368,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						},
 						Parent = eqRow,
 					})
+					if Art.put(b, Art.equip(item), { inset = 6 }) then
+						b.Text = "" -- 付けている品の絵（D-254）
+					end
 					b.Activated:Connect(function()
 						if not equipMode and pickSlot == nil then
 							api.open("EquipSelect", { uid = adv.uid, slot = s })

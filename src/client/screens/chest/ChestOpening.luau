@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local ChestCommon = require("./ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local HubState = require("../../hub/HubState")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
@@ -251,6 +252,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					cell.BackgroundColor3 = C.ch13
 					glyph.Text = ChestCommon.rarityShape(r.rank)
 					glyph.TextColor3 = ChestCommon.rarityColor(r.rank)
+					-- 開いた箱の絵（レアリティごとの箱：D-253）。開ける前は箱の種類を見せない（D-087）
+					if Art.put(cell, Art.chest(r.rank, true), { inset = 4 }) then
+						glyph.Visible = false
+					end
 				end
 			end
 			itemsText.Text = HubState.formatNumber(items)
