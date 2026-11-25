@@ -220,6 +220,8 @@ return function(t)
 			for _ = 1, n do
 				Chest.add(s, "dng_castle", rank, 1)
 			end
+			-- 初めて開ける宝箱の確定の装備（D-246 ①）は FirstChest.spec で見る。ここは普通の宝箱の決まりだけを見る
+			s.stats.firstChestOpenedAt = T0
 			return s
 		end
 		it(

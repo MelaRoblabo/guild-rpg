@@ -788,6 +788,17 @@ local function validateLootAndStarter(c: Checker, d: any)
 		c:number("LootTables.chest.goldMult", L.goldMult, 0)
 		c:integer("LootTables.chest.potionMinRank", L.potionMinRank, 1, rarityCount(d))
 	end
+	-- 初めて開ける宝箱の確定の装備（D-246 ①）
+	local F = if type(d.LootTables) == "table" then d.LootTables.firstChest else nil
+	if type(F) ~= "table" then
+		c:error("LootTables.firstChest", "テーブルが必要")
+	else
+		if F.slot ~= "weapon" and F.slot ~= "armor" then
+			c:error("LootTables.firstChest.slot", "weapon か armor（比べる値のある枠）")
+		end
+		c:integer("LootTables.firstChest.rarity", F.rarity, 1, rarityCount(d))
+		c:integer("LootTables.firstChest.grade", F.grade, 0, 3)
+	end
 
 	local S = d.StarterSet
 	if type(S) ~= "table" then

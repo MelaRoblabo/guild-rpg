@@ -3,6 +3,7 @@
 -- 中身は開封時に抽選する（D-015）。乱数の消費順：装備の数 → 各装備（基本・グレード・修飾語の有無・種類・値）
 --   → 追加（売却用/ゴールド）→ 売却用の種類 → ポーション判定 → ポーションの種類 → 転職ポーションの職業
 
+local Formulas = require("./Formulas")
 local Inventory = require("./Inventory")
 local Rng = require("./Rng")
 
@@ -237,6 +238,45 @@ function Chest.open(state: any, chest: any, rng: Rng.Rng, master: any): any
 		soldItemsGold = soldItemsGold,
 		gold = contents.gold,
 	}
+end
+
+-- 初めて開ける宝箱の確定の装備（D-246 ①）：パーティ1の誰かの今の装備より強くなるものを1つ作る。
+-- 候補＝パーティ1のメンバー×付けられる基本（firstChest.slot の枠・firstChest.rarity で出るもの）のうち、
+-- 比べる値（Formulas.bulkSellValue）が今の装備より高い組。候補から乱数で1つ選ぶ。候補がなければ nil
+function Chest.firstUpgrade(state: any, dungeon: any, rng: Rng.Rng, master: any): any?
+	local F = master.raw.LootTables.firstChest
+	local party = state.parties[1]
+	if party == nil then
+		return nil
+	end
+	local bases = {}
+	for _, b in master.raw.EquipmentBases do
+		if b.slot == F.slot and b.minRarity <= F.rarity then
+			table.insert(bases, b)
+		end
+	end
+	local candidates = {}
+	for _, uid in party.slots do
+		local adv = state.adventurers[uid]
+		if adv then
+			local curUid = adv.equipment[F.slot]
+			local cur = if curUid then state.equipment[curUid] else nil
+			local curValue = if cur then Formulas.bulkSellValue(cur, master) or 0 else 0
+			for _, b in bases do
+				if Inventory.canEquip(adv.jobId, b.id, master) then
+					local fields = { baseId = b.id, rarity = F.rarity, grade = F.grade, itemLevel = dungeon.tier }
+					if (Formulas.bulkSellValue(fields, master) or 0) > curValue then
+						table.insert(candidates, fields)
+					end
+				end
+			end
+		end
+	end
+	if #candidates == 0 then
+		return nil
+	end
+	local pick = rng:pickWeighted(candidates, uniform)
+	return Inventory.newEquipment(state, pick)
 end
 
 -- 1箱で増えうる装備の最大数（倉庫の空き確認用）

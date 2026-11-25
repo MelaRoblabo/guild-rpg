@@ -55,6 +55,8 @@ return function(t)
 		it("D-167 初期値のまま開けると、アンコモン以下は修飾語つきだけ残る", function()
 			local s = newState()
 			s.expansions.warehouseSize = 100000
+			-- 初めて開ける宝箱の確定の装備（D-246 ①）は FirstChest.spec で見る。ここは普通の宝箱の決まりだけを見る
+			s.stats.firstChestOpenedAt = T0
 			Chest.add(s, "dng_ruins", 1, 60)
 			Chest.add(s, "dng_ruins", 2, 60)
 			local r = exec(s, { type = "OpenChests", pileKey = "dng_ruins", count = 120 })
@@ -295,6 +297,8 @@ return function(t)
 				local s = withStrongSword()
 				s.expansions.warehouseSize = 100000
 				expect(s.settings.autoSell.keepModified).toBe(true) -- 初期値のまま
+				-- 初めて開ける宝箱の確定の装備（D-246 ①）は FirstChest.spec で見る。ここは普通の宝箱の決まりだけを見る
+				s.stats.firstChestOpenedAt = T0
 				Chest.add(s, "dng_graveyard", 1, 60)
 				local r = exec(s, { type = "OpenChests", pileKey = "dng_graveyard", count = 60 })
 				local uids = {}

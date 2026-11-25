@@ -717,6 +717,14 @@ handlers.OpenChests = function(state, cmd, ctx)
 			end
 			res.equipmentUids = kept
 		end
+		-- 初めて開ける宝箱には、パーティの誰かが強くなる装備を1つ必ず入れる（D-246 ①。自動売却しない）
+		if opened == 0 and state.stats.firstChestOpenedAt == nil then
+			local extra = Chest.firstUpgrade(state, source.dungeon, takeRng(state), master)
+			if extra then
+				table.insert(res.equipmentUids, extra.uid)
+				res.firstUpgrade = extra.uid
+			end
+		end
 		-- D-089：宝箱の山ごとの発生ライン以上のレアリティなら演出あり（派手さはレアリティで決まる）
 		res.effect = rank >= source.effectMinRarity
 		opened += 1
