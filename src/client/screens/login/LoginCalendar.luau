@@ -310,14 +310,26 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 		end
 	end
 
+	-- 金は Claim：押すとその場で受け取り箱の品を受け取ってから閉じる（D-250 ①。届け方は受け取り箱のまま：D-155）
+	local claiming = false
 	local nextBtn = Components.button({
 		kind = "gold",
 		width = 320,
-		icon = "▶",
-		label = Words.next,
+		icon = "✓",
+		label = Words.claim,
 		name = "Next",
 		glyph = "A",
-		onClick = onNext,
+		onClick = function()
+			if claiming then
+				return
+			end
+			claiming = true
+			local latest = Session.view
+			if latest and #(latest.inbox or {}) > 0 then
+				Session.sendAndWait({ type = "ClaimInbox" })
+			end
+			onNext()
+		end,
 	})
 	nextBtn.AnchorPoint = Vector2.new(1, 1)
 	nextBtn.Position = UDim2.new(1, -40, 1, -24)

@@ -267,6 +267,37 @@ local KIND = {
 	disabled = { top = C.ch16, bottom = C.ch16, rim = C.ch17, ink = C.inkLight, lip = C.ch16 },
 }
 
+-- 作ったボタンの色の種類だけを替える（金⇔茶・押せない色など：D-250 ②⑥）。厚みは作ったときのまま。
+-- 押せない色（disabled）にすると押しても反応せず、厚みを隠して語を薄くする
+function Components.setButtonKind(holder: Frame, kind: string)
+	local k = KIND[kind]
+	local face = holder:FindFirstChild("Face") :: TextButton?
+	if k == nil or face == nil then
+		return
+	end
+	local g = face:FindFirstChildOfClass("UIGradient")
+	if g then
+		g.Color = ColorSequence.new(k.top, k.bottom)
+	end
+	local stroke = face:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = k.rim
+	end
+	local enabled = kind ~= "disabled"
+	face.Active = enabled
+	local lip = holder:FindFirstChild("Lip") :: Frame?
+	if lip then
+		lip.BackgroundColor3 = k.lip
+		lip.Visible = enabled
+	end
+	for _, t in face:GetChildren() do
+		if t:IsA("TextLabel") then
+			t.TextColor3 = k.ink
+			t.TextTransparency = if enabled then 0 else Tokens.transparency.disabledInk
+		end
+	end
+end
+
 -- 押せるボタン。戻り値は外側の枠（大きさ = 幅 × (高さ + 厚み)）
 function Components.button(p: ButtonProps): Frame
 	local h = math.max(p.height or Tokens.size.btnPrimaryH, Tokens.size.tapMin)

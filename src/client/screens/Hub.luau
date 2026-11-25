@@ -567,6 +567,12 @@ local function refreshStatic(view: any)
 		total += c.count
 	end
 	chestCount.Text = tostring(total)
+	-- 宝箱が0個のときは茶、あるときだけ金（D-250 ②。押せるのは同じ）
+	local kind = if total > 0 then "gold" else "brown"
+	if chestButton:GetAttribute("Kind") ~= kind then
+		chestButton:SetAttribute("Kind", kind)
+		Components.setButtonKind(chestButton, kind)
+	end
 	local hasInbox = false
 	for _ in view.inbox or {} do
 		hasInbox = true
