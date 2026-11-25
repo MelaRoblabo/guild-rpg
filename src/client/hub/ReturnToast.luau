@@ -13,6 +13,7 @@ local Nav = require("../ui/Nav")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
+local Words = require("../ui/Words")
 local master = require("../Master")
 
 local C = Tokens.color
@@ -76,7 +77,7 @@ local function show(group: { any })
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(10, 7),
-		Size = UDim2.new(1, -96, 1, -14),
+		Size = UDim2.new(1, -130, 1, -14),
 		ZIndex = 51,
 		[CHILDREN] = {
 			new("UIListLayout", {
@@ -113,14 +114,14 @@ local function show(group: { any })
 	-- 右の端：同じ所へもう一度（待機のパーティだけ）
 	local go: TextButton = new("TextButton", {
 		Name = "Go",
-		Text = "▶", -- パーティの面の Go と同じ（↺ は Roblox の書体で出ない）
-		TextSize = 25,
-		FontFace = Tokens.font.number,
+		Text = "▶ " .. Words.go, -- パーティの面の Go と同じ（↺ は Roblox の書体で出ない）。語を添える（D-245）
+		TextSize = 21,
+		FontFace = Tokens.font.display,
 		TextColor3 = C.inkLight,
 		AutoButtonColor = false,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -7, 0.5, 0),
-		Size = UDim2.fromOffset(66, 66),
+		Size = UDim2.fromOffset(100, 66),
 		BackgroundColor3 = C.secondary,
 		ZIndex = 52,
 		[CHILDREN] = { Components.corner(33), Components.stroke(C.secondaryRim, 3) },

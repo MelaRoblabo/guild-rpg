@@ -24,6 +24,7 @@ local PickMode = require("../hub/PickMode")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
+local Words = require("../ui/Words")
 local WarehouseCommon = require("./warehouse/WarehouseCommon")
 local master = require("../Master")
 
@@ -311,7 +312,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = "gold",
 				width = 240,
 				icon = "▶",
-				label = tostring(p),
+				label = Words.go,
 				name = "Go",
 				glyph = "A",
 				onClick = function()
@@ -421,9 +422,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			actions.Parent = content
 			local form = Components.button({
 				kind = if pickParty and #suited > 0 then "brown" else "disabled",
-				width = 130,
+				width = 150,
 				height = 66,
 				icon = "♟✚",
+				label = Words.form,
 				name = "Form",
 				glyph = "X",
 				onClick = function()
@@ -460,7 +462,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = if canGo then "gold" else "disabled",
 				width = 240,
 				icon = "▶",
-				label = if pickParty then tostring(pickParty) else nil,
+				label = Words.go,
 				name = "Go",
 				glyph = "A",
 				onClick = function()

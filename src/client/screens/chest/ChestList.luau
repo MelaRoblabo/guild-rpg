@@ -17,6 +17,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -25,6 +26,8 @@ local new = Create.new
 local CHILDREN = Create.Children
 
 -- 数の札（暗い凹みにアイコンと数字）
+local OPEN_W = 160 -- 山ごとの「Open ×N」の幅（D-245）
+
 local function countPill(icon: string, n: number, iconColor: Color3?): Frame
 	local pill: Frame = new("Frame", {
 		Name = "Count",
@@ -91,10 +94,9 @@ local function pileRow(
 	local n = math.min(count, master.K.chestBatchOpen)
 	local open = Components.button({
 		kind = if enabled then "brown" else "disabled",
-		width = 140,
+		width = OPEN_W,
 		height = 66,
-		icon = info.icon,
-		label = "×" .. n,
+		label = Words.open .. " ×" .. n, -- 山の印は左の数の札にあるので、ボタンは語と数だけ（D-245）
 		name = "Open",
 		onClick = onOpen,
 	})
@@ -103,7 +105,7 @@ local function pileRow(
 	open.Parent = row
 	local pill = countPill(I.chest, count)
 	pill.AnchorPoint = Vector2.new(1, 0.5)
-	pill.Position = UDim2.new(1, -(6 + 140 + 12), 0.5, 0)
+	pill.Position = UDim2.new(1, -(6 + OPEN_W + 12), 0.5, 0)
 	pill.Parent = row
 	local name = Components.text({
 		text = (if info.special then info.icon .. "  " else "") .. info.name,
@@ -115,7 +117,7 @@ local function pileRow(
 	name.AutomaticSize = Enum.AutomaticSize.None
 	name.AnchorPoint = Vector2.new(0, 0.5)
 	name.Position = UDim2.new(0, 16, 0.5, 0)
-	name.Size = UDim2.new(1, -(16 + 6 + 140 + 12 + 130), 0, 40)
+	name.Size = UDim2.new(1, -(16 + 6 + OPEN_W + 12 + 110), 0, 40)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	name.Parent = row
 	return row
@@ -184,14 +186,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			},
 			Parent = body,
 		})
-		local function tabButton(id: string, icon: string, count: number?, order: number)
+		local function tabButton(id: string, icon: string, word: string, count: number?, order: number)
 			local on = tab == id
 			local b: TextButton = new("TextButton", {
 				Name = "Tab_" .. id,
 				LayoutOrder = order,
 				Text = "",
 				AutoButtonColor = false,
-				Size = UDim2.fromOffset(if count then 170 else 110, 66),
+				Size = UDim2.fromOffset(if count then 250 else 180, 66),
 				BackgroundColor3 = if on then C.selAmber else C.ch16,
 				ZIndex = 11,
 				[CHILDREN] = { Components.corner(33) },
@@ -219,6 +221,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			ic.LayoutOrder = 1
 			ic.ZIndex = 12
 			ic.Parent = inner
+			local wd = Components.text({ text = word, size = 21, color = ink, font = Tokens.font.display })
+			wd.LayoutOrder = 2
+			wd.ZIndex = 12
+			wd.Parent = inner
 			if count then
 				local t = Components.text({
 					text = HubState.formatNumber(count),
@@ -226,7 +232,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					color = ink,
 					font = Tokens.font.number,
 				})
-				t.LayoutOrder = 2
+				t.LayoutOrder = 3
 				t.ZIndex = 12
 				t.Parent = inner
 			end
@@ -238,8 +244,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end)
 			return b
 		end
-		tabButton("chests", I.chest, total, 1)
-		local inboxTab = tabButton("inbox", I.inbox, nil, 2)
+		tabButton("chests", I.chest, Words.chests, total, 1)
+		local inboxTab = tabButton("inbox", I.inbox, Words.inbox, nil, 2)
 		if #inbox > 0 then
 			-- 受け取り箱に届いたものがあるときだけ「！」（D-208 ⑤）
 			new("TextLabel", {
@@ -371,6 +377,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = if blocked or total == 0 then "disabled" else "gold",
 				width = 320,
 				icon = I.all,
+				label = Words.openAll,
 				name = "All",
 				glyph = "A",
 				onClick = function()
@@ -485,6 +492,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = if #inbox == 0 then "disabled" else "gold",
 				width = 320,
 				icon = I.claim,
+				label = Words.claim,
 				name = "Claim",
 				glyph = "A",
 				onClick = function()

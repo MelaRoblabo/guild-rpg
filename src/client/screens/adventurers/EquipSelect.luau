@@ -19,6 +19,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -121,12 +122,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = "Tab_" .. id,
 				LayoutOrder = i,
-				Text = I[id],
-				TextSize = 30,
-				FontFace = Tokens.font.number,
+				Text = I[id] .. " " .. Words.slot[id], -- 語を添える（D-245）
+				TextSize = 21,
+				FontFace = Tokens.font.display,
 				TextColor3 = if on then C.inkDark else C.inkLight,
 				AutoButtonColor = false,
-				Size = UDim2.fromOffset(96, 66),
+				Size = UDim2.fromOffset(Words.slotWidth[id], 66),
 				BackgroundColor3 = if on then C.selAmber else C.ch28,
 				ZIndex = 11,
 				[CHILDREN] = { Components.corner(33) },
@@ -365,6 +366,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			kind = if pick ~= nil then "gold" else "disabled",
 			width = 320,
 			icon = if unequip then I[tab] .. "→" else I.party .. I.attack, -- 外す＝枠＋外への矢印（D-232 ⑥）
+			label = if unequip then Words.unequip else Words.equip,
 			name = if unequip then "Unequip" else "Equip",
 			glyph = "A",
 			onClick = function()

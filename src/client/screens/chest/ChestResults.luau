@@ -15,6 +15,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -135,9 +136,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					local canEquip = not ChestCommon.isBusy(view, adv.uid)
 					local equip = Components.button({
 						kind = if canEquip then "brown" else "disabled",
-						width = 96,
+						width = 150,
 						height = 66,
 						icon = I.equip,
+						label = Words.equip,
 						name = "Equip",
 						onClick = function()
 							if busy then
@@ -267,12 +269,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if batch.all then
 			piles = ChestCommon.allPiles(view)
 			icon = I.all
+			label = Words.openAll
 		else
 			local key = batch.piles[1]
 			local left = ChestCommon.pileCount(view, key)
 			piles = if left > 0 then { key } else {}
 			icon = ChestCommon.pileInfo(key).icon
-			label = if left > 0 then "×" .. math.min(left, master.K.chestBatchOpen) else nil
+			label = Words.open .. (if left > 0 then " ×" .. math.min(left, master.K.chestBatchOpen) else "")
 		end
 		local canOpen = #piles > 0 and not ChestCommon.warehouseBlocked(view)
 		local again = Components.button({

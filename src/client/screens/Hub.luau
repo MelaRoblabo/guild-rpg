@@ -20,6 +20,7 @@ local WorldCarts = require("../hub/WorldCarts")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
+local Words = require("../ui/Words")
 local master = require("../Master")
 
 local C = Tokens.color
@@ -308,20 +309,35 @@ end
 ---------------------------------------------------------------------------
 -- 縁の部品
 
-local function roundButton(icon: string, size: number): TextButton
+-- 縁のボタン：アイコン＋語（D-245。アイコンだけでは分からないので、大きさを変えて語を入れる）
+local function edgeButton(icon: string, word: string): TextButton
 	return new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
-		Size = UDim2.fromOffset(size, size),
+		Size = UDim2.fromOffset(0, 66),
+		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundColor3 = C.ch28,
 		ZIndex = 20,
 		[CHILDREN] = {
-			Components.corner(size / 2),
+			Components.corner(33),
 			Components.stroke(C.bronze, 3),
+			Components.padding(0, 20, 0, 16),
+			new("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, 8),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
 			(function()
-				local t = Components.text({ text = icon, size = 30, color = C.inkLight, font = Tokens.font.number })
-				t.AutomaticSize = Enum.AutomaticSize.None
-				t.Size = UDim2.fromScale(1, 1)
+				local t = Components.text({ text = icon, size = 28, color = C.inkLight, font = Tokens.font.number })
+				t.LayoutOrder = 1
+				t.ZIndex = 21
+				return t
+			end)(),
+			(function()
+				local t = Components.text({ text = word, size = 21, color = C.inkLight, font = Tokens.font.display })
+				t.Name = "Word"
+				t.LayoutOrder = 2
 				t.ZIndex = 21
 				return t
 			end)(),
@@ -350,13 +366,13 @@ local function buildEdges(parent: Frame)
 		},
 		Parent = parent,
 	})
-	local quest = roundButton("✔", 66)
+	local quest = edgeButton("✔", Words.quests)
 	quest.LayoutOrder = 1
 	quest.Parent = topRight
 	quest.Activated:Connect(function()
 		Nav.open("Quests") -- D-233（M8-6）
 	end)
-	local gear = roundButton("⚙", 66)
+	local gear = edgeButton("⚙", Words.settings)
 	gear.LayoutOrder = 2
 	gear.Parent = topRight
 	gear.Activated:Connect(function()
@@ -381,7 +397,7 @@ local function buildEdges(parent: Frame)
 		end
 	end)
 	-- ゴールドの下：フレンドボタン（D-213 ⑯）
-	local friend = roundButton("♟", 66)
+	local friend = edgeButton("♟", Words.friends)
 	friend.AnchorPoint = Vector2.new(1, 0)
 	friend.Position = UDim2.new(1, -40, 0, band + 12 + 66 + 12)
 	friend.Parent = parent
@@ -389,8 +405,9 @@ local function buildEdges(parent: Frame)
 	-- 右下：宝箱ボタン（唯一の金：D-225 ②）
 	local chest = Components.button({
 		kind = "gold",
-		width = 260,
+		width = 300,
 		icon = "▣",
+		label = Words.chests,
 		glyph = "A",
 		name = "ChestButton",
 		onClick = function()
@@ -423,7 +440,7 @@ local function buildEdges(parent: Frame)
 	})
 	chestNotice.Position = UDim2.new(1, -6, 0, 6)
 
-	-- 左下：下メニュー（ギルド・冒険者・倉庫。アイコンだけ：D-213 ⑩）。画面は M8-3・M8-6 でつなぐ
+	-- 左下：下メニュー（ギルド・冒険者・倉庫。アイコン＋語：D-245。D-213 ⑩の「アイコンだけ」を置き換え）
 	local menu: Frame = new("Frame", {
 		Name = "BottomMenu",
 		AnchorPoint = Vector2.new(0, 1),
@@ -441,8 +458,9 @@ local function buildEdges(parent: Frame)
 		},
 		Parent = parent,
 	})
+	local words = { Words.guild, Words.adventurers, Words.warehouse }
 	for i, icon in { I.home, I.party, "▤" } do
-		local b = roundButton(icon, 66)
+		local b = edgeButton(icon, words[i])
 		b.Name = ({ "Guild", "Adventurers", "Warehouse" })[i]
 		b.LayoutOrder = i
 		b.Parent = menu

@@ -18,6 +18,7 @@ local Replay = require("../party/Replay")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
+local Words = require("../ui/Words")
 local master = require("../Master")
 
 local C = Tokens.color
@@ -263,9 +264,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if s.state == "waiting" then
 			local menu = Components.button({
 				kind = "brown",
-				width = 120,
+				width = 150,
 				height = 66,
 				icon = "▤",
+				label = Words.menu,
 				name = "Menu",
 				glyph = "X",
 				onClick = function()
@@ -280,6 +282,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = if dest then "gold" else "disabled",
 				width = 200,
 				icon = "▶",
+				label = Words.go,
+				name = "Go",
 				glyph = "A",
 				onClick = function()
 					if dest then
@@ -299,9 +303,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local on = party.autoRepeat ~= nil
 			local toggle = Components.button({
 				kind = if on then "gold" else "brown",
-				width = 120,
+				width = 170,
 				height = 66,
 				icon = I.reroll,
+				label = Words.repeatOn,
+				name = "Repeat",
 				glyph = "X",
 				onClick = function()
 					Session.send({

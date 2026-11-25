@@ -15,6 +15,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -100,6 +101,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			kind = "gold",
 			width = 200,
 			icon = RebirthCommon.icon.train,
+			label = Words.train,
 			name = "Train",
 			glyph = "A",
 			onClick = function()
@@ -119,6 +121,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			kind = "blue",
 			width = 300,
 			icon = RebirthCommon.icon.keep,
+			label = Words.keepLook,
 			cost = if keep > 0 then tostring(keep) else Components.icon.plus,
 			costIcon = "",
 			name = "KeepLook",

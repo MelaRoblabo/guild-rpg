@@ -19,6 +19,7 @@ local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -213,13 +214,13 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		-- 旗の下：拡張の入口（D-232 ③）。買える拡張があるときだけ NEW
 		local expand: TextButton = new("TextButton", {
 			Name = "Expand",
-			Text = "🔨",
-			TextSize = 30,
-			FontFace = Tokens.font.number,
+			Text = "🔨 " .. Words.expand, -- 語を添える（D-245）
+			TextSize = 21,
+			FontFace = Tokens.font.display,
 			TextColor3 = C.inkLight,
 			AutoButtonColor = false,
-			Position = UDim2.fromOffset(80, band + 314),
-			Size = UDim2.fromOffset(96, 66),
+			Position = UDim2.fromOffset(60, band + 314),
+			Size = UDim2.fromOffset(150, 66),
 			BackgroundColor3 = C.secondary,
 			ZIndex = 6,
 			[CHILDREN] = { Components.corner(18), Components.stroke(C.secondaryRim, 3) },
@@ -253,12 +254,12 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		local warn: TextButton = new("TextButton", {
 			Name = "RosterFull",
 			LayoutOrder = 1,
-			Text = "♟ ⚠",
-			TextSize = 25,
-			FontFace = Tokens.font.number,
+			Text = "♟ " .. Words.full,
+			TextSize = 21,
+			FontFace = Tokens.font.display,
 			TextColor3 = C.warnDark,
 			AutoButtonColor = false,
-			Size = UDim2.fromOffset(120, 66),
+			Size = UDim2.fromOffset(130, 66),
 			BackgroundColor3 = C.ch10,
 			[CHILDREN] = { Components.corner(33), Components.stroke(C.warnDark, 2) },
 			Parent = actions,
@@ -271,6 +272,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		kind = if full or not canPay then "disabled" else "gold",
 		width = 260,
 		icon = Components.icon.bell,
+		label = Words.hire,
 		name = "Call",
 		cost = HubState.formatNumber(cost),
 		glyph = "A",

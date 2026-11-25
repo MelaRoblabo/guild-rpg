@@ -26,6 +26,7 @@ local Roster = require("../../adventurers/Roster")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -115,19 +116,21 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 
 		-- 左：肖像（仮）と保護のピン、下の段の道具
 		local portrait = HireCommon.portrait(body, adv)
+		-- 保護のピン（D-217）。語を添える（D-245）
 		local pin: TextButton = new("TextButton", {
 			Name = "Pin",
-			Text = I.pin,
-			TextSize = 28,
-			FontFace = Tokens.font.number,
-			TextColor3 = C.inkLight,
+			Text = I.pin .. " " .. (if adv.locked then Words.locked else Words.lock),
+			TextSize = 21,
+			FontFace = Tokens.font.display,
+			TextColor3 = if adv.locked then C.inkDark else C.inkLight,
 			AutoButtonColor = false,
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.new(1, -12, 0, 12),
-			Size = UDim2.fromOffset(66, 66),
+			Size = UDim2.fromOffset(0, 66),
+			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundColor3 = if adv.locked then C.selAmber else C.secondary,
 			ZIndex = 9,
-			[CHILDREN] = { Components.corner(33), Components.stroke(C.bronze, 3) },
+			[CHILDREN] = { Components.corner(33), Components.stroke(C.bronze, 3), Components.padding(0, 18, 0, 16) },
 			Parent = portrait,
 		})
 		pin.Activated:Connect(function()
@@ -136,18 +139,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				render()
 			end
 		end)
+		-- 道具：アイコン＋語の2列（D-245。アイコンだけの小さな丸から大きさを変えた）
 		local tools: Frame = new("Frame", {
 			Name = "Tools",
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, -14),
-			Size = UDim2.fromOffset(0, 66),
-			AutomaticSize = Enum.AutomaticSize.X,
+			Size = UDim2.new(1, -28, 0, 66 * 2 + 12),
 			BackgroundTransparency = 1,
 			ZIndex = 9,
 			[CHILDREN] = {
-				new("UIListLayout", {
-					FillDirection = Enum.FillDirection.Horizontal,
-					Padding = UDim.new(0, 14),
+				new("UIGridLayout", {
+					CellSize = UDim2.new(0.5, -6, 0, 66),
+					CellPadding = UDim2.fromOffset(12, 12),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
 			},
@@ -157,6 +160,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			order: number,
 			name: string,
 			icon: string,
+			word: string,
 			count: number?,
 			enabled: boolean,
 			onClick: () -> ()
@@ -164,14 +168,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = name,
 				LayoutOrder = order,
-				Text = icon,
-				TextSize = 30,
-				FontFace = Tokens.font.number,
+				Text = icon .. " " .. word,
+				TextSize = 21,
+				FontFace = Tokens.font.display,
 				TextColor3 = C.inkLight,
 				TextTransparency = if enabled then 0 else 0.5,
 				AutoButtonColor = false,
 				Active = enabled,
-				Size = UDim2.fromOffset(74, 66),
 				BackgroundColor3 = if enabled then C.secondary else C.disabled,
 				ZIndex = 10,
 				[CHILDREN] = { Components.corner(18), Components.stroke(C.secondaryRim, 3) },
@@ -195,13 +198,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				jobPotions += items[row.id] or 0
 			end
 		end
-		tool(1, "Rename", I.rename, nil, adv.uniqueId == nil, function()
+		tool(1, "Rename", I.rename, Words.rename, nil, adv.uniqueId == nil, function()
 			overlay = "rename"
 			render()
 		end)
 		local looks = items.itm_potion_appearance_change or 0
 		local pending = view.appearanceSession and view.appearanceSession.adventurerUid == uid
-		tool(2, "LookChange", I.look, looks, adv.uniqueId == nil and (looks > 0 or pending), function()
+		tool(2, "LookChange", I.look, Words.looks, looks, adv.uniqueId == nil and (looks > 0 or pending), function()
 			-- 押したらすぐ1個使って抽選（確認なし：D-231 ①）→ S-44。選ぶ途中なら続き（D-131）
 			if busy then
 				return
@@ -217,11 +220,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				render()
 			end
 		end)
-		tool(3, "JobPotion", I.jobPotion, jobPotions, not exploring and jobPotions > 0, function()
+		tool(3, "JobPotion", I.jobPotion, Words.jobChange, jobPotions, not exploring and jobPotions > 0, function()
 			overlay = "job"
 			render()
 		end)
-		tool(4, "Dismiss", I.dismiss, nil, not exploring and not adv.locked, function()
+		tool(4, "Dismiss", I.dismiss, Words.dismiss, nil, not exploring and not adv.locked, function()
 			overlay = "dismiss"
 			render()
 		end)
@@ -510,6 +513,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = if can then "gold" else "disabled",
 				width = 320,
 				icon = I.train,
+				label = Words.train,
 				cost = HubState.formatNumber(cost),
 				name = "Train",
 				glyph = "A",
@@ -704,6 +708,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				width = 200,
 				height = 66,
 				icon = "✓",
+				label = Words.ok,
 				name = "RenameOk",
 				glyph = "A",
 				onClick = function()

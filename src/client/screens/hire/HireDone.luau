@@ -10,6 +10,7 @@ local HireCommon = require("./HireCommon")
 local Nav = require("../../ui/Nav")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 
 local C = Tokens.color
 local I = Components.icon
@@ -64,9 +65,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	actions.Visible = false
 	local home = Components.button({
 		kind = "brown",
-		width = 120,
+		width = 160,
 		height = 66,
 		icon = I.home,
+		label = Words.home,
 		name = "Home",
 		glyph = "X",
 		onClick = api.home,
@@ -77,6 +79,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		kind = "gold",
 		width = 200,
 		icon = I.party,
+		label = Words.party,
 		name = "Party",
 		glyph = "A",
 		onClick = function()

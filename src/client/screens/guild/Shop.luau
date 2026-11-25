@@ -12,6 +12,7 @@ local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -136,9 +137,10 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		if cur.odds then
 			local dice = Components.button({
 				kind = "brown",
-				width = 96,
+				width = 150,
 				height = 66,
 				icon = "🎲",
+				label = Words.odds,
 				name = "Odds",
 				glyph = "Y",
 				onClick = function()
@@ -150,7 +152,14 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			dice.Parent = actions
 		end
 		-- 購入は M9。今は押せない色
-		local buy = Components.button({ kind = "disabled", width = 320, icon = "R$", name = "Buy", glyph = "A" })
+		local buy = Components.button({
+			kind = "disabled",
+			width = 320,
+			icon = "R$",
+			label = Words.buy,
+			name = "Buy",
+			glyph = "A",
+		})
 		buy.LayoutOrder = 2
 		buy.Parent = actions
 	end

@@ -226,7 +226,14 @@ function WarehouseCommon.tool(name: string, icon: string, width: number, onClick
 		ZIndex = 10,
 		[CHILDREN] = { Components.corner(18), Components.stroke(C.secondaryRim, 3) },
 	})
-	local t = Components.text({ text = icon, size = 30, color = C.inkLight, font = Tokens.font.number })
+	-- 語を含むときは語の大きさ（D-245）
+	local hasWord = utf8.len(icon) ~= nil and (utf8.len(icon) :: number) > 3
+	local t = Components.text({
+		text = icon,
+		size = if hasWord then 21 else 30,
+		color = C.inkLight,
+		font = if hasWord then Tokens.font.display else Tokens.font.number,
+	})
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
 	t.Position = UDim2.fromScale(0.5, 0.5)
 	t.ZIndex = 11

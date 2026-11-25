@@ -14,6 +14,7 @@ local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -298,6 +299,7 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 		kind = "gold",
 		width = 320,
 		icon = "▶",
+		label = Words.next,
 		name = "Next",
 		glyph = "A",
 		onClick = onNext,

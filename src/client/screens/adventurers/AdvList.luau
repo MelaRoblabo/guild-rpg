@@ -16,6 +16,7 @@ local Roster = require("../../adventurers/Roster")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -208,12 +209,12 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = "Line_" .. id,
 				LayoutOrder = i,
-				Text = if id == "all" then I.all else AdvCommon.lineWord[id],
-				TextSize = if id == "all" then 30 else 21,
+				Text = if id == "all" then Words.all else AdvCommon.lineWord[id], -- 語にする（D-245）
+				TextSize = 21,
 				FontFace = Tokens.font.number,
 				TextColor3 = if on then C.inkDark else C.inkLight,
 				AutoButtonColor = false,
-				Size = UDim2.fromOffset(if id == "all" then 74 else 96, 66),
+				Size = UDim2.fromOffset(96, 66),
 				BackgroundColor3 = if on then C.selAmber else C.ch28,
 				ZIndex = 11,
 				[CHILDREN] = { Components.corner(33) },
@@ -227,12 +228,12 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		-- 並べ方のボタン（今の並べ方と向き）
 		local sortBtn: TextButton = new("TextButton", {
 			Name = "Sort",
-			Text = I.sort .. " " .. SORT_GLYPH[prefs.advSort] .. (if prefs.advDesc then "▼" else "▲"),
-			TextSize = 25,
+			Text = Words.sort .. " " .. SORT_GLYPH[prefs.advSort] .. (if prefs.advDesc then "▼" else "▲"),
+			TextSize = 21,
 			FontFace = Tokens.font.number,
 			TextColor3 = C.inkLight,
 			AutoButtonColor = false,
-			Position = UDim2.fromOffset(40 + 8 + 74 + 4 * 96 + 4 * 4 + 28, band + 16),
+			Position = UDim2.fromOffset(40 + 8 + 5 * 96 + 4 * 4 + 28, band + 16),
 			Size = UDim2.fromOffset(150, 66),
 			BackgroundColor3 = if sheetOpen then C.selAmber else C.secondary,
 			ZIndex = 10,

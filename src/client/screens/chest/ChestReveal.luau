@@ -19,6 +19,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local Upgrades = require("../../chest/Upgrades")
 local master = require("../../Master")
 
@@ -271,7 +272,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			width = if equipable then 160 else 320,
 			height = if equipable then 66 else nil,
 			icon = I.next,
-			label = if index < #batch.special then string.rep("●", #batch.special - index) else nil,
+			label = Words.next
+				.. (if index < #batch.special then " " .. string.rep("●", #batch.special - index) else ""),
 			name = "Next",
 			glyph = if equipable then "X" else "A",
 			onClick = goNext,
@@ -339,6 +341,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			kind = if busy then "disabled" else "gold",
 			width = 320,
 			icon = I.equip,
+			label = Words.equip,
 			name = "Equip",
 			glyph = "A",
 			onClick = function()

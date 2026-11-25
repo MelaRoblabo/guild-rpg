@@ -22,6 +22,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -475,6 +476,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = "gold",
 				width = 320,
 				icon = I.party .. "✓",
+				label = Words.equip,
 				name = "Equip",
 				glyph = "A",
 				onClick = function()
@@ -491,9 +493,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		else
 			local auto = Components.button({
 				kind = if #plan > 0 then "brown" else "disabled",
-				width = 120,
+				width = 200,
 				height = 66,
 				icon = AUTO_ICON,
+				label = Words.autoEquip,
 				name = "AutoEquip",
 				glyph = "X",
 				onClick = function()
@@ -526,6 +529,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = "gold",
 				width = 320,
 				icon = MAP_ICON,
+				label = Words.destination,
 				name = "Destination",
 				glyph = "A",
 				onClick = function()

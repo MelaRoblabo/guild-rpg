@@ -13,6 +13,7 @@ local Nav = require("../../ui/Nav")
 local NotificationPrompt = require("../../NotificationPrompt")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -171,9 +172,10 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		local ok = canNotify == true
 		local nb = Components.button({
 			kind = if ok then "brown" else "disabled",
-			width = 110,
+			width = 150,
 			height = 66,
 			icon = "🔔",
+			label = Words.allow,
 			name = "Notify",
 			onClick = function()
 				if ok then

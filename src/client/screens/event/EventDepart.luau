@@ -22,6 +22,7 @@ local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -327,7 +328,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			kind = if pick then "gold" else "disabled",
 			width = 240,
 			icon = "▶",
-			label = KIND_ICON[ev.kind],
+			label = Words.go,
 			name = "Go",
 			glyph = "A",
 			onClick = function()

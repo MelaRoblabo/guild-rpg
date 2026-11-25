@@ -15,6 +15,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local master = require("../../Master")
 
@@ -225,6 +226,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			kind = if cur and cur.canBuy then "gold" else "disabled",
 			width = 320,
 			icon = "🔨",
+			label = Words.expand,
 			cost = if cur and cur.step then HubState.formatNumber(cur.step.gold) else nil,
 			name = "Buy",
 			glyph = "A",

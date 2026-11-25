@@ -252,7 +252,7 @@ export type ButtonProps = {
 	width: number,
 	height: number?, -- 既定 80（メイン）。サブは 66（D-219・Guild UI）
 	icon: string?,
-	label: string?, -- 語は Rebirth・Sell・Reroll・Choose・Cancel・Nice だけ（D-218・D-220・D-224）
+	label: string?, -- ボタンの語（D-245。ui/Words の語を使う）
 	cost: string?, -- 費用（ボタンの中のコインと数字）
 	costIcon: string?, -- 費用の札のアイコン（既定はコイン。"" で出さない）
 	name: string?, -- インスタンスの名前（確かめ用）
@@ -327,9 +327,11 @@ function Components.button(p: ButtonProps): Frame
 		add(t)
 	end
 	if p.label then
+		-- 小さいボタン（高さ66のサブ・幅の狭いもの）は語を一段小さく（D-245。21px が下限：D-206）
+		local small = h < Tokens.size.btnPrimaryH or w < 180
 		local t = Components.text({
 			text = p.label,
-			size = Tokens.text.button,
+			size = if small then Tokens.text.caption else Tokens.text.button,
 			color = ink,
 			font = Tokens.font.display,
 			stroke = p.kind == "blue",

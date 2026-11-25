@@ -18,6 +18,7 @@ local Screen = require("../Screen")
 local Session = require("../../Session")
 local Stock = require("../../warehouse/Stock")
 local Tokens = require("../../ui/Tokens")
+local Words = require("../../ui/Words")
 local WarehouseCommon = require("./WarehouseCommon")
 local master = require("../../Master")
 
@@ -161,12 +162,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = "Tab_" .. id,
 				LayoutOrder = i,
-				Text = I[id],
-				TextSize = 30,
-				FontFace = Tokens.font.number,
+				Text = I[id] .. " " .. Words.slot[id], -- 語を添える（D-245）
+				TextSize = 21,
+				FontFace = Tokens.font.display,
 				TextColor3 = if on then C.inkDark else C.inkLight,
 				AutoButtonColor = false,
-				Size = UDim2.fromOffset(96, 66),
+				Size = UDim2.fromOffset(Words.slotWidth[id], 66),
 				BackgroundColor3 = if on then C.selAmber else C.ch28,
 				ZIndex = 11,
 				[CHILDREN] = { Components.corner(33) },
@@ -182,15 +183,19 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end)
 		end
 		local isGear = tab ~= "items"
-		local tabsRight = 40 + 4 + 4 * 96 + 3 * 4 + 4
+		local tabsW = 0
+		for _, id in TABS do
+			tabsW += Words.slotWidth[id]
+		end
+		local tabsRight = 40 + 4 + tabsW + (#TABS - 1) * 4 + 4
 
 		-- 並べ替えの面を開くボタン（今の並べ方の印と向き）
 		local x = tabsRight + 28
 		if isGear then
 			local sortBtn = WarehouseCommon.tool(
 				"Sort",
-				I.sort .. " " .. WarehouseCommon.sortIcon[prefs.whSort] .. (if prefs.whDesc then I.desc else I.asc),
-				140,
+				Words.sort .. " " .. WarehouseCommon.sortIcon[prefs.whSort] .. (if prefs.whDesc then I.desc else I.asc),
+				150,
 				function()
 					overlay = "sort"
 					render()
@@ -198,10 +203,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			)
 			sortBtn.Position = UDim2.fromOffset(x, band + 16)
 			sortBtn.Parent = body
-			x += 140 + 16
+			x += 150 + 16
 		end
 		-- 自動売却の設定（S-51）。オンなら緑の点
-		local auto = WarehouseCommon.tool("AutoSell", I.recycle, 66, function()
+		local auto = WarehouseCommon.tool("AutoSell", I.recycle .. " " .. Words.autoSell, 170, function()
 			api.open("AutoSell")
 		end)
 		auto.Position = UDim2.fromOffset(x, band + 16)
@@ -452,9 +457,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 			local bulk = Components.button({
 				kind = "brown",
-				width = 110,
+				width = 190,
 				height = 66,
 				icon = I.bulk,
+				label = Words.bulkSell,
 				name = "SellByRule",
 				glyph = "X",
 				onClick = function()
