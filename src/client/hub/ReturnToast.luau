@@ -3,12 +3,14 @@
 --   - オンライン中の帰還（ExpeditionReturned、留守番でないもの）で出す。少しの間に帰ったパーティは1つにまとめる（D-128）。
 --   - 中身：馬車（帰る向き）＋パーティの番号（まとめは重ねる）＋宝箱の数＋XP の札（休息ボーナス＝月、日替わり＝太陽。
 --     両方なら掛け合わせた倍率：06章 §14・§16）。右の端の Go＝同じ所へもう一度（待機のパーティだけ）。
+--   - レベルが上がった人がいれば「Lv▲ 人数」の札を足し、その人をパーティの面で一度光らせる（D-246 ④）。
 --   - トーストを触るとそのパーティを選ぶ（D-116）。画面を重ねている間（開封・面接・転生など）と、設定でオフのときは出さない。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local HubState = require("./HubState")
+local LevelUpMarks = require("./LevelUpMarks")
 local Nav = require("../ui/Nav")
 local Root = require("../ui/Root")
 local Session = require("../Session")
@@ -27,6 +29,7 @@ local GROUP_SECONDS = master.K.returnToastGroupSeconds
 local ReturnToast = {}
 
 local pending: { any } = {}
+local pendingLevelUps: { [string]: boolean } = {} -- まとめる間にレベルが上がった人（D-246 ④）
 local current: Frame? = nil
 local token = 0
 
@@ -42,7 +45,7 @@ local function xpMult(e: any): number
 	return m
 end
 
-local function show(group: { any })
+local function show(group: { any }, levelUps: number)
 	if current then
 		current:Destroy()
 		current = nil
@@ -65,7 +68,7 @@ local function show(group: { any })
 		-- 左の一覧のすぐ右から。右上のボタン（Quests・Settings：D-245 で語が付き広がった）に重ねない
 		AnchorPoint = Vector2.new(0, 0),
 		Position = UDim2.fromOffset(200, band + 12),
-		Size = UDim2.fromOffset(560, 80),
+		Size = UDim2.fromOffset(620, 80),
 		BackgroundColor3 = C.ch10,
 		ZIndex = 50,
 		[CHILDREN] = { Components.corner(40), Components.stroke(C.bronze, 3) },
@@ -105,6 +108,9 @@ local function show(group: { any })
 	if rest or daily then
 		-- 休息ボーナス＝月（☾ は Roblox の書体で出ないので 🌙）、日替わり＝太陽
 		label(3, (if rest then "🌙" else "") .. (if daily then "☀" else "") .. " XP ×" .. mult, 23, C.inkLight)
+	end
+	if levelUps > 0 then
+		label(4, "Lv▲ " .. levelUps, 23, C.upDark) -- レベルが上がった人数（D-246 ④）
 	end
 	tap.Activated:Connect(function()
 		HubState.selected = parties[1]
@@ -156,6 +162,9 @@ function ReturnToast.mount()
 		for _, e in events do
 			if e.type == "ExpeditionReturned" and not e.offline then
 				table.insert(pending, e)
+			elseif e.type == "LevelUp" and e.uid then
+				pendingLevelUps[e.uid] = true
+				LevelUpMarks.note(e.uid) -- パーティの面で一度光らせる（トーストを出さないときも）
 			end
 		end
 		if #pending == 0 then
@@ -167,6 +176,11 @@ function ReturnToast.mount()
 			end
 			local group = pending
 			pending = {}
+			local levelUps = 0
+			for _ in pendingLevelUps do
+				levelUps += 1
+			end
+			pendingLevelUps = {}
 			local view = Session.view
 			if Nav.depth() > 0 or view == nil then
 				return
@@ -174,7 +188,7 @@ function ReturnToast.mount()
 			if not Game.query.preferences(view, master).returnToast then
 				return
 			end
-			show(group)
+			show(group, levelUps)
 		end)
 	end)
 end

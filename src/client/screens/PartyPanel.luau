@@ -13,6 +13,7 @@ local TweenService = game:GetService("TweenService")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
+local LevelUpMarks = require("../hub/LevelUpMarks")
 local Nav = require("../ui/Nav")
 local Replay = require("../party/Replay")
 local Root = require("../ui/Root")
@@ -68,7 +69,14 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 	name.LayoutOrder = 2
 	name.TextTransparency = if down then 0.5 else 0
 	name.Parent = row
-	local lv = Components.text({ text = "Lv " .. adv.level, size = 21, color = C.inkMid, font = Tokens.font.number })
+	-- レベルが上がった直後の1回だけ、Lv を明るい数字の色と ▲ で光らせる（D-246 ④。数字は増減の瞬間だけ：D-218）
+	local lit = LevelUpMarks.lit(adv.uid, os.clock())
+	local lv = Components.text({
+		text = (if lit then "Lv▲ " else "Lv ") .. adv.level,
+		size = 21,
+		color = if lit then C.up else C.inkMid, -- 羊皮紙の上の ▲ の緑
+		font = Tokens.font.number,
+	})
 	lv.LayoutOrder = 3
 	lv.Parent = row
 	if hp ~= nil and maxHp ~= nil and maxHp > 0 then
