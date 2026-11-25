@@ -43,4 +43,9 @@ function QuestView.mainReward(rewards: any): { kind: string, n: number }?
 	return nil
 end
 
+-- 鍵の行にするか（D-250 ⑦）：転生の行は、まだ済んでおらず進みもなく、転生できる冒険者がいないうちは鍵で沈める
+function QuestView.locked(kind: string?, entry: any, anyRebirthable: boolean): boolean
+	return kind == "rebirths" and not entry.done and (entry.progress or 0) == 0 and not anyRebirthable
+end
+
 return QuestView

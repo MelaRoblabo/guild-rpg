@@ -11,6 +11,7 @@ local Calendar = require("@game/ReplicatedStorage/Core/Calendar")
 local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
+local Rebirth = require("@game/ReplicatedStorage/Core/Rebirth")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Guide = require("../../hub/Guide")
@@ -117,20 +118,29 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			left.AnchorPoint = Vector2.new(1, 0.5)
 			left.Position = UDim2.fromScale(1, 0.5)
 			left.Parent = head
+			-- 転生できる冒険者がいるか（Rebirth の行の鍵：D-250 ⑦）
+			local anyRebirthable = false
+			for _, a in view.adventurers or {} do
+				if Rebirth.canRebirth(a, master) == nil then
+					anyRebirthable = true
+					break
+				end
+			end
 			-- 行
 			for i, e in book.entries do
 				local row = master.quests[e.questId]
+				local locked = QuestView.locked(row and row.kind, e, anyRebirthable)
 				local r: Frame = new("Frame", {
 					Name = "Row_" .. e.questId,
 					LayoutOrder = i,
 					Size = UDim2.new(1, 0, 0, 76),
 					BackgroundColor3 = if e.done then C.ch68 else C.ch75,
-					BackgroundTransparency = if e.done then 0.35 else 0,
+					BackgroundTransparency = if e.done or locked then 0.35 else 0,
 					[CHILDREN] = { Components.corner(8), Components.padding(6, 10, 7, 14) },
 					Parent = b,
 				})
 				local word = Components.text({
-					text = if row then row.nameEn else e.questId,
+					text = (if locked then "🔒 " else "") .. (if row then row.nameEn else e.questId),
 					size = 23,
 					color = C.inkDark,
 					font = Tokens.font.bodyStrong,
@@ -161,6 +171,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				end
 				local track: Frame = new("Frame", {
 					Name = "Bar",
+					Visible = not locked, -- 鍵の行は進みの棒を出さない（D-250 ⑦）
 					AnchorPoint = Vector2.new(0, 1),
 					Position = UDim2.fromScale(0, 1),
 					Size = UDim2.new(1, 0, 0, 28),

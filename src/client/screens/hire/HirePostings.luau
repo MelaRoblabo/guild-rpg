@@ -2,7 +2,10 @@
 -- S-21b 求人票（D-220）。候補の数だけ求人票が机に乗っている。
 --   - 1枚は折りたたまれていて、触ると開く（演出の仮）。
 --   - 求人票を触ると大きくなり、右下の判子（もう一度選ぶ）で採用＝面接へ。選ばなかった候補は破棄される。
+--   - 判子（Hire）は最初から押せない色で出し、票を選ぶと金。選ぶまでは票が少し揺れる（D-250 ⑥）。
 --   - 特別な訪問者（ユニーク）は金の票で、能力は最初から決まっている。採用すると面接を飛ばして S-21e へ。
+
+local TweenService = game:GetService("TweenService")
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
@@ -174,6 +177,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 	local rings: { UIStroke } = {}
 	local sheets: { TextButton } = {}
 	local stamp: Frame
+	local sways: { Tween } = {}
 	local function refresh()
 		for i, s in sheets do
 			local on = selected == i
@@ -181,7 +185,26 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			s.Size = if on then UDim2.fromOffset(SHEET_W * 1.08, SHEET_H * 1.08) else UDim2.fromOffset(SHEET_W, SHEET_H)
 			s.BackgroundTransparency = if selected ~= nil and not on then 0.35 else 0
 		end
-		stamp.Visible = selected ~= nil
+		-- Hire は最初から押せない色で出し、票を選ぶと金（D-250 ⑥）
+		Components.setButtonKind(stamp, if selected ~= nil then "gold" else "disabled")
+		-- 選ぶまでは票が少し浮いて揺れる（触れる物だと分かるように）
+		for _, tw in sways do
+			tw:Cancel()
+		end
+		table.clear(sways)
+		for i, s in sheets do
+			s.Rotation = 0
+			if selected == nil then
+				s.Rotation = -1.5
+				local tw = TweenService:Create(
+					s,
+					TweenInfo.new(0.9 + i * 0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+					{ Rotation = 1.5 }
+				)
+				tw:Play()
+				table.insert(sways, tw)
+			end
+		end
 	end
 	local function hire()
 		if selected == nil then
