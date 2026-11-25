@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Portrait = require("../../ui/Portrait")
 local Nav = require("../../ui/Nav")
 local OtherCarts = require("../../world/OtherCarts")
 local Root = require("../../ui/Root")
@@ -293,6 +294,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			g.AnchorPoint = Vector2.new(0.5, 0.5)
 			g.Position = UDim2.fromScale(0.5, 0.5)
 			g.Parent = f
+			if Portrait.fill(f, m.appearanceId) then
+				g.Visible = false
+			end
 			local function line(order: number, t: string, size: number, color: Color3, font: Font)
 				local l = Components.text({ text = t, size = size, color = color, font = font })
 				l.LayoutOrder = order

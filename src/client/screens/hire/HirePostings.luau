@@ -11,6 +11,7 @@ local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local HireCommon = require("./HireCommon")
 local Nav = require("../../ui/Nav")
+local Portrait = require("../../ui/Portrait")
 local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
@@ -58,12 +59,14 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 		BackgroundTransparency = 1,
 		Parent = body,
 	})
-	new("Frame", {
+	local face: Frame = new("Frame", {
+		Name = "Face",
 		Size = UDim2.fromOffset(64, 64),
 		BackgroundColor3 = C.ch45,
 		[CHILDREN] = { Components.corner(8), Components.stroke(C.ch16, 2) },
 		Parent = head,
 	})
+	Portrait.fill(face, candidate.appearanceId)
 	local name = Components.text({
 		text = candidate.name .. " " .. (if candidate.gender == "f" then "♀" else "♂"),
 		size = 23,

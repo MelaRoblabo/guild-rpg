@@ -34,7 +34,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		return { frame = frame, scrim = 1 }
 	end
 	local band = Root.bandBottom()
-	local portrait = RebirthCommon.portrait(frame, { kind = if adv.uniqueId then "unique" else "general" })
+	local portrait = RebirthCommon.portrait(
+		frame,
+		{ kind = if adv.uniqueId then "unique" else "general", appearanceId = adv.appearanceId }
+	)
 	-- 光（2拍目）
 	local rays: Frame = new("Frame", {
 		Name = "Rays",

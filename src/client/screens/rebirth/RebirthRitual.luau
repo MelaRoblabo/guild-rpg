@@ -54,7 +54,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		return { frame = frame, scrim = 1 }
 	end
 	local K = master.K
-	RebirthCommon.portrait(frame, { kind = if adv.uniqueId then "unique" else "general" })
+	RebirthCommon.portrait(
+		frame,
+		{ kind = if adv.uniqueId then "unique" else "general", appearanceId = adv.appearanceId }
+	)
 	local data = RebirthCommon.preview(adv)
 	local panel = RebirthCommon.statPanel(frame, adv, data, nil, nil)
 	new("UIListLayout", {

@@ -12,6 +12,7 @@ local Party = require("@game/ReplicatedStorage/Core/Party")
 local TweenService = game:GetService("TweenService")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
+local Portrait = require("../ui/Portrait")
 local HubState = require("../hub/HubState")
 local LevelUpMarks = require("../hub/LevelUpMarks")
 local Nav = require("../ui/Nav")
@@ -59,7 +60,7 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 	})
 	local down = hp ~= nil and hp <= 0
 	-- 顔（仮：バストアップの代わりの丸）
-	new("Frame", {
+	local face: Frame = new("Frame", {
 		Name = "Face",
 		LayoutOrder = 1,
 		Size = UDim2.fromOffset(40, 40),
@@ -67,6 +68,7 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 		[CHILDREN] = { Components.corner(8), Components.stroke(C.ch16, 2) },
 		Parent = row,
 	})
+	Portrait.fill(face, adv.appearanceId, down)
 	local name = Components.text({ text = adv.name, size = 23, color = C.inkDark, font = Tokens.font.bodyStrong })
 	name.LayoutOrder = 2
 	name.TextTransparency = if down then 0.5 else 0

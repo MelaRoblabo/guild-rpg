@@ -312,7 +312,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		})
 		panel.Name = "WhoGetsStronger"
 		panel.Parent = revealed
-		local bust = ChestCommon.bust(Vector2.new(230, 380))
+		local bust = ChestCommon.bust(Vector2.new(230, 380), adv.appearanceId)
 		bust.Position = UDim2.fromOffset(0, 6)
 		bust.Parent = content
 		local busy = ChestCommon.isBusy(view, adv.uid)

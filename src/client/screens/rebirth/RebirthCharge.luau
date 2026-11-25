@@ -28,7 +28,10 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		return { frame = frame, scrim = 1 }
 	end
 	local adv = view.adventurers[r.adventurerUid]
-	RebirthCommon.portrait(frame, { kind = if adv.uniqueId then "unique" else "general" })
+	RebirthCommon.portrait(
+		frame,
+		{ kind = if adv.uniqueId then "unique" else "general", appearanceId = adv.appearanceId }
+	)
 	local panel = RebirthCommon.statPanel(frame, adv, r, r.currentBonus, nil)
 	local close = Screen.closeTopRight(frame, api.close)
 	close.BackgroundTransparency = 0.5 -- 進行中は薄く（介入しない）

@@ -5,6 +5,7 @@
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Portrait = require("../../ui/Portrait")
 local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Tokens = require("../../ui/Tokens")
@@ -76,6 +77,9 @@ function HireCommon.portrait(parent: Frame, candidate: any)
 	label.AutomaticSize = Enum.AutomaticSize.None
 	label.Size = UDim2.fromScale(1, 1)
 	label.Parent = content
+	if candidate and Portrait.fill(content, candidate.appearanceId) then
+		label.Visible = false -- バストアップの画像があれば仮の文字を隠す
+	end
 	if candidate and candidate.kind == "unique" then
 		local star = Components.text({ text = "★", size = 40, color = C.rewardGlow, font = Tokens.font.number })
 		star.Position = UDim2.fromOffset(8, 4)

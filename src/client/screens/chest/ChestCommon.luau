@@ -11,6 +11,7 @@ local Party = require("@game/ReplicatedStorage/Core/Party")
 local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Portrait = require("../../ui/Portrait")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
 local Upgrades = require("../../chest/Upgrades")
@@ -306,7 +307,7 @@ function ChestCommon.compareRow(slot: string, value: number, current: number): F
 end
 
 -- バストアップの仮の枠
-function ChestCommon.bust(size: Vector2): Frame
+function ChestCommon.bust(size: Vector2, appearanceId: string?): Frame
 	local f: Frame = new("Frame", {
 		Name = "Bust",
 		Size = UDim2.fromOffset(size.X, size.Y),
@@ -317,6 +318,9 @@ function ChestCommon.bust(size: Vector2): Frame
 	t.AutomaticSize = Enum.AutomaticSize.None
 	t.Size = UDim2.fromScale(1, 1)
 	t.Parent = f
+	if Portrait.fill(f, appearanceId) then
+		t.Visible = false
+	end
 	return f
 end
 

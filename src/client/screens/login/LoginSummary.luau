@@ -8,6 +8,7 @@
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Portrait = require("../../ui/Portrait")
 local HubState = require("../../hub/HubState")
 local LoginFlow = require("../../login/LoginFlow")
 local Nav = require("../../ui/Nav")
@@ -160,7 +161,10 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 			f.Name = "Face" .. i
 			f.LayoutOrder = i
 			f.Parent = faces
-			glyph(f, I.face, 30, C.inkLight)
+			local who = view and view.adventurers[m.uid]
+			if not Portrait.fill(f, who and who.appearanceId) then
+				glyph(f, I.face, 30, C.inkLight)
+			end
 			if m.up then
 				badge(f, Components.icon.up, C.ch75, C.up, 26, UDim2.new(1, -4, 1, -4))
 			end

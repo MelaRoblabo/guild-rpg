@@ -18,6 +18,7 @@ local AdvCommon = require("../adventurers/AdvCommon")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Portrait = require("../../ui/Portrait")
 local Nav = require("../../ui/Nav")
 local PickMode = require("../../hub/PickMode")
 local Root = require("../../ui/Root")
@@ -185,6 +186,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				[CHILDREN] = { Components.corner(8), Components.stroke(C.ch16, 2) },
 				Parent = card,
 			})
+			if adv and Portrait.fill(face, adv.appearanceId) then
+				face.Text = ""
+			end
 			face.Activated:Connect(function()
 				if equipMode or busy then
 					return

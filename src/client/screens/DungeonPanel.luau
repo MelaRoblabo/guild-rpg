@@ -18,6 +18,7 @@ local Game = require("@game/ReplicatedStorage/Core/Game")
 local Party = require("@game/ReplicatedStorage/Core/Party")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
+local Portrait = require("../ui/Portrait")
 local Hint = require("../party/Hint")
 local HubState = require("../hub/HubState")
 local Nav = require("../ui/Nav")
@@ -123,6 +124,9 @@ local function face(parent: GuiObject, order: number, adv: any, fav: string?, di
 	g.AnchorPoint = Vector2.new(0.5, 0.5)
 	g.Position = UDim2.fromScale(0.5, 0.5)
 	g.Parent = f
+	if Portrait.fill(f, adv.appearanceId, dim) then
+		g.Visible = false
+	end
 	local isFav = fav ~= nil and job ~= nil and job.attackType == fav
 	new("TextLabel", {
 		Name = "Attack",

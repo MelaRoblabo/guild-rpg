@@ -10,6 +10,7 @@ local Game = require("@game/ReplicatedStorage/Core/Game")
 local AdvCommon = require("./AdvCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Portrait = require("../../ui/Portrait")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Roster = require("../../adventurers/Roster")
@@ -77,6 +78,9 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 	local face = smallText(I.party, 56, C.ch45, pic, 10)
 	face.AnchorPoint = Vector2.new(0.5, 0.5)
 	face.Position = UDim2.fromScale(0.5, 0.55)
+	if Portrait.fill(pic, adv.appearanceId) then
+		face.Visible = false
+	end
 	-- 左上：パーティの番号と状態
 	local badge = AdvCommon.partyBadge(view, adv.uid)
 	if badge then

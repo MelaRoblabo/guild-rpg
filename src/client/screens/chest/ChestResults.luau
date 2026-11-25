@@ -102,7 +102,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					[CHILDREN] = { Components.corner(6), Components.padding(8, 8, 8, 8) },
 					Parent = card,
 				})
-				local bust = ChestCommon.bust(Vector2.new(184, 212))
+				local bust = ChestCommon.bust(Vector2.new(184, 212), adv and adv.appearanceId)
 				bust.Parent = top
 				local info: Frame = new("Frame", {
 					Position = UDim2.fromOffset(198, 0),

@@ -24,7 +24,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local showingPrevious = params ~= nil and (params :: any).previous == true and r.previousBonus ~= nil
 	local bonus = if showingPrevious then r.previousBonus else r.currentBonus
 	local prev = if showingPrevious then nil else r.previousBonus
-	RebirthCommon.portrait(frame, { kind = if adv.uniqueId then "unique" else "general" })
+	RebirthCommon.portrait(
+		frame,
+		{ kind = if adv.uniqueId then "unique" else "general", appearanceId = adv.appearanceId }
+	)
 	local panel = RebirthCommon.statPanel(frame, adv, r, bonus, prev)
 	Screen.closeTopRight(frame, api.close)
 
