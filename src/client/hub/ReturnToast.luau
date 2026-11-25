@@ -101,7 +101,8 @@ local function show(group: { any })
 	label(1, "◀ " .. table.concat(nums, " "), 28, C.inkLight)
 	label(2, "▣ +" .. chests, 30, C.numHi)
 	if rest or daily then
-		label(3, (if rest then "☾" else "") .. (if daily then "☀" else "") .. " XP ×" .. mult, 23, C.inkLight)
+		-- 休息ボーナス＝月（☾ は Roblox の書体で出ないので 🌙）、日替わり＝太陽
+		label(3, (if rest then "🌙" else "") .. (if daily then "☀" else "") .. " XP ×" .. mult, 23, C.inkLight)
 	end
 	tap.Activated:Connect(function()
 		HubState.selected = parties[1]
@@ -112,7 +113,7 @@ local function show(group: { any })
 	-- 右の端：同じ所へもう一度（待機のパーティだけ）
 	local go: TextButton = new("TextButton", {
 		Name = "Go",
-		Text = "▶↺",
+		Text = "▶", -- パーティの面の Go と同じ（↺ は Roblox の書体で出ない）
 		TextSize = 25,
 		FontFace = Tokens.font.number,
 		TextColor3 = C.inkLight,

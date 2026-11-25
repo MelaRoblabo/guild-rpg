@@ -27,7 +27,7 @@ return function(t)
 				{ type = "ExpeditionReturned", partyIndex = 1, chests = 3, gold = 100, itemsSoldGold = 20 },
 				{ type = "ExpeditionReturned", partyIndex = 1, chests = 2, gold = 50 },
 				{ type = "LevelUp", uid = uid, level = 2 },
-			}, s)
+			}, s, T0, master)
 			expect(sum.show).toBe(true)
 			expect(sum.gold).toBe(170)
 			expect(sum.chests).toBe(5)
@@ -47,7 +47,7 @@ return function(t)
 			"メンバーのいないパーティは出さず、帰らなかったパーティは moved = false（D-161）",
 			function()
 				local s = Game.newState(master, 1, T0)
-				local sum = LoginFlow.summarize({}, s)
+				local sum = LoginFlow.summarize({}, s, T0, master)
 				expect(sum.show).toBe(false)
 				for _, p in sum.parties do
 					expect(#p.members > 0).toBe(true)
@@ -62,7 +62,7 @@ return function(t)
 				local a = LoginFlow.summarize({
 					{ type = "GuildLevelUp", level = 5, rewards = { itm_slot_ticket = 3 } },
 					{ type = "GuildLevelUp", level = 6, rewards = { itm_slot_ticket = 3 } },
-				}, s)
+				}, s, T0, master)
 				expect(a.show).toBe(true)
 				expect(a.guildLevel).toBe(6)
 				local c = a.cutIn :: any
@@ -73,18 +73,44 @@ return function(t)
 					{ type = "GuildLevelUp", level = 5, rewards = {} },
 					{ type = "DungeonUnlocked", dungeonId = "dng_a" },
 					{ type = "DungeonUnlocked", dungeonId = "dng_b" },
-				}, s)
+				}, s, T0, master)
 				local d = b.cutIn :: any
 				expect(d.kind).toBe("dungeon")
 				expect(d.dungeonId).toBe("dng_b")
 			end
 		)
-		it("D-208 ログインボーナスだけならまとめは出さず、カレンダーへ渡す", function()
-			local s = Game.newState(master, 1, T0)
-			local sum = LoginFlow.summarize({ { type = "LoginBonus", day = 3, cycle = 1 } }, s)
-			expect(sum.show).toBe(false)
-			expect((sum.loginBonus :: any).day).toBe(3)
-		end)
+		it(
+			"D-208 ④ 受け取り箱に届いたもの（ログインボーナスなど）があればまとめを出し、カレンダーへも渡す",
+			function()
+				local s = Game.newState(master, 1, T0)
+				local sum = LoginFlow.summarize(
+					{ { type = "LoginBonus", day = 3, cycle = 1, inboxUid = "inb_9" } },
+					s,
+					T0,
+					master
+				)
+				expect(sum.show).toBe(true)
+				expect((sum.loginBonus :: any).day).toBe(3)
+			end
+		)
+		it(
+			"D-208 ④ 休息ボーナスがたまったらまとめを出す（留守の時間 × restBonusRate、上限まで）",
+			function()
+				local K = master.K
+				local s = Game.newState(master, 1, T0)
+				s.lastSavedAt = T0
+				local away = 3600
+				s.restBonusSeconds = math.floor(away * K.restBonusRate)
+				expect(LoginFlow.restGained(s, T0 + away, master)).toBe(true)
+				expect(LoginFlow.summarize({}, s, T0 + away, master).show).toBe(true)
+				-- 留守の前から上限だった（たまっていない）
+				s.restBonusSeconds = K.restBonusMaxSeconds
+				expect(LoginFlow.restGained(s, T0 + 1, master)).toBe(false)
+				-- 休息ボーナスがない
+				s.restBonusSeconds = 0
+				expect(LoginFlow.restGained(s, T0 + away, master)).toBe(false)
+			end
+		)
 	end)
 
 	describe("D-155 カレンダーの1日分の中身（LoginFlow.dayRewards）", function()

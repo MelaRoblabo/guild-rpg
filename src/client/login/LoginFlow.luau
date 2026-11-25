@@ -4,7 +4,9 @@
 --     - parties：メンバーのいるパーティごとに、留守の間に帰ったか（moved）、持ち帰った宝箱・ゴールド、Lv が上がった人。
 --       動かなかったパーティ（自動再派遣がオフ）は moved = false（D-161・D-162）。
 --     - gold：持ち帰ったゴールド＋自動売却のゴールドの合計。guildLevel：上がったあとの Lv（上がっていなければ nil）。
---     - show：帰還・ギルドLvアップ・ダンジョン解放のどれかがあればまとめを出す。
+--     - show：留守番が動いた（帰還）・休息ボーナスがたまった・受け取り箱に届いた、のどれかがあればまとめを出す（D-208 ④）。
+--       ギルドLvアップ・ダンジョン解放も出す（D-132）。休息ボーナスは出来事がないので、要約の lastSavedAt（前回の保存＝留守の始まり）
+--       から今までの留守に core と同じ式（留守の時間 × restBonusRate、上限 restBonusMaxSeconds：06章 §13）で、たまった分があるかを見る。
 --     - cutIn：最大1回（D-132）。新しいダンジョンの解放を先に（D-238 ②）、なければギルドLvアップ（上がった分の報酬を合わせる）。
 --     - loginBonus：その日の最初のログインで届いたログインボーナス（カレンダーをまとめの後に1回：D-208）。
 
@@ -33,7 +35,7 @@ export type Summary = {
 	loginBonus: any?,
 }
 
-function LoginFlow.summarize(events: { any }, view: any): Summary
+function LoginFlow.summarize(events: { any }, view: any, now: number, master: any): Summary
 	local ups: { [string]: boolean } = {}
 	local byParty: { [number]: { chests: number, gold: number } } = {}
 	local gold, chests = 0, 0
@@ -41,6 +43,7 @@ function LoginFlow.summarize(events: { any }, view: any): Summary
 	local guildRewards: { [string]: number } = {}
 	local unlocked: { string } = {}
 	local loginBonus = nil
+	local inboxArrived = false
 	for _, e in events do
 		if e.type == "ExpeditionReturned" then
 			local p = byParty[e.partyIndex] or { chests = 0, gold = 0 }
@@ -61,6 +64,9 @@ function LoginFlow.summarize(events: { any }, view: any): Summary
 			table.insert(unlocked, e.dungeonId)
 		elseif e.type == "LoginBonus" then
 			loginBonus = e
+		end
+		if e.inboxUid then
+			inboxArrived = true -- ログインボーナス・レイドの報酬など、受け取り箱に届いた（D-164）
 		end
 	end
 	local parties: { PartyRow } = {}
@@ -89,7 +95,11 @@ function LoginFlow.summarize(events: { any }, view: any): Summary
 		cutIn = { kind = "guild", level = guildLevel, rewards = guildRewards }
 	end
 	return {
-		show = next(byParty) ~= nil or guildLevel ~= nil or #unlocked > 0,
+		show = next(byParty) ~= nil or guildLevel ~= nil or #unlocked > 0 or inboxArrived or LoginFlow.restGained(
+			view,
+			now,
+			master
+		),
 		parties = parties,
 		gold = gold,
 		chests = chests,
@@ -98,6 +108,18 @@ function LoginFlow.summarize(events: { any }, view: any): Summary
 		cutIn = cutIn,
 		loginBonus = loginBonus,
 	}
+end
+
+-- 留守の間に休息ボーナスがたまったか（D-161・D-162・D-208 ④）。上限に達していれば、たまっていない
+function LoginFlow.restGained(view: any, now: number, master: any): boolean
+	local K = master.K
+	local from = view.lastSavedAt
+	if from == nil or (view.restBonusSeconds or 0) <= 0 then
+		return false
+	end
+	local gained = math.floor(math.max(0, now - from) * K.restBonusRate)
+	local before = (view.restBonusSeconds or 0) - gained
+	return gained > 0 and before < K.restBonusMaxSeconds
 end
 
 -- 休息ボーナスの輪の割合（上限に対する今の秒：D-162）

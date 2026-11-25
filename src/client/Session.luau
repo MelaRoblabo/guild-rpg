@@ -24,6 +24,10 @@ Session.notice = Signal.new() :: Signal.Signal<string>
 -- 他のプレイヤーの公開情報（WorldChanged：11章 §6.1、D-121）。userId → { userId, guildLevel, parties }。
 -- 連番はなく、届いたものをそのまま上書きする（届かなくても自分のゲームには影響しない）
 Session.world = {} :: { [number]: any }
+-- ログイン（reason "load"）で届いた出来事。画面が待ち受けを始める前に届いても、あとから読めるように覚えておく（S-01）
+Session.loadEvents = nil :: { any }?
+-- ログインの知らせを受けて要約を当てたあとに必ず鳴る（出来事が0件でも。S-01 のまとめは休息ボーナスだけでも出す：D-208 ④）
+Session.loaded = Signal.new() :: Signal.Signal<{ any }>
 Session.worldChanged = Signal.new() :: Signal.Signal<boolean>
 
 local syncing = false
@@ -94,6 +98,13 @@ worldRemote.OnClientEvent:Connect(function(msg: any)
 end)
 
 stateRemote.OnClientEvent:Connect(function(msg: any)
+	if msg.reason == "load" then
+		Session.loadEvents = msg.events or {}
+		-- 取り直し（Sync）の途中でも鳴らす。受け取る側は要約がそろうのを待つ
+		task.defer(function()
+			Session.loaded:fire(Session.loadEvents or {})
+		end)
+	end
 	if #(msg.events or {}) > 0 then
 		Session.events:fire(msg.reason, msg.events)
 	end
