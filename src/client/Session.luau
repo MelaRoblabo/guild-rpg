@@ -53,12 +53,15 @@ function Session.send(command: any): any?
 end
 
 -- コマンドを送り、成功したら状態の差分が届くまで待つ（届いた状態で次の画面を作るため）。最大 2 秒
+-- コマンドを送り、そのコマンドの後の状態が届くまで待つ（最大2秒）。
+-- 返事の seq まで待つ（時間経過の通知が先に届いて番号が進んでも、コマンドの結果がまだのことがあるため）
 function Session.sendAndWait(command: any): any?
 	local before = Session.seq
 	local r = Session.send(command)
 	if r and r.ok then
+		local target = if type(r.seq) == "number" then r.seq else before + 1
 		local deadline = os.clock() + 2
-		while Session.seq == before and os.clock() < deadline do
+		while Session.seq < target and os.clock() < deadline do
 			task.wait()
 		end
 	end

@@ -187,12 +187,12 @@ DataStore を直接使い、セッションロックを自前で実装する。
 
 ```lua
 local result = Remotes.Command:InvokeServer({ type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
--- result = { ok = true, events = { ... } } / { ok = false, error = "PARTY_BUSY" }
+-- result = { ok = true, events = { ... }, seq = 43 } / { ok = false, error = "PARTY_BUSY", seq = 43 }
 ```
 
 - 受け付けるのは 05章の M2〜M5b のコマンド。`GrantPurchase`（サーバー専用）は受け付けない。
 - 加えてサーバーだけで処理する `{ type = "Sync" }`：何も変えずに、状態の要約の**全体**と連番を返す（`{ ok = true, seq, view }`）。クライアントの起動直後と、連番が飛んだときの再同期に使う（§4.3）。
-- 状態の変化は戻り値には入れず、§4.2 の通知で送る（`reason = "command"`）。戻り値は `ok`・`error`・`events` だけ。
+- 状態の変化は戻り値には入れず、§4.2 の通知で送る（`reason = "command"`）。戻り値は `ok`・`error`・`events` と、そのコマンドの後の状態の連番 `seq`。クライアントは手元の `seq` がそこまで進むのを待ってから結果の画面を作る（時間経過の通知が先に届いて連番が進んでも、コマンドの結果はまだのことがある。M8-8 の初見プレイで見つけた）。
 - サーバー側のエラーコード（core のエラーに加える）：
 
 | コード | 意味 |

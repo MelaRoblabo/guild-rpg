@@ -197,7 +197,13 @@ function Network.start(sessions: any)
 		local result = resultOrErr.result
 		push(session, "command", concat(resultOrErr.advanced, result.events or {}))
 		sessions:checkReferral(session) -- 紹介の進み具合に届いたか（D-192）
-		return { ok = result.ok, error = result.error, events = Protocol.redactEvents(result.events or {}) }
+		-- seq：このコマンドの後の状態の番号。クライアントはここまで届くのを待つ（sendAndWait）
+		return {
+			ok = result.ok,
+			error = result.error,
+			events = Protocol.redactEvents(result.events or {}),
+			seq = session.seq,
+		}
 	end
 
 	-- 定期の時間経過（11章 §2）
