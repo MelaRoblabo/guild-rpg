@@ -897,6 +897,12 @@ local function validateHiringData(c: Checker, d: any)
 			oneOf(c, p .. ".gender", a.gender, { m = true, f = true })
 			oneOf(c, p .. ".looks", a.looks, { bea = true, nor = true, ugl = true, dem = true })
 			oneOf(c, p .. ".outfitClass", a.outfitClass, { phy = true, mag = true })
+			-- 画像（任意）：Roblox に登録したアセット（15章 §4）
+			if
+				a.imageId ~= nil and (type(a.imageId) ~= "string" or not string.match(a.imageId, "^rbxassetid://%d+$"))
+			then
+				c:error(p .. ".imageId", `rbxassetid://<数字> の形でない（{tostring(a.imageId)}）`)
+			end
 			if a.looks == "dem" then
 				oneOf(
 					c,

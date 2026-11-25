@@ -111,6 +111,20 @@ return function(t)
 			expect(paths["Jobs[1].nameEn"]).toBe(true)
 			expect(paths["Names.m[1]"]).toBe(true)
 		end)
+		it(
+			"D-042 見た目の画像は rbxassetid://<数字> の形でなければ失敗（無いのはよい）",
+			function()
+				local d = clone(Data)
+				d.Appearances[1].imageId = "87081995123632"
+				d.Appearances[2].imageId = nil
+				local paths = {}
+				for _, e in errorsOf(d) do
+					paths[e.path] = true
+				end
+				expect(paths["Appearances[1].imageId"]).toBe(true)
+				expect(paths["Appearances[2].imageId"]).toBe(nil)
+			end
+		)
 		it("必須の定数が欠けると失敗", function()
 			local d = clone(Data)
 			d.Constants.maxTurns = nil
