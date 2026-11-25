@@ -45,6 +45,7 @@ local goldText: TextLabel
 local chestCount: TextLabel
 local chestNotice: Frame
 local chestButton: Frame
+local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 ②）
 
 ---------------------------------------------------------------------------
 -- マップ
@@ -386,6 +387,7 @@ local function buildEdges(parent: Frame)
 	local quest = edgeButton("✔", Words.quests)
 	quest.LayoutOrder = 1
 	quest.Parent = topRight
+	questButton = quest
 	quest.Activated:Connect(function()
 		Nav.open("Quests") -- D-233（M8-6）
 	end)
@@ -550,6 +552,8 @@ local function refreshGuide(view: any)
 		total += c.count
 	end
 	Guide.mark(chestButton, (Guide.is("chests") or Guide.is("openAll")) and total > 0 and Nav.depth() == 0, 18, true)
+	-- 最後の段：右上の Quests（並べる仕組みの中なので、輪と指はメイン画面の面に重ねる：D-246 ②）
+	Guide.markOver(questButton, Guide.is("quests") and Nav.depth() == 0, 33, layer, 19)
 end
 
 local function refreshMoving(view: any)

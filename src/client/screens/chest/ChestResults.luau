@@ -28,8 +28,22 @@ local CARDS = 2 -- 1枚に並べるカードの数（D-223 ①の見本）
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local batch: ChestCommon.Batch = (params :: any).batch
-	-- 初回の誘導は最初の開封の結果で終わる（強くなる品がなく Equip が出なかったときも：D-244 ①）
-	Guide.done("equip")
+	-- 初回の誘導の Equip の段：結果に Equip が出るならそれを光らせ、出ないならここで済んだ扱い（D-244 ①・D-246 ①）
+	local guideEquip = false
+	if Guide.is("equip") then
+		local v = Session.view
+		for i, u in batch.plan do
+			local adv = v and v.adventurers[u.advUid]
+			local item = v and v.equipment[u.itemUid]
+			if i <= CARDS and adv and item and item.equippedBy ~= adv.uid and not ChestCommon.isBusy(v, adv.uid) then
+				guideEquip = true
+				break
+			end
+		end
+		if not guideEquip then
+			Guide.done("equip")
+		end
+	end
 	local band = Root.bandBottom()
 	local frame = Screen.scene("ChestResults")
 	Screen.closeTopRight(frame, api.close)
@@ -151,11 +165,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 							busy = true
 							Session.sendAndWait({ type = "Equip", adventurerUid = adv.uid, equipmentUid = item.uid })
 							busy = false
+							Guide.done("equip")
 							render()
 						end,
 					})
 					equip.LayoutOrder = 3
 					equip.Parent = info
+					-- 初回の誘導：最初の Equip だけ光らせる（下端に近いので指は上から）
+					if guideEquip and canEquip and Guide.is("equip") and shown == 1 then
+						Guide.mark(equip, true, 18, true)
+					end
 				end
 				local row = ChestCommon.compareRow(u.slot, u.value, u.current)
 				row.LayoutOrder = 2

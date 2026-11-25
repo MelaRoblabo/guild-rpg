@@ -13,6 +13,7 @@ local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Guide = require("../../hub/Guide")
 local HubState = require("../../hub/HubState")
 local Nav = require("../../ui/Nav")
 local QuestView = require("../../quest/QuestView")
@@ -30,6 +31,7 @@ local deps = { nextDayStart = Calendar.nextDayStart, nextWeekStart = Calendar.ne
 local REWARD_ICON = { chest = "▣", ticket = Components.icon.ticket, gold = Components.icon.coin }
 
 local function build(_params: any?, api: Nav.Api): Nav.Built
+	Guide.done("quests") -- 誘導の最後の段（D-246 ②）
 	local band = Root.bandBottom()
 	local frame: Frame = new("Frame", {
 		Name = "Quests",
