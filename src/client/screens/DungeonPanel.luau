@@ -7,7 +7,8 @@
 --      金＝選んだパーティでこのダンジョンへ Go、茶のサブ＝この4人で編成（D-244 ③。D-235 ① の「金＝編成」を置き換え）。
 --      探索中の人・ほかのパーティの人は入れられないので、空いている人と選んだパーティの人から選び直す（D-235 ①）。
 --   ③ 未解放：ヒントは出す。解放の条件は「鍵 → 前のダンジョンの丸（踏破の印）」。ボタンはない（解放は無料・自動）。
---   攻略ヒント：攻撃の種類の割合（剣と光の玉の帯）、多い種族（英語の短い語を多い順、一番多いものは濃い縁）、罠Lv、フロアの印。
+--   攻略ヒント（D-250 ③）：Foes＝多い種族（英語の短い語を多い順、一番多いものは濃い縁）、Traps＝罠Lv の2行だけ。
+--   攻撃の種類の割合の帯とフロアの印は出さない（フロアは探索の窓で見える）。
 --   派遣費は出さない（D-163）。マップイベント（レアダンジョン・レイド）の面は ④ の画面で作る。
 
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
@@ -191,7 +192,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local fav = Hint.favored(d)
 
 		local panel, content = Components.panel({
-			size = UDim2.fromOffset(PANEL_W, if mode == "locked" then 420 else 556),
+			size = UDim2.fromOffset(PANEL_W, if mode == "locked" then 300 else 452), -- ヒントが2行になったぶん低い（D-250 ③）
 			position = UDim2.fromOffset(PANEL_X, band + 44),
 			title = roman(d) .. "  " .. d.nameEn .. (if mode == "locked" then "  🔒" else ""),
 		})
@@ -204,11 +205,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		close.Parent = panel
 		new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = content })
 
-		-- 攻略ヒント（D-048）
+		-- 攻略ヒント（D-048。初めての人に読める2行だけ：D-250 ③）
 		local hint: Frame = new("Frame", {
 			Name = "Hint",
 			LayoutOrder = 1,
-			Size = UDim2.new(1, 0, 0, 4 * 46 + 3 * 6 + 12),
+			Size = UDim2.new(1, 0, 0, 2 * 46 + 6 + 12),
 			BackgroundColor3 = C.ch50,
 			[CHILDREN] = {
 				Components.corner(8),
@@ -217,12 +218,17 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			},
 			Parent = content,
 		})
-		local phys = AutoEquip.weights(dungeonId, master)
-		local r1 = row(hint, 1, 46)
-		label(r1, 1, "⚔", 25)
-		bar(r1, 2, phys, 260, 22)
-		label(r1, 3, "◈", 25, C.statMag)
-		local r2 = row(hint, 2, 46)
+		local function heading(r: Frame, word: string)
+			local t = Components.text({ text = word, size = 21, color = C.inkDark, font = Tokens.font.display })
+			t.Name = "Heading"
+			t.LayoutOrder = 0
+			t.AutomaticSize = Enum.AutomaticSize.None
+			t.Size = UDim2.fromOffset(78, 30)
+			t.TextXAlignment = Enum.TextXAlignment.Left
+			t.Parent = r
+		end
+		local r2 = row(hint, 1, 46)
+		heading(r2, Words.foes)
 		for i, rc in Hint.races(d, master) do
 			local t = WarehouseCommon.pill("", rc.word, 21)
 			t.BackgroundColor3 = C.ch75
@@ -236,26 +242,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			t.LayoutOrder = i
 			t.Parent = r2
 		end
-		local r3 = row(hint, 3, 46)
+		local r3 = row(hint, 2, 46)
+		heading(r3, Words.traps)
 		label(r3, 1, "⚠", 25)
 		local trap = WarehouseCommon.pill("", tostring(d.trapLevel), 23)
 		trap.LayoutOrder = 2
 		trap.Parent = r3
-		local r4 = row(hint, 4, 46)
-		r4:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 4)
-		for f = 1, d.floors do
-			local boss = f == d.floors
-			local event = f % 2 == 0 and not boss
-			new("Frame", {
-				Name = "Floor" .. f,
-				LayoutOrder = f,
-				Size = UDim2.fromOffset(if boss then 20 else 14, if boss then 20 else 14),
-				Rotation = if event then 45 else 0,
-				BackgroundTransparency = 1,
-				[CHILDREN] = { Components.corner(if event then 2 else 10), Components.stroke(C.inkMid, 2) },
-				Parent = r4,
-			})
-		end
 
 		local actions: Frame = new("Frame", {
 			Name = "Actions",

@@ -13,6 +13,9 @@ local Words = {
 	destination = "Destination",
 	autoEquip = "Auto Equip",
 	party = "Party",
+	-- 出発の面の攻略ヒントの行の見出し（ボタンではないが、同じ語をそろえるためここに置く：D-250 ③）
+	foes = "Foes",
+	traps = "Traps",
 	-- 宝箱・受け取り箱
 	chests = "Chests",
 	open = "Open",

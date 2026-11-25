@@ -15,6 +15,7 @@ local Create = require("../ui/Create")
 local HubState = require("../hub/HubState")
 local LevelUpMarks = require("../hub/LevelUpMarks")
 local Nav = require("../ui/Nav")
+local PickMode = require("../hub/PickMode")
 local Replay = require("../party/Replay")
 local Root = require("../ui/Root")
 local Session = require("../Session")
@@ -32,6 +33,7 @@ local PANEL_W = 420
 local PANEL_H = 470
 local PANEL_H_EXPLORE = 554 -- 探索ウィンドウ（一枚絵の枠つき）
 local SCENE_H = 160
+local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
 local EVENT_GLYPH = { chest = "▣", item = "🎟", trap = "⚠", fountain = "✚", none = "…" }
 
 local function clock(seconds: number): string
@@ -297,6 +299,41 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			menu.Parent = actions
 			-- 最後の行き先（D-228）。まだ一度も出ていなければ、解放済みで一番浅いダンジョン（D-244 ②）
 			local dest = party.lastDungeonId or HubState.firstUnlocked(view)
+			-- Go の行き先の札（D-250 ④）：Go のすぐ上に「ローマ数字＋名前」。押すとマップで行き先を選ぶ
+			local dd = if dest then master.dungeons[dest] else nil
+			if dd then
+				local idx = HubState.dungeonIndex(dest)
+				local holder: Frame = new("Frame", {
+					Name = "Destination",
+					LayoutOrder = 100,
+					Size = UDim2.new(1, 0, 0, 52),
+					BackgroundTransparency = 1,
+					Parent = body,
+				})
+				local tag: TextButton = new("TextButton", {
+					Name = "Tag",
+					Text = "▶ " .. (if idx then (ROMAN[idx] or tostring(idx)) .. "  " else "") .. dd.nameEn,
+					TextSize = 21,
+					FontFace = Tokens.font.display,
+					TextColor3 = C.inkLight,
+					AutoButtonColor = false,
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.fromScale(1, 0.5),
+					Size = UDim2.fromOffset(0, 48),
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundColor3 = C.ch28,
+					[CHILDREN] = {
+						Components.corner(24),
+						Components.stroke(C.bronze, 2),
+						Components.padding(0, 18, 0, 18),
+					},
+					Parent = holder,
+				})
+				tag.Activated:Connect(function()
+					PickMode.start(partyIndex)
+					api.home()
+				end)
+			end
 			local go = Components.button({
 				kind = if dest then "gold" else "disabled",
 				width = 200,
