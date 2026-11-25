@@ -92,7 +92,8 @@ Protocol.CLIENT_COMMANDS = {
 
 -- 読み取り専用のコマンド（状態を変えない。Game.execute を通さず、サーバーが答える。回数制限の対象：11章（システム）§6.2）
 Protocol.READ_COMMANDS = {
-	Inspect = { userId = int(1, 2 ^ 53), partyIndex = int(1, 20) }, -- D-108・D-121。他のプレイヤーの馬車の詳細
+	-- D-108・D-121。他のプレイヤーの馬車の詳細。Studio のテストのプレイヤーは番号がマイナス（Player1＝-1）なので負も受け付ける
+	Inspect = { userId = int(-(2 ^ 53), 2 ^ 53), partyIndex = int(1, 20) },
 } :: { [string]: { [string]: Field } }
 
 -- サーバーだけが受け付けるコマンド（Game にはあるがクライアントからは受け付けない）

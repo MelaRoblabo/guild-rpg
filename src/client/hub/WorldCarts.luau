@@ -88,7 +88,7 @@ local function cartAt(i: number): TextButton
 		if type(keys) == "string" and keys ~= "" then
 			local list = {}
 			for k in string.gmatch(keys, "[^;]+") do
-				local u, p = string.match(k, "(%d+):(%d+)")
+				local u, p = string.match(k, "(-?%d+):(%d+)")
 				table.insert(list, { userId = tonumber(u), partyIndex = tonumber(p) })
 			end
 			Nav.open("OtherParty", { list = list })
@@ -140,7 +140,7 @@ function WorldCarts.refresh(view: any)
 		b.Visible = true
 		b.Position = UDim2.fromOffset(g.x, g.y)
 		b:SetAttribute("Keys", table.concat(g.keys, ";"))
-		local first = tonumber(string.match(g.keys[1], "^(%d+)")) or 0
+		local first = tonumber(string.match(g.keys[1], "^(-?%d+)")) or 0
 		local face = b:FindFirstChild("Face") :: ImageLabel
 		face.Image = thumbOf(first)
 		local more = b:FindFirstChild("More") :: TextLabel

@@ -1,6 +1,7 @@
 --!strict
 -- 他のプレイヤーに見せる公開情報（D-108・D-121・D-151、11章（システム）§6）
 local Game = require("../src/core/Game")
+local Protocol = require("../src/core/Protocol")
 local World = require("../src/core/World")
 local Fixtures = require("./helpers/Fixtures")
 
@@ -76,6 +77,14 @@ return function(t)
 				expect(type(m.level)).toBe("number")
 			end
 		end)
+		it(
+			"Inspect の形：Studio のテストのプレイヤー（番号がマイナス）も受け付け、パーティの番号がなければ断る",
+			function()
+				expect((Protocol.validateCommand({ type = "Inspect", userId = 12345, partyIndex = 1 }))).toBe(true)
+				expect((Protocol.validateCommand({ type = "Inspect", userId = -2, partyIndex = 1 }))).toBe(true)
+				expect((Protocol.validateCommand({ type = "Inspect", userId = 12345 }))).toBe(false)
+			end
+		)
 		it("探索中でなければ nil（NOT_FOUND）", function()
 			local s = Game.newState(master, 1, T0)
 			expect(World.inspect(s, 1, T0)).toBe(nil)
