@@ -232,6 +232,29 @@ return function(t)
 				expect(table.find(master.raw.Names.dem, name) ~= nil).toBeTruthy()
 			end
 		end)
+		it("D-260 名前を引くとき、使ってほしくない名前は出ない", function()
+			local rng = Rng.new(14)
+			local list = master.raw.Names.m
+			local taken = {}
+			for i = 2, #list do
+				taken[list[i]] = true -- 1つ目だけ残す
+			end
+			for _ = 1, 50 do
+				expect(Appearance.rollName("m", "nor", rng, master, taken)).toBe(list[1])
+			end
+		end)
+		it("D-260 同じ回の候補で名前が重ならない", function()
+			local s = newState(1000)
+			s.expansions.candidateSlots = 3
+			for seed = 1, 300 do
+				local cs = Hiring.rollCandidates(s, Rng.new(seed), master, T0)
+				local seen = {}
+				for _, c in cs do
+					expect(seen[c.name]).toBe(nil)
+					seen[c.name] = true
+				end
+			end
+		end)
 	end)
 
 	describe("名前変更・解雇（02章、Q-020）", function()

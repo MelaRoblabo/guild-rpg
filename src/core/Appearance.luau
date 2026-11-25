@@ -37,10 +37,31 @@ function Appearance.roll(gender: string?, outfitClass: string, rng: Rng.Rng, mas
 end
 
 -- 名前を抽選する（D-054：亜人は亜人用のリスト）
-function Appearance.rollName(gender: string, looks: string, rng: Rng.Rng, master: any): string
+-- taken：使ってほしくない名前（同じ回の候補と重ねない：D-260）。引いた名前が taken にあれば、
+-- taken を除いた候補から1回だけ引き直す（重ならないときの乱数の消費は今までどおり）。除くと空なら最初の名前のまま
+function Appearance.rollName(
+	gender: string,
+	looks: string,
+	rng: Rng.Rng,
+	master: any,
+	taken: { [string]: boolean }?
+): string
 	local names = master.raw.Names
 	local list = if looks == "dem" then names.dem else names[gender]
-	return rng:pickWeighted(list, uniform)
+	local name = rng:pickWeighted(list, uniform)
+	if taken == nil or not taken[name] then
+		return name
+	end
+	local rest = {}
+	for _, n in list do
+		if not taken[n] then
+			table.insert(rest, n)
+		end
+	end
+	if #rest == 0 then
+		return name
+	end
+	return rng:pickWeighted(rest, uniform)
 end
 
 -- 見た目のタイプ（appearanceId から引く。ユニークは nil）

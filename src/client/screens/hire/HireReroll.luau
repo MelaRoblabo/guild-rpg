@@ -81,7 +81,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local costText: string?
 	local costIcon = "" -- 費用の札のアイコン（チケットのときだけ）
 	if unique or showingPrevious then
-		-- ユニークは能力が決まっている。前回に戻したあとの引き直しは、捨てた今回が「前回」になるため止める（Q 候補）
+		-- ユニークは能力が決まっている。前回に戻したあとの引き直しは、捨てた今回が「前回」になるため止める（D-263）
 		kind, costText = "disabled", nil
 	elseif h.freeRerollsLeft > 0 then
 		kind, costText = "gold", "Free ×" .. h.freeRerollsLeft

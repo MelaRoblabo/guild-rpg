@@ -25,7 +25,8 @@ local function rollCandidate(
 	rng: Rng.Rng,
 	master: any,
 	now: number,
-	takenUniques: { [string]: boolean }
+	takenUniques: { [string]: boolean },
+	takenNames: { [string]: boolean }
 ): any
 	local u = Visitor.roll(state, rng, master, now, takenUniques)
 	if u then
@@ -41,7 +42,7 @@ local function rollCandidate(
 	end
 	local job = rng:pickWeighted(master.raw.Jobs, hireWeightOf)
 	local look = Appearance.roll(nil, job.outfitClass, rng, master)
-	local name = Appearance.rollName(look.gender, look.looks, rng, master)
+	local name = Appearance.rollName(look.gender, look.looks, rng, master, takenNames)
 	local gift = rng:pickWeighted(master.giftList, weightOf)
 	return {
 		kind = "general",
@@ -57,8 +58,11 @@ end
 function Hiring.rollCandidates(state: any, rng: Rng.Rng, master: any, now: number): { any }
 	local out = {}
 	local taken = {}
+	local takenNames = {} -- 同じ回の候補で名前を重ねない（D-260）
 	for _ = 1, state.expansions.candidateSlots do
-		table.insert(out, rollCandidate(state, rng, master, now, taken))
+		local c = rollCandidate(state, rng, master, now, taken, takenNames)
+		takenNames[c.name] = true
+		table.insert(out, c)
 	end
 	return out
 end
