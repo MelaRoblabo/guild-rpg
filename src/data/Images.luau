@@ -1,6 +1,6 @@
 --!strict
 -- 画像のアセットID（15章 §4）。アセット制作リストの「RobloxアセットID」から取り込む（2026-11-25）。
--- 冒険者のバストアップは Appearances の imageId。ここは装備・道具・宝箱・モンスター・ダンジョンの背景。
+-- 冒険者のバストアップは Appearances の imageId。ここは装備・道具・宝箱・モンスター・背景・ユニーク・NPC・マップ・ギフト・UIアイコン。
 
 return {
 	-- モンスター（mon_*）
@@ -227,4 +227,94 @@ return {
 		eq_sub_dragonwing_aegis = "rbxassetid://125151561008872",
 		eq_sub_aegis = "rbxassetid://119979966860627",
 	},
+	-- ユニークのバストアップ（Uniques の appearanceId で引く：D-055）
+	uniques = {
+		uni_garrett = "rbxassetid://116245654257109",
+		uni_lyra = "rbxassetid://125742582734845",
+		uni_bran = "rbxassetid://109404262602838",
+	},
+	-- NPC（受付嬢・旅の商人。680×800 透過）
+	npcs = {
+		npc_receptionist = "rbxassetid://95271683081881",
+		npc_merchant = "rbxassetid://102909439254093",
+	},
+	-- ワールドマップ（1024×720 を左から順につなぐ：15章 §9）とマップのギルド
+	map = {
+		tiles = {
+			"rbxassetid://109670804134199",
+			"rbxassetid://102422783643080",
+			"rbxassetid://110494669321541",
+			"rbxassetid://71787184749894",
+			"rbxassetid://121671614777779",
+		},
+		guild = "rbxassetid://125266182479466",
+	},
+	-- ギフトのメダル（Gifts の id）
+	gifts = {
+		gift_swift = "rbxassetid://124043113530836",
+		gift_lucky = "rbxassetid://93398797400982",
+		gift_exorcist = "rbxassetid://101035161472232",
+		gift_sturdy = "rbxassetid://92084663282989",
+		gift_guide = "rbxassetid://75439884831295",
+		gift_trapsense = "rbxassetid://128102668536952",
+		gift_glutton = "rbxassetid://103735036841925",
+	},
+	-- UIアイコン（白1色。ImageColor3 で塗る：Guild UI のアイコン一覧・D-149）。sheet は 8×8 にまとめた1枚（この順）
+	ui = {
+		stat_str = "rbxassetid://114730981455737",
+		stat_mag = "rbxassetid://93383755435525",
+		stat_agi = "rbxassetid://118927484793421",
+		stat_dex = "rbxassetid://97769859419205",
+		stat_hp = "rbxassetid://105956545348535",
+		attack = "rbxassetid://74237968873167",
+		pdef = "rbxassetid://104129910273421",
+		mdef = "rbxassetid://99299067972770",
+		job_physical = "rbxassetid://111963906084792",
+		job_magic = "rbxassetid://95743624365537",
+		slot_weapon = "rbxassetid://128080070145974",
+		slot_armor = "rbxassetid://112839350257871",
+		slot_sub = "rbxassetid://100167037899978",
+		unknown = "rbxassetid://114016395473947",
+		up = "rbxassetid://90478067179239",
+		down = "rbxassetid://89700430792428",
+		locked = "rbxassetid://131257695488036",
+		pin = "rbxassetid://81837069014473",
+		inherit = "rbxassetid://139099235591782",
+		reroll = "rbxassetid://85333069035598",
+		chest = "rbxassetid://83666334557895",
+		chest_open = "rbxassetid://123332469656245",
+		special = "rbxassetid://108849657898781",
+		warehouse = "rbxassetid://116799710511848",
+		party = "rbxassetid://100402317870776",
+		roster = "rbxassetid://91953537033894",
+		gold = "rbxassetid://135340849606563",
+		ticket = "rbxassetid://98442854856620",
+		auto_redispatch = "rbxassetid://111837295746570",
+		time = "rbxassetid://98646868576655",
+		rebirth = "rbxassetid://79070825612878",
+		train = "rbxassetid://78380667053664",
+		look_keep = "rbxassetid://133986653781196",
+		look_change = "rbxassetid://123650326126610",
+		vanish = "rbxassetid://115261960378157",
+		pinch = "rbxassetid://138336672702262",
+		cart_moving = "rbxassetid://73437847555519",
+		cart_exploring = "rbxassetid://140262413965136",
+		cart_returning = "rbxassetid://85533862657837",
+		cart_waiting = "rbxassetid://123892055888364",
+		guild = "rbxassetid://94326280448635",
+		shop = "rbxassetid://119775534531575",
+		settings = "rbxassetid://83513256427091",
+		rest = "rbxassetid://110408738075873",
+		daily = "rbxassetid://71320995719532",
+		inbox = "rbxassetid://121783858861324",
+		friend = "rbxassetid://70383444847951",
+		map = "rbxassetid://108953608672271",
+		cart = "rbxassetid://79727896084177",
+		rare_dungeon = "rbxassetid://130087820436125",
+		raid = "rbxassetid://124101557773295",
+		merchant = "rbxassetid://136872254762330",
+		quest = "rbxassetid://74482376333719",
+		login = "rbxassetid://90441578134373",
+	},
+	uiSheet = "rbxassetid://112602887860207",
 }

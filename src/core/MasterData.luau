@@ -1000,6 +1000,28 @@ local function validateHiringData(c: Checker, d: any)
 		keyed("backgrounds", idsOf(d.Dungeons))
 		keyed("items", idsOf(d.Items))
 		keyed("equipment", idsOf(d.EquipmentLooks))
+		keyed("gifts", idsOf(d.Gifts))
+		local uniqueLooks: { [string]: boolean } = {}
+		for _, u in d.Uniques or {} do
+			uniqueLooks[u.appearanceId] = true
+		end
+		keyed("uniques", uniqueLooks)
+		for _, group in { "npcs", "ui" } do
+			for key, v in d.Images[group] or {} do
+				asset(`Images.{group}.{key}`, v)
+			end
+		end
+		if d.Images.map then
+			for i, v in d.Images.map.tiles or {} do
+				asset(`Images.map.tiles[{i}]`, v)
+			end
+			if d.Images.map.guild ~= nil then
+				asset("Images.map.guild", d.Images.map.guild)
+			end
+		end
+		if d.Images.uiSheet ~= nil then
+			asset("Images.uiSheet", d.Images.uiSheet)
+		end
 		for i, ch in d.Images.chests or {} do
 			asset(`Images.chests[{i}].closed`, ch.closed)
 			asset(`Images.chests[{i}].open`, ch.open)
