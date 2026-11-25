@@ -60,9 +60,9 @@ end
 
 local function buildMap(parent: Frame)
 	local n = #master.dungeonList
-	-- マップの絵（1024×720 を左からつなぐ：15章 §9）があれば、その幅まで広げる
+	-- マップの絵（1024×720 を左からつなぐ：15章 §9）。スクロールは最後のダンジョンの少し先まで（絵の右の続きは今は使わない）
 	local tiles = Art.mapTiles()
-	local width = math.max(MapLayout.width(n), 1024 * #tiles)
+	local width = MapLayout.width(n)
 	map = new("ScrollingFrame", {
 		Name = "Map",
 		Size = UDim2.fromScale(1, 1),
@@ -691,7 +691,7 @@ local function refreshMoving(view: any)
 		pinch.Visible = s.pinch
 		if HubState.following and HubState.selected == i then
 			local viewW = map.AbsoluteSize.X / math.max(Root.frame.scale, 0.01)
-			local target = MapLayout.cameraX(w.Position.X.Offset, viewW, MapLayout.width(#master.dungeonList))
+			local target = MapLayout.cameraX(w.Position.X.Offset, viewW, map.CanvasSize.X.Offset) -- 絵の幅まで広げたマップ
 			map.CanvasPosition = Vector2.new(target, 0)
 		end
 	end
