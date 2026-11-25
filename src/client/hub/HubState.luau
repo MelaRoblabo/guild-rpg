@@ -48,6 +48,15 @@ function HubState.status(view: any, partyIndex: number): PartyStatus.Status
 	return PartyStatus.compute(e, Session.now(), Expedition.progressAt, maxHp, master.K.pinchHpRatio)
 end
 
+-- 残り時間の表示（分:秒。1時間以上は 時:分:秒）
+function HubState.clock(seconds: number): string
+	local s = math.max(0, math.ceil(seconds))
+	if s >= 3600 then
+		return string.format("%d:%02d:%02d", s // 3600, (s // 60) % 60, s % 60)
+	end
+	return string.format("%d:%02d", s // 60, s % 60)
+end
+
 -- 3桁ごとのカンマ
 function HubState.formatNumber(n: number): string
 	local s = tostring(math.floor(n))

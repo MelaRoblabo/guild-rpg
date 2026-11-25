@@ -17,6 +17,9 @@ export type Status = {
 	downCount: number,
 	hp: { number }?, -- 今の時点のメンバーの HP（隊列順。ログのメンバー順）
 	returnAt: number?,
+	remaining: number?, -- 帰るまでの残り秒（行き・探索・帰りを通して。D-249 ①）
+	exploreRatio: number?, -- ダンジョンの中の進み 0〜1（探索中だけ。マップの輪：D-249 ②）
+	inBattle: boolean, -- 今のフロアが戦闘か（馬車が揺れて ⚔：D-249 ②）
 }
 
 export type Progress = { phase: string, ratio: number, floorIndex: number? }
@@ -45,7 +48,7 @@ function PartyStatus.compute(
 	pinchHpRatio: number?
 ): Status
 	if expedition == nil or expedition.collected then
-		return { state = "waiting", along = 0, pinch = false, downCount = 0 }
+		return { state = "waiting", along = 0, pinch = false, downCount = 0, inBattle = false }
 	end
 	local log = expedition.log
 	local p = progressAt(log, now)
@@ -57,15 +60,22 @@ function PartyStatus.compute(
 		pinch = false,
 		downCount = 0,
 		returnAt = expedition.returnAt,
+		remaining = math.max(0, (expedition.returnAt or (log.departAt + log.totalSeconds)) - now),
+		inBattle = false,
 	}
 	if p.phase == "outbound" then
 		s.state, s.along = "moving", p.ratio
 	elseif p.phase == "floor" then
 		s.state, s.along, s.floorIndex = "exploring", 1, p.floorIndex
+		local t = now - log.departAt - log.travelSeconds
+		s.exploreRatio = math.clamp(t / math.max(log.replaySeconds, 1), 0, 1)
+		local f = log.floors and p.floorIndex and log.floors[p.floorIndex]
+		s.inBattle = f ~= nil and f.kind == "battle"
 	elseif p.phase == "inbound" then
 		s.state, s.along = "returning", 1 - p.ratio
 	else
 		s.state, s.along = "waiting", 0
+		s.remaining = nil
 		return s -- 帰ってきた（受け取りはサーバーが行う）
 	end
 	local hp = PartyStatus.hpAt(log, now)

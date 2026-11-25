@@ -23,6 +23,33 @@ local MAX = { 100, 100, 100, 100 }
 return function(t)
 	local describe, it, expect = t.describe, t.it, t.expect
 
+	describe("D-249 帰るまでの残り・ダンジョンの中の進み・戦闘中", function()
+		it(
+			"行き・探索・帰りを通して、帰るまでの残り秒を出す。待機は出さない",
+			function()
+				local e = makeExpedition({ { 100 }, { 100 }, { 100 } })
+				expect(PartyStatus.compute(e, 1050, Expedition.progressAt, MAX, 0.3).remaining).toBe(210)
+				expect(PartyStatus.compute(e, 1130, Expedition.progressAt, MAX, 0.3).remaining).toBe(130)
+				expect(PartyStatus.compute(e, 1200, Expedition.progressAt, MAX, 0.3).remaining).toBe(60)
+				expect(PartyStatus.compute(nil, 1200, Expedition.progressAt, MAX, 0.3).remaining).toBe(nil)
+			end
+		)
+		it("ダンジョンの中だけ進み（0〜1）を出す", function()
+			local e = makeExpedition({ { 100 }, { 100 }, { 100 } })
+			expect(PartyStatus.compute(e, 1050, Expedition.progressAt, MAX, 0.3).exploreRatio).toBe(nil)
+			expect(PartyStatus.compute(e, 1130, Expedition.progressAt, MAX, 0.3).exploreRatio).toBe(0.5)
+			expect(PartyStatus.compute(e, 1200, Expedition.progressAt, MAX, 0.3).exploreRatio).toBe(nil)
+		end)
+		it("今のフロアが戦闘のときだけ戦闘中", function()
+			local e = makeExpedition({ { 100 }, { 100 }, { 100 } })
+			e.log.floors[1].kind = "battle"
+			e.log.floors[2].kind = "event"
+			expect(PartyStatus.compute(e, 1110, Expedition.progressAt, MAX, 0.3).inBattle).toBe(true)
+			expect(PartyStatus.compute(e, 1130, Expedition.progressAt, MAX, 0.3).inBattle).toBe(false)
+			expect(PartyStatus.compute(e, 1050, Expedition.progressAt, MAX, 0.3).inBattle).toBe(false)
+		end)
+	end)
+
 	describe("D-212 パーティの状態（PartyStatus.compute）", function()
 		it("D-212 探索がなければ待機", function()
 			local s = PartyStatus.compute(nil, 1000, Expedition.progressAt, MAX, 0.3)

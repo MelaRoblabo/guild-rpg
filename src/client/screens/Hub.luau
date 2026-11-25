@@ -39,7 +39,7 @@ local map: ScrollingFrame
 local mapContent: Frame
 local listFrame: Frame
 local wagons: { [number]: Frame } = {}
-local rows: { [number]: { button: TextButton, glyph: TextLabel, pinch: Frame, ring: UIStroke } } = {}
+local rows: { [number]: { button: TextButton, glyph: TextLabel, pinch: Frame, ring: UIStroke, timer: TextLabel } } = {}
 local markers: { [string]: TextButton } = {}
 local goldText: TextLabel
 local chestCount: TextLabel
@@ -49,6 +49,8 @@ local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 �
 
 ---------------------------------------------------------------------------
 -- マップ
+
+local PROGRESS_DOTS = 12 -- 進みの輪の点の数（D-249 ②。見た目の分け方でゲームの数値ではない）
 
 local function placeAt(inst: GuiObject, p: MapLayout.Point)
 	inst.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -140,6 +142,29 @@ local function buildMap(parent: Frame)
 			Nav.open("DungeonPanel", { dungeonId = d.id })
 		end)
 		markers[d.id] = m
+		-- 探索の進みの輪（D-249 ②）：丸の周りに点を並べ、進みに合わせて明るくする。探索中のときだけ見せる
+		local ring: Frame = new("Frame", {
+			Name = "Progress",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Visible = false,
+			Parent = m,
+		})
+		for k = 1, PROGRESS_DOTS do
+			local a = math.rad(-90 + (k - 1) * 360 / PROGRESS_DOTS)
+			new("Frame", {
+				Name = "Dot" .. k,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, math.cos(a) * 54, 0.5, math.sin(a) * 54),
+				Size = UDim2.fromOffset(10, 10),
+				BackgroundColor3 = C.ch45,
+				ZIndex = 4,
+				[CHILDREN] = { Components.corner(5) },
+				Parent = ring,
+			})
+		end
 	end
 	-- 行き先を選ぶ形（D-231 ⑦）：選べるダンジョンは琥珀の輪
 	local function showPickMode()
@@ -229,6 +254,22 @@ local function wagonFor(partyIndex: number): Frame
 		[CHILDREN] = { Components.corner(15), Components.stroke(C.warnDark, 2) },
 		Parent = w,
 	})
+	-- 戦いの間の吹き出し（D-249 ②）
+	new("TextLabel", {
+		Name = "Battle",
+		Text = "⚔",
+		TextSize = 25,
+		FontFace = Tokens.font.number,
+		TextColor3 = C.inkLight,
+		BackgroundColor3 = C.ch10,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 0, -4),
+		Size = UDim2.fromOffset(38, 34),
+		ZIndex = 8,
+		Visible = false,
+		[CHILDREN] = { Components.corner(17), Components.stroke(C.bronze, 2) },
+		Parent = w,
+	})
 	-- 馬車を触ってもパーティの面を開く（D-212。一覧の行と同じ）
 	local tap: TextButton = new("TextButton", {
 		Name = "Tap",
@@ -294,9 +335,17 @@ local function rowFor(partyIndex: number)
 	num.Parent = button
 	local glyph = Components.text({ text = "", size = 30, color = C.ch75, font = Tokens.font.number })
 	glyph.AnchorPoint = Vector2.new(0.5, 0.5)
-	glyph.Position = UDim2.fromOffset(80, 33)
+	glyph.Position = UDim2.fromOffset(76, 33)
 	glyph.ZIndex = 22
 	glyph.Parent = button
+	-- 帰るまでの残り（出ている間だけ。状態の印は上へ寄せる：D-249 ①）
+	local timer = Components.text({ text = "", size = 21, color = C.inkLight, font = Tokens.font.number })
+	timer.Name = "Timer"
+	timer.AnchorPoint = Vector2.new(0.5, 0.5)
+	timer.Position = UDim2.fromOffset(76, 48)
+	timer.ZIndex = 22
+	timer.Visible = false
+	timer.Parent = button
 	local pinch: Frame = new("TextLabel", {
 		Name = "Pinch",
 		Text = "♥",
@@ -319,7 +368,7 @@ local function rowFor(partyIndex: number)
 		PickMode.stop() -- 行き先を選ぶのをやめる
 		Nav.open("PartyPanel", { partyIndex = partyIndex })
 	end)
-	r = { button = button, glyph = glyph, pinch = pinch, ring = ring }
+	r = { button = button, glyph = glyph, pinch = pinch, ring = ring, timer = timer }
 	rows[partyIndex] = r
 	return r
 end
@@ -563,11 +612,19 @@ local function refreshMoving(view: any)
 		return
 	end
 	refreshGuide(view)
+	local exploring: { [string]: number } = {} -- ダンジョンごとの探索の進み（D-249 ②）
 	for _, party in view.parties or {} do
 		local i = party.index
 		local s = HubState.status(view, i)
 		local r = rowFor(i)
 		r.glyph.Text = STATE_GLYPH[s.state]
+		-- 帰るまでの残り（D-249 ①）：出ている間は印を上に、時計を下に
+		local out = s.remaining ~= nil and s.state ~= "waiting"
+		r.timer.Visible = out
+		r.glyph.Position = UDim2.fromOffset(76, if out then 20 else 33)
+		if out then
+			r.timer.Text = "🕒" .. HubState.clock(s.remaining :: number)
+		end
 		r.pinch.Visible = s.pinch
 		r.ring.Transparency = if HubState.selected == i then 0 else 1
 		local w = wagonFor(i)
@@ -580,12 +637,40 @@ local function refreshMoving(view: any)
 		end
 		local waiting = w:FindFirstChild("Waiting") :: GuiObject
 		waiting.Visible = s.state == "waiting"
+		-- 戦いの間は馬車が小さく揺れ、⚔ の吹き出し（D-249 ②）
+		local battle = w:FindFirstChild("Battle") :: GuiObject
+		battle.Visible = s.inBattle
+		if s.inBattle then
+			w.Rotation = math.sin(os.clock() * 18) * 4
+		else
+			w.Rotation = 0
+		end
+		if s.state == "exploring" and s.dungeonId and s.exploreRatio then
+			exploring[s.dungeonId] = math.max(exploring[s.dungeonId] or 0, s.exploreRatio)
+		end
 		local pinch = w:FindFirstChild("Pinch") :: GuiObject
 		pinch.Visible = s.pinch
 		if HubState.following and HubState.selected == i then
 			local viewW = map.AbsoluteSize.X / math.max(Root.frame.scale, 0.01)
 			local target = MapLayout.cameraX(w.Position.X.Offset, viewW, MapLayout.width(#master.dungeonList))
 			map.CanvasPosition = Vector2.new(target, 0)
+		end
+	end
+	-- 探索の進みの輪（D-249 ②）
+	for id, m in markers do
+		local ring = m:FindFirstChild("Progress") :: Frame?
+		if ring then
+			local ratio = exploring[id]
+			ring.Visible = ratio ~= nil
+			if ratio then
+				local lit = math.floor(ratio * PROGRESS_DOTS + 0.5)
+				for k = 1, PROGRESS_DOTS do
+					local dot = ring:FindFirstChild("Dot" .. k) :: Frame?
+					if dot then
+						dot.BackgroundColor3 = if k <= lit then C.numHi else C.ch45
+					end
+				end
+			end
 		end
 	end
 end

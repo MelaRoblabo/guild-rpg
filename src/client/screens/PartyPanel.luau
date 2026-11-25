@@ -80,9 +80,14 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 	lv.LayoutOrder = 3
 	lv.Parent = row
 	if hp ~= nil and maxHp ~= nil and maxHp > 0 then
+		-- HP のアイコン（ハート・青：D-149）を棒の左に。棒も HP の青（D-249 ④）
+		local heart = Components.text({ text = "♥", size = 21, color = C.statHp, font = Tokens.font.number })
+		heart.Name = "HpIcon"
+		heart.LayoutOrder = 4
+		heart.Parent = row
 		local track: Frame = new("Frame", {
 			Name = "Hp",
-			LayoutOrder = 4,
+			LayoutOrder = 5,
 			Size = UDim2.fromOffset(110, 20),
 			BackgroundColor3 = C.barTrack,
 			[CHILDREN] = { Components.corner(6) },
@@ -90,7 +95,7 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 		})
 		new("Frame", {
 			Size = UDim2.fromScale(math.clamp(hp / maxHp, 0, 1), 1),
-			BackgroundColor3 = if down then C.warn elseif hp / maxHp < 0.3 then C.dangerRed else C.barFill,
+			BackgroundColor3 = if down then C.warn elseif hp / maxHp < 0.3 then C.dangerRed else C.statHp,
 			[CHILDREN] = { Components.corner(6) },
 			Parent = track,
 		})
@@ -98,13 +103,13 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 	if delta and delta ~= 0 then
 		-- 回復・罠・泉の増減（D-236 ②③）
 		local d = Components.text({
-			text = (if delta > 0 then "+" else "") .. delta,
+			text = (if delta > 0 then "+" else "−") .. math.abs(delta),
 			size = 23,
 			color = if delta > 0 then C.up else C.warnDark,
 			font = Tokens.font.number,
 			stroke = delta < 0,
 		})
-		d.LayoutOrder = 5
+		d.LayoutOrder = 6
 		d.Parent = row
 	end
 	return row
@@ -258,6 +263,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 							delta = d.amount
 						end
 					end
+					-- このターンに敵から受けたダメージ（行の棒の横に赤：D-249 ③）
+					if rp.hit and rp.hit.index == memberIdx and rp.hit.amount > 0 then
+						delta = -rp.hit.amount
+					end
 					local _, mySlot = Party.find(view, uid)
 					for _, a in rp.actions do
 						if a.kind == "heal" and a.target == mySlot then
@@ -340,10 +349,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local t = Components.text({ text = text, size = size, color = color, font = Tokens.font.number, stroke = true })
 		t.Name = "Popup"
 		t.AnchorPoint = Vector2.new(0.5, 0.5)
-		t.Position = UDim2.fromScale(0.5, 0.45)
+		-- 敵の名前の上から、上へ浮かんで消える（D-249 ③）
+		t.Position = UDim2.fromScale(0.5, 0.3)
 		t.ZIndex = 10
 		t.Parent = scene
-		TweenService:Create(t, TweenInfo.new(0.8), { Position = UDim2.fromScale(0.5, 0.2), TextTransparency = 1 })
+		TweenService:Create(t, TweenInfo.new(0.8), { Position = UDim2.fromScale(0.5, 0.16), TextTransparency = 1 })
 			:Play()
 		task.delay(0.85, function()
 			t:Destroy()
@@ -386,6 +396,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			p.Position = UDim2.new(1, -6, 0, 6)
 			p.Parent = scene
 		end
+		-- 帰るまでの残り（左の一覧の行と同じ時計：D-249 ①）。帰り道は真ん中の時計が同じなので出さない
+		if st.phase ~= "inbound" then
+			local c = Components.chip("🕒", clock(st.remaining), C.inkLight)
+			c.Name = "ReturnClock"
+			c.Position = UDim2.fromOffset(6, 6)
+			c.Parent = scene
+		end
 		if st.phase ~= "floor" then
 			-- 移動中・帰り道：馬車と残り時間（帰り道は持ち帰る宝箱も：D-236 ④）
 			local toGo = if st.phase == "outbound"
@@ -402,11 +419,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local d = master.dungeons[e.dungeonId]
 		if st.kind == "battle" then
 			local mon = if st.monsterId then master.monsters[st.monsterId] else nil
-			center(if mon then mon.nameEn else "?", 25, C.inkLight, 0.5)
+			center(if mon then mon.nameEn else "?", 25, C.inkLight, 0.45)
+			-- 敵の HP の棒は名前のすぐ下（数字なし：D-236 ①・D-249 ③）
 			local track: Frame = new("Frame", {
 				Name = "MonsterHp",
-				Position = UDim2.fromOffset(12, 12),
-				Size = UDim2.new(1, -120, 0, 16),
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, 0.58),
+				Size = UDim2.new(0.6, 0, 0, 18),
 				BackgroundColor3 = C.barTrack,
 				[CHILDREN] = { Components.corner(6) },
 				Parent = scene,
@@ -429,7 +448,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					end
 				end
 				if total > 0 then
-					popup(tostring(total), if crit then 44 else 30, if crit then C.numHi else C.inkWhite)
+					-- 与えたダメージは「−数字」（D-249 ③）
+					popup("−" .. total, if crit then 44 else 30, if crit then C.numHi else C.inkWhite)
 				end
 			end
 		else
