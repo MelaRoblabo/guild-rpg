@@ -81,7 +81,7 @@ function HireCommon.portrait(parent: Frame, candidate: any)
 		label.Visible = false -- バストアップの画像があれば仮の文字を隠す
 	end
 	if candidate and candidate.kind == "unique" then
-		local star = Components.text({ text = "★", size = 40, color = C.rewardGlow, font = Tokens.font.number })
+		local star = Components.text({ text = "@special", size = 40, color = C.rewardGlow, font = Tokens.font.number })
 		star.Position = UDim2.fromOffset(8, 4)
 		star.Parent = content
 	end

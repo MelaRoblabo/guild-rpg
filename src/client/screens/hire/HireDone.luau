@@ -32,6 +32,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		name = adv.name,
 		jobId = adv.jobId,
 		giftIds = adv.giftIds,
+		appearanceId = adv.appearanceId,
 	}
 	local portrait = HireCommon.portrait(frame, candidate)
 	local panel = HireCommon.statPanel(frame, candidate, adv.baseStats, nil)

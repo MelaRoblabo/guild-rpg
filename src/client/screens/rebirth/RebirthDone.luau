@@ -50,6 +50,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		[CHILDREN] = { Components.corner(190) },
 		Parent = portrait,
 	})
+	-- バストアップの画像があるときは、光を顔の後ろへ回す（顔に色がかぶらないように）
+	local bust = portrait:FindFirstChild("Bust", true)
+	if bust and bust:IsA("GuiObject") and bust.Parent then
+		rays.Parent = bust.Parent
+		rays.ZIndex = bust.ZIndex - 1
+	end
 	-- シルエット（1拍目）
 	local shadow: Frame = new("Frame", {
 		Name = "Silhouette",

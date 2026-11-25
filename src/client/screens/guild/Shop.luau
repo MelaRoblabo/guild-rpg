@@ -36,8 +36,8 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 	local items = {
 		{ id = "gold", icon = Components.icon.coin, qty = nil, odds = false },
 		{ id = "ticket", icon = Components.icon.ticket, qty = nil, odds = false },
-		{ id = "look1", icon = "🎲", qty = 1, odds = true },
-		{ id = "look3", icon = "🎲", qty = 3, odds = true },
+		{ id = "look1", icon = "@look_change", qty = 1, odds = true },
+		{ id = "look3", icon = "@look_change", qty = 3, odds = true },
 	}
 	local pick = "look1"
 	local showOdds = false
@@ -139,7 +139,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				kind = "brown",
 				width = 150,
 				height = 66,
-				icon = "🎲",
+				icon = "@look_change",
 				label = Words.odds,
 				name = "Odds",
 				glyph = "Y",

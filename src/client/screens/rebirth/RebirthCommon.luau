@@ -118,15 +118,17 @@ function RebirthCommon.row(p: RowProps): Row
 		BackgroundColor3 = C.ch75,
 		[CHILDREN] = { Components.corner(6) },
 	})
-	new("Frame", {
-		Name = "Icon",
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
-		Size = UDim2.fromOffset(30, 30),
-		BackgroundColor3 = STAT_COLOR[p.stat] or C.inkMid,
-		[CHILDREN] = { Components.corner(15), Components.stroke(C.inkDark, 2) },
-		Parent = row,
+	-- 能力のアイコン（Components.statRow と同じ絵と色）
+	local icon = Components.text({
+		text = "@stat_" .. p.stat,
+		size = 30,
+		color = STAT_COLOR[p.stat] or C.inkMid,
+		font = Tokens.font.number,
 	})
+	icon.Name = "Icon"
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 12, 0.5, 0)
+	icon.Parent = row
 	local label = Components.text({
 		text = p.label,
 		size = Tokens.text.body,

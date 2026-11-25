@@ -200,16 +200,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local num = WarehouseCommon.pill("✓", if d then ROMAN[d.tier] or tostring(d.tier) else "?", 23)
 			num.LayoutOrder = 1
 			num.Parent = r1
-			label(r1, 2, "⚔", 25)
+			label(r1, 2, "@job_physical", 25)
 			local mix = bar(r1, 3, 150, 24)
 			new("Frame", {
 				Size = UDim2.fromScale(AutoEquip.weights(target.dungeonId, master), 1),
 				BackgroundColor3 = C.barFill,
 				Parent = mix,
 			})
-			label(r1, 4, "◈", 25, C.statMag)
+			label(r1, 4, "@job_magic", 25, C.statMag)
 			local r2 = row(box, 2, 60)
-			label(r2, 1, "▣★", 28)
+			label(r2, 1, "@chest", 28)
 			label(r2, 2, "×" .. master.K.rareDungeonChestMult, 25, C.ctaGoldRim)
 			-- S-15 と同じ物差し（D-234 ①）：選んだパーティの4人と罠の避けやすさ
 			local r3 = row(box, 3, 60)
@@ -270,8 +270,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				Parent = hb,
 			})
 			local r2 = row(box, 2, 60)
-			label(r2, 1, "▣★", 28)
-			label(r2, 2, "♟", 25)
+			label(r2, 1, "@chest", 28)
+			label(r2, 2, "@party", 25)
 			for i, p in joined do
 				local j = WarehouseCommon.pill("✓", tostring(p), 21, C.okGreen)
 				j.LayoutOrder = 2 + i

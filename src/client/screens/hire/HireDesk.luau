@@ -17,6 +17,7 @@ local ExpandInfo = require("../../guild/ExpandInfo")
 local HireCommon = require("./HireCommon")
 local HubState = require("../../hub/HubState")
 local Nav = require("../../ui/Nav")
+local Portrait = require("../../ui/Portrait")
 local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
@@ -87,8 +88,13 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		star.Size = UDim2.fromScale(1, 1)
 		star.ZIndex = 4
 		star.Parent = face
+		-- 来訪中のユニークのバストアップ（画像があれば仮の★を隠す）
+		local u = master.uniques[visitor.uniqueId]
+		if u and Portrait.fill(face, u.appearanceId) then
+			star.Visible = false
+		end
 		local days = math.max(0, math.ceil((visitor.nextWeekAt - Session.now()) / 86400))
-		local d = Components.chip("▦", tostring(days), C.inkLight)
+		local d = Components.chip("@time", tostring(days), C.inkLight)
 		d.LayoutOrder = 2
 		d.ZIndex = 3
 		d.Parent = poster
@@ -159,7 +165,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			},
 			Parent = frame,
 		})
-		local mark = Components.text({ text = "⌂", size = 25, color = C.bronzeHi, font = Tokens.font.number })
+		local mark = Components.text({ text = "@guild", size = 25, color = C.bronzeHi, font = Tokens.font.number })
 		mark.LayoutOrder = 1
 		mark.ZIndex = 6
 		mark.Parent = banner

@@ -9,6 +9,7 @@ local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
 local Party = require("@game/ReplicatedStorage/Core/Party")
+local Art = require("../../ui/Art")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
@@ -166,7 +167,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				l.Parent = card
 			end
 			txt(1, ChestCommon.rarityShape(it.rarity), 25, ChestCommon.rarityColor(it.rarity))
-			txt(2, WarehouseCommon.icon[if base then base.slot else "weapon"] or "?", 44, C.inkDark)
+			-- 装備の絵（見た目の段：D-254）。絵がなければ枠のアイコン
+			local art = Art.icon(Art.equip(it), 88, 2)
+			if art then
+				art.ImageTransparency = if it.bought then 0.55 else 0
+				art.Parent = card
+			else
+				txt(2, WarehouseCommon.icon[if base then base.slot else "weapon"] or "?", 44, C.inkDark)
+			end
 			txt(3, WarehouseCommon.fullName(it), 21, C.inkDark, true)
 			local vals = WarehouseCommon.values(it)
 			if vals[1] then
