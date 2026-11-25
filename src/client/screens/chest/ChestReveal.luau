@@ -348,7 +348,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local equip = Components.button({
 			kind = if busy then "disabled" else "gold",
 			width = 320,
-			icon = I.equip,
+			icon = "@slot_" .. (best.slot or "weapon"), -- 付ける枠のアイコン（D-256）
 			label = Words.equip,
 			name = "Equip",
 			glyph = "A",

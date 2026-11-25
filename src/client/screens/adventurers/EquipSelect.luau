@@ -134,6 +134,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				[CHILDREN] = { Components.corner(33) },
 				Parent = tabs,
 			})
+			Components.setParts(b, { I[id], Words.slot[id] })
 			b.Activated:Connect(function()
 				if tab ~= id then
 					tab = id
@@ -376,9 +377,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local main = Components.button({
 			kind = if pick ~= nil then "gold" else "disabled",
 			width = 320,
-			icon = if unequip
-				then Components.plain(I[tab]) .. "→"
-				else Components.plain(I.party) .. Components.plain(I.attack), -- 外す＝枠＋外への矢印（D-232 ⑥）
+			icon = if unequip then Components.plain(I[tab]) .. "→" else I[tab], -- 付ける枠のアイコン（Equip＝枠：D-256）。外す＝枠＋外への矢印（D-232 ⑥）
 			label = if unequip then Words.unequip else Words.equip,
 			name = if unequip then "Unequip" else "Equip",
 			glyph = "A",

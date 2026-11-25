@@ -155,7 +155,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						kind = if canEquip then "brown" else "disabled",
 						width = 150,
 						height = 66,
-						icon = I.equip,
+						-- 付ける枠のアイコン（Equip＝枠：D-256。鎧なら鎧）
+						icon = "@slot_" .. ((master.equipmentBases[item.baseId] or {}).slot or "weapon"),
 						label = Words.equip,
 						name = "Equip",
 						onClick = function()
