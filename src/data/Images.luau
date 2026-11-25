@@ -242,7 +242,7 @@ return {
 	map = {
 		tiles = {
 			"rbxassetid://109670804134199",
-			"rbxassetid://102422783643080",
+			"rbxassetid://125875652423505",
 			"rbxassetid://110494669321541",
 			"rbxassetid://71787184749894",
 			"rbxassetid://121671614777779",
