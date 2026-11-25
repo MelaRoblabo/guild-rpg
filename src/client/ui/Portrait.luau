@@ -12,7 +12,12 @@ function Portrait.image(appearanceId: string?): string?
 		return nil
 	end
 	local a = master.appearances[appearanceId]
-	return if a then a.imageId else nil
+	if a then
+		return a.imageId
+	end
+	-- ユニークは見た目の表になく、Images.uniques にある（D-055）
+	local images = master.images
+	return if images and images.uniques then images.uniques[appearanceId] else nil
 end
 
 -- frame に画像を入れる。入れたら true（呼び出し側は仮の印を隠す）。

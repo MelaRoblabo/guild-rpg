@@ -12,6 +12,7 @@ local Guild = require("@game/ReplicatedStorage/Core/Guild")
 local Party = require("@game/ReplicatedStorage/Core/Party")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local ExpandInfo = require("../../guild/ExpandInfo")
 local HireCommon = require("./HireCommon")
 local HubState = require("../../hub/HubState")
@@ -110,6 +111,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 	ph.AutomaticSize = Enum.AutomaticSize.None
 	ph.Size = UDim2.fromScale(1, 1)
 	ph.Parent = ladyContent
+	if Art.put(ladyContent, Art.npc("npc_receptionist")) then
+		ph.Visible = false
+	end
 	-- カウンター
 	new("Frame", {
 		Name = "Counter",

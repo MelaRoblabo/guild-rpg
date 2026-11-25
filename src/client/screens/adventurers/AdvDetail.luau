@@ -457,6 +457,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			if g then
 				local gift = master.gifts[g]
 				local t = pill("", if gift then gift.nameEn else g, 21)
+				local medal = Art.icon(Art.gift(g), 28, 0)
+				if medal then
+					medal.Parent = t -- メダルの絵を語の左に（D-245）
+				end
 				t.LayoutOrder = k
 				t.Parent = gifts
 			else

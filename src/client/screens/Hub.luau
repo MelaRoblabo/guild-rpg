@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
+local Art = require("../ui/Art")
 local HubState = require("../hub/HubState")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
@@ -59,7 +60,9 @@ end
 
 local function buildMap(parent: Frame)
 	local n = #master.dungeonList
-	local width = MapLayout.width(n)
+	-- マップの絵（1024×720 を左からつなぐ：15章 §9）があれば、その幅まで広げる
+	local tiles = Art.mapTiles()
+	local width = math.max(MapLayout.width(n), 1024 * #tiles)
 	map = new("ScrollingFrame", {
 		Name = "Map",
 		Size = UDim2.fromScale(1, 1),
@@ -80,6 +83,18 @@ local function buildMap(parent: Frame)
 		[CHILDREN] = { Components.gradient(C.ch16, C.ch13) },
 		Parent = map,
 	})
+	for i, img in tiles do
+		new("ImageLabel", {
+			Name = "MapTile" .. i,
+			Image = img,
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(1024 * (i - 1), 0),
+			Size = UDim2.new(0, 1024, 1, 0),
+			ScaleType = Enum.ScaleType.Stretch,
+			ZIndex = 1,
+			Parent = map,
+		})
+	end
 	mapContent = new("Frame", {
 		Name = "Content",
 		Size = UDim2.new(0, width, 1, 0),
@@ -109,6 +124,18 @@ local function buildMap(parent: Frame)
 		Parent = mapContent,
 	})
 	placeAt(guild, MapLayout.guild())
+	local guildArt = Art.put(guild, Art.mapGuild(), { zIndex = 4 })
+	if guildArt then
+		-- 建物の絵があれば枠と記号を消す
+		guild.BackgroundTransparency = 1
+		for _, c in guild:GetChildren() do
+			if c:IsA("TextLabel") then
+				c.Visible = false
+			elseif c:IsA("UIStroke") then
+				c.Enabled = false
+			end
+		end
+	end
 	-- ダンジョン
 	for i, d in master.dungeonList do
 		local m: TextButton = new("TextButton", {
@@ -377,7 +404,9 @@ end
 -- 縁の部品
 
 -- 縁のボタン：アイコン＋語（D-245。アイコンだけでは分からないので、大きさを変えて語を入れる）
-local function edgeButton(icon: string, word: string): TextButton
+local function edgeButton(icon: string, word: string, uiKey: string?): TextButton
+	-- UIアイコンの絵があれば記号の代わりに使う（白1色を文字の色で塗る：D-149）
+	local iconImage = if uiKey then Art.ui(uiKey) else nil
 	return new("TextButton", {
 		Text = "",
 		AutoButtonColor = false,
@@ -395,7 +424,11 @@ local function edgeButton(icon: string, word: string): TextButton
 				Padding = UDim.new(0, 8),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
-			(function()
+			(function(): GuiObject
+				local img = Art.icon(iconImage, 30, 1, C.inkLight, 21)
+				if img then
+					return img
+				end
 				local t = Components.text({ text = icon, size = 28, color = C.inkLight, font = Tokens.font.number })
 				t.LayoutOrder = 1
 				t.ZIndex = 21
@@ -433,14 +466,14 @@ local function buildEdges(parent: Frame)
 		},
 		Parent = parent,
 	})
-	local quest = edgeButton("✔", Words.quests)
+	local quest = edgeButton("✔", Words.quests, "quest")
 	quest.LayoutOrder = 1
 	quest.Parent = topRight
 	questButton = quest
 	quest.Activated:Connect(function()
 		Nav.open("Quests") -- D-233（M8-6）
 	end)
-	local gear = edgeButton("⚙", Words.settings)
+	local gear = edgeButton("⚙", Words.settings, "settings")
 	gear.LayoutOrder = 2
 	gear.Parent = topRight
 	gear.Activated:Connect(function()
@@ -465,7 +498,7 @@ local function buildEdges(parent: Frame)
 		end
 	end)
 	-- ゴールドの下：フレンドボタン（D-213 ⑯）
-	local friend = edgeButton("♟", Words.friends)
+	local friend = edgeButton("♟", Words.friends, "friend")
 	friend.AnchorPoint = Vector2.new(1, 0)
 	friend.Position = UDim2.new(1, -40, 0, band + 12 + 66 + 12)
 	friend.Parent = parent
@@ -529,7 +562,7 @@ local function buildEdges(parent: Frame)
 	})
 	local words = { Words.guild, Words.adventurers, Words.warehouse }
 	for i, icon in { I.home, I.party, "▤" } do
-		local b = edgeButton(icon, words[i])
+		local b = edgeButton(icon, words[i], ({ "guild", "roster", "warehouse" })[i])
 		b.Name = ({ "Guild", "Adventurers", "Warehouse" })[i]
 		b.LayoutOrder = i
 		b.Parent = menu

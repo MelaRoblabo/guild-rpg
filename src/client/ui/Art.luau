@@ -29,6 +29,45 @@ function Art.background(dungeonId: string?): string?
 	return if dungeonId and images.backgrounds then images.backgrounds[dungeonId] else nil
 end
 
+function Art.gift(giftId: string?): string?
+	return if giftId and images.gifts then images.gifts[giftId] else nil
+end
+
+function Art.npc(npcId: string): string?
+	return if images.npcs then images.npcs[npcId] else nil
+end
+
+-- UIアイコン（白1色。色は ImageColor3 で塗る：D-149）。key は Images.ui のキー（例 "guild"）
+function Art.ui(key: string): string?
+	return if images.ui then images.ui[key] else nil
+end
+
+-- ワールドマップの絵（左から順の1024×720）とマップのギルド
+function Art.mapTiles(): { string }
+	return if images.map and images.map.tiles then images.map.tiles else {}
+end
+
+function Art.mapGuild(): string?
+	return if images.map then images.map.guild else nil
+end
+
+-- 並べる枠（UIListLayout）の中に置く小さな絵（アイコン・メダル）。color を渡すと白1色の絵をその色で塗る
+function Art.icon(image: string?, size: number, order: number?, color: Color3?, zIndex: number?): ImageLabel?
+	if image == nil then
+		return nil
+	end
+	return Create.new("ImageLabel", {
+		Name = "Icon",
+		Image = image,
+		ImageColor3 = color or Color3.new(1, 1, 1),
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(size, size),
+		ScaleType = Enum.ScaleType.Fit,
+		LayoutOrder = order or 0,
+		ZIndex = zIndex or 1,
+	})
+end
+
 -- 宝箱（レアリティの rank。open＝開いた箱）
 function Art.chest(rank: number?, open: boolean?): string?
 	local c = if rank and images.chests then images.chests[rank] else nil

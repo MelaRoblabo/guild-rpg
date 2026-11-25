@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
+local Art = require("../../ui/Art")
 local HireCommon = require("./HireCommon")
 local Nav = require("../../ui/Nav")
 local Portrait = require("../../ui/Portrait")
@@ -128,8 +129,9 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 	-- ギフト
 	for _, g in candidate.giftIds or {} do
 		local gift = master.gifts[g]
+		local medalImage = Art.gift(g)
 		local t = Components.text({
-			text = "◆ " .. (if gift then gift.nameEn else g),
+			text = (if medalImage then "" else "◆ ") .. (if gift then gift.nameEn else g),
 			size = 21,
 			color = C.inkDark,
 			font = Tokens.font.bodyStrong,
@@ -137,6 +139,17 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 		})
 		t.LayoutOrder = 20
 		t.Parent = body
+		if medalImage then
+			-- メダルの絵を語の左に（文字を右へずらす）
+			t.Size = UDim2.new(1, 0, 0, 30)
+			t.AutomaticSize = Enum.AutomaticSize.None
+			local pad = Instance.new("UIPadding")
+			pad.PaddingLeft = UDim.new(0, 34)
+			pad.Parent = t
+			local medal = Art.icon(medalImage, 28, 0) :: ImageLabel
+			medal.Position = UDim2.fromOffset(-34, 1)
+			medal.Parent = t
+		end
 	end
 	return b, ring
 end
