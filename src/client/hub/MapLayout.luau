@@ -26,7 +26,7 @@ local EVENT_PLACES: { Point } = {
 	{ x = GUILD.x + STEP_X * 0.5, y = 560 },
 	{ x = GUILD.x + STEP_X * 1.5, y = 380 },
 	{ x = GUILD.x + STEP_X * 2.5, y = 600 },
-	{ x = GUILD.x + STEP_X * 3.5, y = 240 },
+	{ x = GUILD.x + STEP_X * 3.5, y = 460 }, -- 上の帯（右上のボタン）に重ねない高さ（D-251）
 }
 
 function MapLayout.eventPlace(index: number): Point

@@ -132,4 +132,20 @@ return function(t)
 			expect(MapLayout.cameraX(2000, 1280, 4000)).toBe(2000 - 640)
 		end)
 	end)
+	describe("D-251 マップイベントの仮の場所", function()
+		it(
+			"上の帯（右上のボタンの高さ）より下で、ダンジョンの丸と重ならない",
+			function()
+				for i = 1, 4 do
+					local p = MapLayout.eventPlace(i)
+					expect(p.y >= 300).toBe(true)
+					for k = 1, 12 do
+						local d = MapLayout.dungeon(k)
+						local dist = math.sqrt((p.x - d.x) ^ 2 + (p.y - d.y) ^ 2)
+						expect(dist >= 120).toBe(true)
+					end
+				end
+			end
+		)
+	end)
 end

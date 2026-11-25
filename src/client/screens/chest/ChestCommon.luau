@@ -60,6 +60,14 @@ ChestCommon.sourceIcon = {
 	raid = "⚡",
 	referral = "❖",
 }
+-- 受け取り箱の行の記号に添える語（D-251 ①）
+ChestCommon.sourceWord = {
+	quest = "Quest",
+	login = "Login",
+	playtime = "Playtime",
+	raid = "Raid",
+	referral = "Friend",
+}
 
 export type PileInfo = { pileKey: string, special: boolean, icon: string, name: string }
 

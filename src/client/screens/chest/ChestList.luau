@@ -271,9 +271,17 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 
 		if tab == "chests" then
 			local blocked = ChestCommon.warehouseBlocked(view)
+			-- 特別な宝箱の山が1つもなければ右の枠を出さず、左を全幅にする（D-251 ②）
+			local hasSpecial = false
+			for _, c in view.chests or {} do
+				if c.count > 0 and ChestCommon.pileInfo(c.pileKey).special then
+					hasSpecial = true
+					break
+				end
+			end
 			-- 左：普通の山（ダンジョン）
 			local left, leftContent = Components.panel({
-				size = UDim2.new(1, -(40 + 24 + 456 + 40), 0, 392), -- 横に広い端末では左の面が伸びる
+				size = if hasSpecial then UDim2.new(1, -(40 + 24 + 456 + 40), 0, 392) else UDim2.new(1, -80, 0, 392), -- 横に広い端末では左の面が伸びる
 				position = UDim2.fromOffset(40, band + 98),
 				dark = true,
 			})
@@ -286,6 +294,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				dark = true,
 			})
 			right.Name = "SpecialPiles"
+			right.Visible = hasSpecial
 			right.Parent = body
 			local leftList = list(leftContent)
 			local rightList = list(rightContent)
@@ -430,8 +439,24 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				})
 				src.AutomaticSize = Enum.AutomaticSize.None
 				src.Size = UDim2.fromOffset(48, 48)
-				src.LayoutOrder = 1
+				src.LayoutOrder = 0
 				src.Parent = row
+				-- どこからの報酬かを語で（D-251 ①）
+				local srcWord = ChestCommon.sourceWord[entry.source]
+				if srcWord then
+					local w = Components.text({
+						text = srcWord,
+						size = 21,
+						color = C.inkLight,
+						font = Tokens.font.display,
+					})
+					w.AutomaticSize = Enum.AutomaticSize.None
+					w.Size = UDim2.fromOffset(110, 48)
+					w.TextXAlignment = Enum.TextXAlignment.Left
+					w.LayoutOrder = 1
+					w.Name = "SourceWord"
+					w.Parent = row
+				end
 				local order = 2
 				local function put(inst: GuiObject)
 					inst.LayoutOrder = order

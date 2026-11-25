@@ -199,14 +199,27 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 						HorizontalAlignment = Enum.HorizontalAlignment.Center,
 						Wraps = true,
 						Padding = UDim.new(0, 6),
+						SortOrder = Enum.SortOrder.LayoutOrder,
 					}),
 				},
 				Parent = banner,
 			})
+			-- 次の Lv で貰える物だと分かるように頭に「▶ Lv N」（持っている数と取り違えない：D-251 ③）
+			local head = Components.text({
+				text = "▶ Lv " .. (lv + 1),
+				size = 21,
+				color = C.inkDark,
+				font = Tokens.font.number,
+			})
+			head.Name = "NextLv"
+			head.LayoutOrder = 0
+			head.ZIndex = 7
+			head.Parent = rewards
 			for itemId, n in nextLv.rewards do
 				local def = master.items[itemId]
 				local icon = if def and def.kind == "ticket" then Components.icon.ticket else "◈"
 				local chip = Components.chip(icon, "×" .. n, C.bronzeHi)
+				chip.LayoutOrder = 1
 				chip.ZIndex = 7
 				chip.Parent = rewards
 			end
