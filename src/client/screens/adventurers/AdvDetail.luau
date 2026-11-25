@@ -480,6 +480,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local main = Components.button({
 				kind = if exploring then "disabled" else "gold",
 				width = 320,
+				icon = RebirthCommon.icon.rebirth, -- 転生の面と同じ（D-245：アイコン＋語）
 				label = "Rebirth",
 				cost = HubState.formatNumber(cost),
 				name = "Rebirth",
