@@ -932,6 +932,83 @@ local function validateHiringData(c: Checker, d: any)
 	end
 	local _ = appearanceIds
 
+	-- 装備の見た目（D-254）：基本アイテムごとに、段 1〜(最深の段÷まとめる数) の普通の見た目と、武器・防具・盾は銘入りがそろうこと
+	local lk = d.Constants or {}
+	c:integer("Constants.equipLookTiersPerBand", lk.equipLookTiersPerBand, 1)
+	c:integer("Constants.equipLookAccessoryTiersPerBand", lk.equipLookAccessoryTiersPerBand, 1)
+	c:integer("Constants.equipLookNamedMinRarity", lk.equipLookNamedMinRarity, 1)
+	if type(d.EquipmentLooks) == "table" and type(d.EquipmentBases) == "table" and type(d.Dungeons) == "table" then
+		c:uniqueIds("EquipmentLooks", d.EquipmentLooks, "eq_")
+		local baseSet: { [string]: any } = {}
+		for _, b in d.EquipmentBases do
+			baseSet[b.id] = b
+		end
+		local maxTier = 1
+		for _, dg in d.Dungeons do
+			maxTier = math.max(maxTier, dg.tier or 1)
+		end
+		local have: { [string]: boolean } = {}
+		for i, l in d.EquipmentLooks do
+			local p = `EquipmentLooks[{i}]`
+			c:ref(p .. ".baseId", l.baseId, baseSet)
+			c:integer(p .. ".band", l.band, 1)
+			have[`{l.baseId}:{l.band}:{l.named == true}`] = true
+		end
+		for _, b in d.EquipmentBases do
+			local acc = b.kind == "accessory"
+			local per = if acc then lk.equipLookAccessoryTiersPerBand else lk.equipLookTiersPerBand
+			if type(per) == "number" and per >= 1 then
+				for band = 1, math.ceil(maxTier / per) do
+					if not have[`{b.id}:{band}:false`] then
+						c:warn(
+							"EquipmentLooks",
+							`{b.id} の段 {band} の普通の見た目がない（基本アイテムの名前で出す）`
+						)
+					end
+					if not acc and not have[`{b.id}:{band}:true`] then
+						c:warn(
+							"EquipmentLooks",
+							`{b.id} の段 {band} の銘入りがない（普通の見た目で出す）`
+						)
+					end
+				end
+			end
+		end
+	end
+
+	-- 画像のアセットID（15章 §4）：形と、指す先が実在すること
+	if type(d.Images) == "table" then
+		local function asset(p: string, v: any)
+			if type(v) ~= "string" or not string.match(v, "^rbxassetid://%d+$") then
+				c:error(p, `rbxassetid://<数字> の形でない（{tostring(v)}）`)
+			end
+		end
+		local function keyed(group: string, ids: { [string]: any })
+			for key, v in d.Images[group] or {} do
+				asset(`Images.{group}.{key}`, v)
+				c:ref(`Images.{group}.{key}`, key, ids)
+			end
+		end
+		local function idsOf(list: any): { [string]: boolean }
+			local s = {}
+			for _, x in list or {} do
+				s[x.id] = true
+			end
+			return s
+		end
+		keyed("monsters", idsOf(d.Monsters))
+		keyed("backgrounds", idsOf(d.Dungeons))
+		keyed("items", idsOf(d.Items))
+		keyed("equipment", idsOf(d.EquipmentLooks))
+		for i, ch in d.Images.chests or {} do
+			asset(`Images.chests[{i}].closed`, ch.closed)
+			asset(`Images.chests[{i}].open`, ch.open)
+		end
+		if d.Images.chests and type(d.Rarities) == "table" and #d.Images.chests > #d.Rarities then
+			c:error("Images.chests", "レアリティの数より多い")
+		end
+	end
+
 	-- 名前（D-054）
 	for _, key in { "m", "f", "dem" } do
 		local list = if type(d.Names) == "table" then d.Names[key] else nil
@@ -1397,6 +1474,7 @@ end
 local NAME_EN_TABLES = {
 	"Dungeons",
 	"EquipmentBases",
+	"EquipmentLooks",
 	"Expansions",
 	"Gifts",
 	"Items",
@@ -1536,6 +1614,18 @@ function MasterData.load(data: any): any
 			table.insert(visitorUniques, u)
 		end
 	end
+	-- 装備の見た目を基本アイテム×段で引けるようにする（D-254）
+	local lookIndex: { [string]: { [number]: { normal: any?, named: any? } } } = {}
+	for _, l in data.EquipmentLooks do
+		lookIndex[l.baseId] = lookIndex[l.baseId] or {}
+		local slot = lookIndex[l.baseId][l.band] or {}
+		if l.named then
+			slot.named = l
+		else
+			slot.normal = l
+		end
+		lookIndex[l.baseId][l.band] = slot
+	end
 	-- core が使う形にまとめる（読み取り専用）
 	return table.freeze({
 		rarityCount = #data.Rarities,
@@ -1547,6 +1637,8 @@ function MasterData.load(data: any): any
 		giftList = generalGifts, -- 一般の抽選（雇用の初期ギフト・転生で増えるギフト）に出るギフト。専用ギフトは除く（D-165）
 		modifiers = byId(data.Modifiers),
 		equipmentBases = byId(data.EquipmentBases),
+		equipmentLooks = lookIndex, -- [baseId][band] = { normal = 見た目, named = 見た目? }（D-254）
+		images = data.Images, -- 画像のアセットID（15章 §4）
 		items = byId(data.Items),
 		monsters = byId(data.Monsters),
 		dungeons = byId(data.Dungeons),

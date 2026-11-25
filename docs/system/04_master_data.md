@@ -7,7 +7,7 @@
 - `src/data/<Name>.luau` が Luau のテーブルを `return` する。RobloxでもLuneでもそのまま読める。
 - 1ファイル1種類。行は配列、各行は一意の `id`（snake_case、接頭辞付き）を持つ。
 - 公開後は `id` を変えない（セーブデータが参照するため）。
-- 画面に出す名前は英語（D-231 ⑥・D-233 ①）。`Dungeons`・`EquipmentBases`・`Expansions`・`Gifts`・`Items`・`Jobs`・`Modifiers`・`Rarities`・`Monsters`・`Quests` の各行に `nameEn`（英語名）を持つ。日本語の `name` は文書・デバッグ用に残す（`Quests` は `name` なし）。修飾語の `nameEn` は品の名前の頭に付ける語（例：Trapward Mace）。
+- 画面に出す名前は英語（D-231 ⑥・D-233 ①）。`Dungeons`・`EquipmentBases`・`EquipmentLooks`・`Expansions`・`Gifts`・`Items`・`Jobs`・`Modifiers`・`Rarities`・`Monsters`・`Quests` の各行に `nameEn`（英語名）を持つ。日本語の `name` は文書・デバッグ用に残す（`Quests` は `name` なし）。修飾語の `nameEn` は品の名前の頭に付ける語（例：Trapward Mace）。
 - 冒険者の名前は保存される文字なので、`Names`・`StarterSet` の `name`・`Uniques` の `name` は英語そのものを持つ（日本語は持たない）。
 - 他の5言語（日本語を含む）は M9 の前に足す（D-231 ⑥）。
 
@@ -19,6 +19,7 @@
 | `Gifts.luau` | ギフト | `gift_` |
 | `Modifiers.luau` | 修飾語 | `mod_` |
 | `EquipmentBases.luau` | 基本アイテム | `eq_` |
+| `EquipmentLooks.luau` | 装備の見た目（名前と絵。基本アイテム×段×銘入り。D-254） | `eq_` |
 | `Items.luau` | アイテム | `itm_` |
 | `Dungeons.luau` | ダンジョン | `dng_` |
 | `Monsters.luau` | モンスター | `mon_` |
@@ -35,6 +36,7 @@
 | `PlaytimeRewards.luau` | プレイ時間の段階（D-154） | — |
 | `SpecialChests.luau` | 特別な宝箱の表（D-166） | `spc_` |
 | `MapEvents.luau` | マップイベント（種類・場所。D-152） | `mev_` |
+| `Images.luau` | 画像のアセットID（モンスター・ダンジョンの背景・宝箱・道具・装備の見た目。15章 §4）。バストアップは `Appearances` の `imageId` | — |
 
 ## 2. 検証（MasterData.luau）
 

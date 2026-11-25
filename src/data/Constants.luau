@@ -167,6 +167,10 @@ return {
 	equipRarityMult = { 1.0, 1.3, 1.7, 2.2, 3.0, 4.0 }, -- 仮（Q-020）。レアリティの数だけ並べる（D-085）
 	equipGradeCoef = 0.10, -- 仮（Q-020）
 	equipTierMult = 1.30, -- アイテムレベルが1上がるごとの倍率（D-069）
+	-- 装備の見た目（名前と絵：D-254）。強さには使わない
+	equipLookTiersPerBand = 2, -- 武器・防具・盾はダンジョンの段を2つずつまとめて素材の段にする
+	equipLookAccessoryTiersPerBand = 4, -- 指輪・護符は4つずつ（3段）
+	equipLookNamedMinRarity = 4, -- エピック以上は銘入り
 	-- 宝箱の保管は上限なし（D-084。旧 chestStorageMax は廃止）
 	chestBatchOpen = 100, -- D-089：「まとめて開く」の個数（残りが少なければその数）
 	-- 開封演出が入る割合の基準（D-090）：各ダンジョンで chestEffectMinRarity 以上が出る確率をこの範囲に収める

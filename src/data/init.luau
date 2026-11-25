@@ -9,6 +9,7 @@ return {
 	Gifts = require("@self/Gifts"),
 	Modifiers = require("@self/Modifiers"),
 	EquipmentBases = require("@self/EquipmentBases"),
+	EquipmentLooks = require("@self/EquipmentLooks"),
 	Items = require("@self/Items"),
 	Monsters = require("@self/Monsters"),
 	Dungeons = require("@self/Dungeons"),
@@ -25,4 +26,5 @@ return {
 	LoginBonus = require("@self/LoginBonus"),
 	PlaytimeRewards = require("@self/PlaytimeRewards"),
 	MapEvents = require("@self/MapEvents"),
+	Images = require("@self/Images"),
 }
