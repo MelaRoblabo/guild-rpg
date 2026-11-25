@@ -85,9 +85,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	elseif h.freeRerollsLeft > 0 then
 		kind, costText = "gold", "Free ×" .. h.freeRerollsLeft
 	elseif tickets > 0 then
-		kind, costText = "gold", I.ticket .. " " .. tickets
+		kind, costText = "gold", Components.plain(I.ticket) .. " " .. tickets
 	else
-		kind, costText = "gold", I.ticket .. " " .. I.plus
+		kind, costText = "gold", Components.plain(I.ticket) .. " " .. I.plus
 	end
 	local reroll = Components.button({
 		kind = kind,

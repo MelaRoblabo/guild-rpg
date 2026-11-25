@@ -68,7 +68,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		kind = "brown",
 		width = 160,
 		height = 66,
-		icon = I.home,
+		icon = "@map", -- メイン画面（マップ）へ戻る
 		label = Words.home,
 		name = "Home",
 		glyph = "X",

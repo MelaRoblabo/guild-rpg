@@ -22,10 +22,10 @@ local RebirthCommon = {}
 RebirthCommon.STATS = HireCommon.STATS
 RebirthCommon.portrait = HireCommon.portrait
 RebirthCommon.icon = {
-	rebirth = "★", -- 転生回数の札（仮）
-	inherit = "▼", -- 引き継ぐ分の印
-	keep = "⬅", -- 見た目維持ポーション（前の姿に戻す。仮）
-	train = "▲",
+	rebirth = "@rebirth", -- 転生回数の札
+	inherit = "@inherit", -- 引き継ぐ分の印
+	keep = "@look_keep", -- 形見のロケット（前の姿に戻す：D-255）
+	train = "@train",
 }
 
 local STAT_COLOR = {
@@ -210,7 +210,10 @@ function RebirthCommon.row(p: RowProps): Row
 	num.Parent = track
 	local d = if p.prevBonus and p.bonus then p.bonus - p.prevBonus else 0
 	local delta = Components.text({
-		text = if d > 0 then Components.icon.up .. d elseif d < 0 then Components.icon.down .. -d else "",
+		text = if d > 0
+			then Components.plain(Components.icon.up) .. d
+			elseif d < 0 then Components.plain(Components.icon.down) .. -d
+			else "",
 		size = Tokens.text.body,
 		color = if d >= 0 then C.up else C.warn,
 		font = Tokens.font.number,
@@ -257,10 +260,10 @@ function RebirthCommon.statPanel(
 		Parent = content,
 	})
 	local tags = Components.chip(
-		if job and job.attackType == "magic" then "◈" else "⚔",
+		if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
 		(if job then job.nameEn else adv.jobId)
 			.. "   "
-			.. RebirthCommon.icon.rebirth
+			.. Components.plain(RebirthCommon.icon.rebirth)
 			.. " "
 			.. tostring(rebirthCount or adv.rebirthCount),
 		C.inkLight

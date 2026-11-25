@@ -88,7 +88,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		panel.Name = "Previous"
 		panel.Parent = body
 		local tags = Components.chip(
-			if job and job.attackType == "magic" then "◈" else "⚔",
+			if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
 			(if job then job.nameEn else adv.jobId) .. "   Lv " .. adv.level,
 			C.inkLight
 		)

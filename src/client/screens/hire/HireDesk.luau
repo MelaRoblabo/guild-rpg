@@ -309,7 +309,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			emptyParty = true
 		end
 	end
-	local markText = if emptyParty then "♟✚" else Components.icon.reroll .. master.K.hireFreeRerolls
+	local markText = if emptyParty
+		then "♟✚"
+		else Components.plain(Components.icon.reroll) .. master.K.hireFreeRerolls
 	new("TextLabel", {
 		Name = "HireMark",
 		Text = markText,

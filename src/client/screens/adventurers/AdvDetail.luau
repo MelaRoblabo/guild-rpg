@@ -120,7 +120,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		-- 保護のピン（D-217）。語を添える（D-245）
 		local pin: TextButton = new("TextButton", {
 			Name = "Pin",
-			Text = I.pin .. " " .. (if adv.locked then Words.locked else Words.lock),
+			Text = Components.plain(I.pin) .. " " .. (if adv.locked then Words.locked else Words.lock),
 			TextSize = 21,
 			FontFace = Tokens.font.display,
 			TextColor3 = if adv.locked then C.inkDark else C.inkLight,
@@ -169,7 +169,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = name,
 				LayoutOrder = order,
-				Text = icon .. " " .. word,
+				Text = Components.plain(icon) .. " " .. word,
 				TextSize = 21,
 				FontFace = Tokens.font.display,
 				TextColor3 = C.inkLight,
@@ -240,9 +240,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		panel.Name = "Stats"
 		panel.Parent = body
 		local tags = Components.chip(
-			if job and job.attackType == "magic" then "◈" else "⚔",
+			if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
 			(if job then job.nameEn else adv.jobId)
-				.. (if (adv.rebirthCount or 0) > 0 then "   " .. I.rebirth .. " " .. adv.rebirthCount else "")
+				.. (if (adv.rebirthCount or 0) > 0
+					then "   " .. Components.plain(I.rebirth) .. " " .. adv.rebirthCount
+					else "")
 				.. "   Lv "
 				.. adv.level,
 			C.inkLight
@@ -611,7 +613,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						Parent = sc,
 					})
 					local nm = pill(
-						if target and target.attackType == "magic" then "◈" else "⚔",
+						if target and target.attackType == "magic" then "@job_magic" else "@job_physical",
 						if target then target.nameEn else row.jobId,
 						23
 					)
@@ -667,7 +669,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			q.LayoutOrder = 1
 			q.Parent = sc
-			local back = pill(I.weapon .. I.armor .. I.sub, "→ " .. WarehouseCommon.icon.warehouse, 25)
+			local back = pill(
+				Components.plain(I.weapon) .. Components.plain(I.armor) .. Components.plain(I.sub),
+				"→ " .. Components.plain(WarehouseCommon.icon.warehouse),
+				25
+			)
 			back.LayoutOrder = 2
 			back.Parent = sc
 			local yes = Components.button({

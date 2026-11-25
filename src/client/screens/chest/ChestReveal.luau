@@ -327,8 +327,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			chip.Parent = bust
 		end
 		-- 職業と Lv の札
-		local tags =
-			Components.chip(if job and job.attackType == "magic" then "◈" else "⚔", "Lv " .. adv.level, C.inkLight)
+		local tags = Components.chip(
+			if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
+			"Lv " .. adv.level,
+			C.inkLight
+		)
 		tags.AnchorPoint = Vector2.new(1, 0.5)
 		tags.Position = UDim2.new(1, -96, 0, 0) -- 右上の × を避ける
 		tags.ZIndex = 8

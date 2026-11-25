@@ -35,7 +35,7 @@ local I = AdvCommon.icon
 local new = Create.new
 local CHILDREN = Create.Children
 
-local MAP_ICON = "▦" -- 行き先を選ぶ（地図。仮の記号）
+local MAP_ICON = "@map" -- 行き先を選ぶ（地図）
 local AUTO_ICON = "🛡★" -- 自動装備（鎧＋きらめき。仮。✦ は出ない）
 
 local function pill(icon: string, text: string, size: number, iconColor: Color3?): Frame
@@ -109,7 +109,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local panel, content = Components.panel({
 			size = UDim2.new(1, -80, 0, 444),
 			position = UDim2.fromOffset(40, band + 44),
-			title = I.party .. " " .. partyIndex .. "  " .. "⌂",
+			title = Components.plain(I.party) .. " " .. partyIndex .. "  " .. Components.plain("@cart_waiting"),
 		})
 		panel.Name = "Formation"
 		panel.Parent = body
@@ -178,7 +178,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				Name = "Face",
 				Position = UDim2.fromOffset(0, 36),
 				Size = UDim2.fromOffset(96, 120),
-				Text = if adv then I.party else "✚",
+				Text = if adv then Components.plain(I.party) else "✚",
 				TextSize = 44,
 				FontFace = Tokens.font.number,
 				TextColor3 = if adv then C.ch45 else C.inkMid,
@@ -247,7 +247,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				nm.TextTruncate = Enum.TextTruncate.AtEnd
 				nm.Parent = info
 				local jt = pill(
-					if job and job.attackType == "magic" then "◈" else "⚔",
+					if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
 					if job then job.nameEn else adv.jobId,
 					21,
 					C.inkLight
@@ -255,7 +255,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				jt.LayoutOrder = 2
 				jt.Parent = info
 				local lv = Components.text({
-					text = I.rebirth .. (adv.rebirthCount or 0) .. "   Lv" .. adv.level,
+					text = Components.plain(I.rebirth) .. (adv.rebirthCount or 0) .. "   Lv" .. adv.level,
 					size = 21,
 					color = C.inkDark,
 					font = Tokens.font.number,
@@ -349,7 +349,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					local b: TextButton = new("TextButton", {
 						Name = "Slot_" .. s,
 						LayoutOrder = k,
-						Text = I[s],
+						Text = Components.plain(I[s]),
 						TextSize = 28,
 						FontFace = Tokens.font.number,
 						TextColor3 = if item then C.inkLight else C.ch45,
@@ -475,7 +475,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				local b: TextButton = new("TextButton", {
 					Name = "Adv_" .. o.uid,
 					LayoutOrder = i,
-					Text = (if free then "" else I.party .. o.p .. " ") .. o.adv.name .. "\nLv " .. o.adv.level,
+					Text = (if free then "" else Components.plain(I.party) .. o.p .. " ")
+						.. o.adv.name
+						.. "\nLv "
+						.. o.adv.level,
 					TextSize = 21,
 					FontFace = Tokens.font.display,
 					TextColor3 = C.inkLight,
@@ -532,7 +535,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local equip = Components.button({
 				kind = "gold",
 				width = 320,
-				icon = I.party .. "✓",
+				icon = Components.plain(I.party) .. "✓",
 				label = Words.equip,
 				name = "Equip",
 				glyph = "A",

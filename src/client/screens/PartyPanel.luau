@@ -36,7 +36,7 @@ local PANEL_H = 470
 local PANEL_H_EXPLORE = 554 -- 探索ウィンドウ（一枚絵の枠つき）
 local SCENE_H = 160
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
-local EVENT_GLYPH = { chest = "▣", item = "🎟", trap = "⚠", fountain = "✚", none = "…" }
+local EVENT_GLYPH = { chest = "@chest", item = "@ticket", trap = "⚠", fountain = "@stat_hp", none = "…" }
 
 local function clock(seconds: number): string
 	local s = math.max(0, math.floor(seconds))
@@ -86,7 +86,7 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 	lv.Parent = row
 	if hp ~= nil and maxHp ~= nil and maxHp > 0 then
 		-- HP のアイコン（ハート・青：D-149）を棒の左に。棒も HP の青（D-249 ④）
-		local heart = Components.text({ text = "♥", size = 21, color = C.statHp, font = Tokens.font.number })
+		local heart = Components.text({ text = "@stat_hp", size = 21, color = C.statHp, font = Tokens.font.number })
 		heart.Name = "HpIcon"
 		heart.LayoutOrder = 4
 		heart.Parent = row
@@ -290,7 +290,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				kind = "brown",
 				width = 150,
 				height = 66,
-				icon = "▤",
+				icon = "@party",
 				label = Words.menu,
 				name = "Menu",
 				glyph = "X",
@@ -462,14 +462,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			t.Parent = scene
 		end
 		local function chestPill()
-			local p = Components.chip("▣", tostring(st.chests), C.bronzeHi)
+			local p = Components.chip("@chest", tostring(st.chests), C.bronzeHi)
 			p.AnchorPoint = Vector2.new(1, 0)
 			p.Position = UDim2.new(1, -6, 0, 6)
 			p.Parent = scene
 		end
 		-- 帰るまでの残り（左の一覧の行と同じ時計：D-249 ①）。帰り道は真ん中の時計が同じなので出さない
 		if st.phase ~= "inbound" then
-			local c = Components.chip("🕒", clock(st.remaining), C.inkLight)
+			local c = Components.chip("@time", clock(st.remaining), C.inkLight)
 			c.Name = "ReturnClock"
 			c.Position = UDim2.fromOffset(6, 6)
 			c.Parent = scene

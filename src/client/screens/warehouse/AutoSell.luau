@@ -96,7 +96,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		-- 修飾語つきを残す
 		local r3 = row(3, 84, not a.enabled)
 		local keepIc = Components.text({
-			text = I.modifier .. " " .. I.warehouse,
+			text = I.modifier .. " " .. Components.plain(I.warehouse),
 			size = 30,
 			color = C.inkDark,
 			font = Tokens.font.number,

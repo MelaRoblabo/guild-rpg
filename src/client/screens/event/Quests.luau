@@ -29,7 +29,7 @@ local new = Create.new
 local CHILDREN = Create.Children
 
 local deps = { nextDayStart = Calendar.nextDayStart, nextWeekStart = Calendar.nextWeekStart }
-local REWARD_ICON = { chest = "▣", ticket = Components.icon.ticket, gold = Components.icon.coin }
+local REWARD_ICON = { chest = "@chest", ticket = Components.icon.ticket, gold = Components.icon.coin }
 
 local function build(_params: any?, api: Nav.Api): Nav.Built
 	Guide.done("quests") -- 誘導の最後の段（D-246 ②）
@@ -43,7 +43,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		size = UDim2.fromOffset(860, 574),
 		position = UDim2.new(1, -40, 0, band + 20),
 		anchor = Vector2.new(1, 0),
-		title = "✔",
+		title = "@quest",
 	})
 	panel.Name = "Panel"
 	panel.Parent = frame
@@ -114,7 +114,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			title.AnchorPoint = Vector2.new(0, 0.5)
 			title.Position = UDim2.fromScale(0, 0.5)
 			title.Parent = head
-			local left = WarehouseCommon.pill("🕒", QuestView.left(period, now, deps), 23)
+			local left = WarehouseCommon.pill("@time", QuestView.left(period, now, deps), 23)
 			left.AnchorPoint = Vector2.new(1, 0.5)
 			left.Position = UDim2.fromScale(1, 0.5)
 			left.Parent = head
@@ -249,7 +249,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				chip(Components.icon.coin, HubState.formatNumber(Formulas.rewardGold(base, bonus.goldMult, master.K)))
 			end
 			for _, c in bonus.chests or {} do
-				chip("▣", "×" .. c.count)
+				chip("@chest", "×" .. c.count)
 			end
 			for itemId, n in bonus.items or {} do
 				local def = master.items[itemId]

@@ -25,10 +25,10 @@ local new = Create.new
 local CHILDREN = Create.Children
 
 local ICON = {
-	chest = "▣",
+	chest = "@chest",
 	itm_slot_ticket = Components.icon.ticket,
-	itm_potion_appearance_change = "🎲",
-	itm_potion_appearance_keep = "🧪",
+	itm_potion_appearance_change = "@look_change",
+	itm_potion_appearance_keep = "@look_keep",
 }
 local DAYS = 7
 
@@ -182,7 +182,7 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 		for i, l in LoginFlow.dayRewards(master.loginBonus.fallback, goldOf) do
 			local icon = lineIcon(l)
 			local tx = Components.text({
-				text = icon .. " ×" .. HubState.formatNumber(l.n),
+				text = Components.plain(icon) .. " ×" .. HubState.formatNumber(l.n),
 				size = 25,
 				color = C.inkLight,
 				font = Tokens.font.number,
@@ -196,7 +196,7 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 	seven.Position = UDim2.new(1, -14, 0, 14)
 	local left = DAYS - today
 	if left > 0 then
-		local chip = Components.chip("🕒", tostring(left), C.inkLight)
+		local chip = Components.chip("@time", tostring(left), C.inkLight)
 		chip.Name = "DaysLeft"
 		chip.Position = UDim2.fromOffset(14, 14)
 		chip.ZIndex = 4

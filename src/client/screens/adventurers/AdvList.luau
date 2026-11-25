@@ -27,7 +27,7 @@ local CHILDREN = Create.Children
 local deps = AdvCommon.deps
 
 local SORT_GLYPH = { level = "Lv", attack = I.attack, maxHp = I.hp, hired = I.bell, rebirths = I.rebirth }
-local STATE_GLYPH = { all = I.all, wait = "⌂", exploring = "●", none = "○" }
+local STATE_GLYPH = { all = I.all, wait = "@cart_waiting", exploring = "@cart_exploring", none = "○" }
 
 local function smallText(text: string, size: number, color: Color3, parent: GuiObject, z: number): TextLabel
 	local t = Components.text({ text = text, size = size, color = color, font = Tokens.font.number })
@@ -119,7 +119,7 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 	name.ZIndex = 10
 	name.Parent = b
 	if (adv.rebirthCount or 0) > 0 then
-		local rb = smallText(string.rep(I.rebirth, math.min(adv.rebirthCount, 3)), 21, C.numHi, b, 10)
+		local rb = smallText(string.rep(Components.plain(I.rebirth), math.min(adv.rebirthCount, 3)), 21, C.numHi, b, 10)
 		rb.AnchorPoint = Vector2.new(1, 0)
 		rb.Position = UDim2.new(1, -8, 0, 128)
 	end
@@ -232,7 +232,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		-- 並べ方のボタン（今の並べ方と向き）
 		local sortBtn: TextButton = new("TextButton", {
 			Name = "Sort",
-			Text = Words.sort .. " " .. SORT_GLYPH[prefs.advSort] .. (if prefs.advDesc then "▼" else "▲"),
+			Text = Words.sort .. " " .. Components.plain(SORT_GLYPH[prefs.advSort]) .. (if prefs.advDesc
+				then "▼"
+				else "▲"),
 			TextSize = 21,
 			FontFace = Tokens.font.number,
 			TextColor3 = C.inkLight,
@@ -362,6 +364,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 						[CHILDREN] = { Components.corner(33) },
 						Parent = r,
 					})
+					Components.setText(b, o.text) -- アイコンなら絵に
 					b.Activated:Connect(function()
 						onPick(o.id)
 					end)

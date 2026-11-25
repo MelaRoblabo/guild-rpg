@@ -20,24 +20,24 @@ WarehouseCommon.deps = { value = Formulas.bulkSellValue, price = Inventory.equip
 
 -- 仮のアイコン（文字）。素材ができたら画像に差し替える（D-227 ②）
 WarehouseCommon.icon = {
-	weapon = "⚔",
-	armor = "🛡",
-	sub = "❖",
-	items = "🎟",
+	weapon = "@slot_weapon",
+	armor = "@slot_armor",
+	sub = "@slot_sub",
+	items = "@ticket",
 	sort = "▦",
-	recycle = "⇄",
-	bulk = "▤",
-	pin = "📌",
+	recycle = "@gold",
+	bulk = "@gold",
+	pin = "@pin",
 	modifier = "◉",
-	warehouse = "⌂",
+	warehouse = "@warehouse",
 	warn = "⚠",
 	potion = "◈",
-	desc = "▼",
-	asc = "▲",
+	desc = "@down",
+	asc = "@up",
 }
 
 -- 並べ替えの種類のアイコン（レアリティ＝形、性能＝剣、売却額＝コイン、新しい順＝＋）
-WarehouseCommon.sortIcon = { rarity = "★", power = "⚔", sell = "G", new = "✚" }
+WarehouseCommon.sortIcon = { rarity = "@special", power = "@attack", sell = "@gold", new = "✚" }
 
 -- 品の性能の札：{ icon, text }（武器＝攻撃、防具・盾＝防御、指輪＝能力、護符＝XP の倍率。D-231 ⑭）
 function WarehouseCommon.values(item: any): { { icon: string, text: string } }
@@ -48,11 +48,11 @@ function WarehouseCommon.values(item: any): { { icon: string, text: string } }
 	local mult = Formulas.equipMult(item.rarity, item.grade, item.itemLevel or 1, master.K)
 	local out = {}
 	if base.atk then
-		table.insert(out, { icon = WarehouseCommon.icon.weapon, text = tostring(math.floor(base.atk * mult)) })
+		table.insert(out, { icon = "@attack", text = tostring(math.floor(base.atk * mult)) })
 	end
 	local def = math.floor((base.pdef or 0) * mult) + math.floor((base.mdef or 0) * mult)
 	if base.pdef or base.mdef then
-		table.insert(out, { icon = WarehouseCommon.icon.armor, text = tostring(def) })
+		table.insert(out, { icon = "@pdef", text = tostring(def) })
 	end
 	for stat, v in base.stats or {} do
 		table.insert(out, { icon = "", text = string.upper(stat) .. " " .. math.floor(v * mult) })

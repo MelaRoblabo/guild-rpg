@@ -111,7 +111,14 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 	end
 	if cut.kind == "guild" then
 		medalText(FLAG, 96, C.bronzeHi, Tokens.font.number)
-		plaque(1, "Lv " .. cut.level .. " " .. Components.icon.up, 40, C.lvOrange, Tokens.font.display).Name = "Level"
+		plaque(
+			1,
+			"Lv " .. cut.level .. " " .. Components.plain(Components.icon.up),
+			40,
+			C.lvOrange,
+			Tokens.font.display
+		).Name =
+			"Level"
 		local ids = {}
 		for id in cut.rewards or {} do
 			table.insert(ids, id)

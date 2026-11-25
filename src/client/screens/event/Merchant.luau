@@ -97,7 +97,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local panel, content = Components.panel({
 			size = UDim2.new(1, -80, 0, 504),
 			position = UDim2.fromOffset(40, band + 90),
-			title = "🛒",
+			title = "@merchant",
 		})
 		panel.Name = "Panel"
 		panel.Parent = body
@@ -206,7 +206,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			BackgroundTransparency = 1,
 			Parent = content,
 		})
-		local timer = WarehouseCommon.pill("🕒", clock(q and ev.closesIn or 0), 30)
+		local timer = WarehouseCommon.pill("@time", clock(q and ev.closesIn or 0), 30)
 		timer.AnchorPoint = Vector2.new(0, 0.5)
 		timer.Position = UDim2.fromScale(0, 0.5)
 		timer.Parent = foot
@@ -222,7 +222,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local buy = Components.button({
 			kind = if can then "gold" else "disabled",
 			width = 320,
-			icon = "🛍",
+			icon = "@merchant",
 			label = Words.buy,
 			cost = if cur then HubState.formatNumber(cur.price) else nil,
 			name = "Buy",

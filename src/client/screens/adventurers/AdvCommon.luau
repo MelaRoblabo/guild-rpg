@@ -6,6 +6,7 @@ local Game = require("@game/ReplicatedStorage/Core/Game")
 local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
 local Party = require("@game/ReplicatedStorage/Core/Party")
 local HubState = require("../../hub/HubState")
+local Components = require("../../ui/Components")
 
 local AdvCommon = {}
 
@@ -19,36 +20,37 @@ AdvCommon.deps = {
 
 -- 仮のアイコン（文字）。素材ができたら画像に差し替える（D-227 ②）
 AdvCommon.icon = {
-	all = "♟",
+	all = "@roster",
 	sort = "▦",
-	party = "♟",
-	pin = "📌",
-	up = "▲",
-	rebirth = "★",
+	party = "@party",
+	pin = "@pin",
+	up = "@up",
+	rebirth = "@rebirth",
 	male = "♂",
 	female = "♀",
 	warn = "⚠",
-	train = "▲",
+	train = "@train",
 	rename = "✏",
-	look = "🎲",
+	look = "@look_change",
 	jobPotion = "🧪",
 	dismiss = "🚪",
-	weapon = "⚔",
-	armor = "🛡",
-	sub = "❖",
-	attack = "⚔",
-	pdef = "🛡",
-	mdef = "◈",
+	weapon = "@slot_weapon",
+	armor = "@slot_armor",
+	sub = "@slot_sub",
+	attack = "@attack",
+	pdef = "@pdef",
+	mdef = "@mdef",
 	bell = "🔔",
-	hp = "✚",
-	clock = "🕒",
+	hp = "@stat_hp",
+	clock = "@time",
 }
 
 -- 職業系統のタブの語（D-231 ⑤：系統のアイコンは分からないので短い語）
 AdvCommon.lineWord = { warrior = "Warrior", scout = "Scout", mage = "Mage", support = "Support" }
 
 -- パーティの状態の印（メイン画面の一覧と同じ意味）
-local STATE_GLYPH = { moving = "▶", exploring = "●", returning = "◀", waiting = "⌂" }
+local STATE_GLYPH =
+	{ moving = "@cart_moving", exploring = "@cart_exploring", returning = "@cart_returning", waiting = "@cart_waiting" }
 
 function AdvCommon.partyBadge(view: any, uid: string): string?
 	local p = Party.find(view, uid)
@@ -56,7 +58,11 @@ function AdvCommon.partyBadge(view: any, uid: string): string?
 		return nil
 	end
 	local s = HubState.status(view, p)
-	return AdvCommon.icon.party .. p .. " " .. (STATE_GLYPH[s.state] or "⌂")
+	-- 文字の札に入れるので記号に戻す（Components.plain）
+	return Components.plain(AdvCommon.icon.party)
+		.. p
+		.. " "
+		.. Components.plain(STATE_GLYPH[s.state] or "@cart_waiting")
 end
 
 return AdvCommon

@@ -22,7 +22,7 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local I = { loop = "⇄", stay = Components.icon.home, chest = "▣", inbox = "▤", face = Components.icon.party }
+local I = { loop = "@auto_redispatch", stay = "@cart_waiting", chest = "@chest", inbox = "@inbox", face = "@party" }
 
 local function circle(size: number, fill: Color3, rim: Color3?, rimW: number?): Frame
 	local f: Frame = new("Frame", {
@@ -205,7 +205,7 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 		gold.Parent = foot
 	end
 	if sum.guildLevel then
-		local lv = well("Lv", C.inkLight, tostring(sum.guildLevel) .. " " .. Components.icon.up, 60)
+		local lv = well("Lv", C.inkLight, tostring(sum.guildLevel) .. " " .. Components.plain(Components.icon.up), 60)
 		lv.Name = "GuildLevel"
 		lv.LayoutOrder = 2
 		lv.Parent = foot

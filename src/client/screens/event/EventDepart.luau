@@ -30,7 +30,7 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local KIND_ICON = { rareDungeon = "◈", raid = "⚡" }
+local KIND_ICON = { rareDungeon = "@rare_dungeon", raid = "@raid" }
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
 local deps = {
 	weights = AutoEquip.weights,
@@ -176,7 +176,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			Parent = content,
 		})
 		-- 残り時間
-		local timer = WarehouseCommon.pill("🕒", clock(ev.closesIn or 0), 30)
+		local timer = WarehouseCommon.pill("@time", clock(ev.closesIn or 0), 30)
 		timer.Name = "Timer"
 		timer.LayoutOrder = 1
 		timer.Parent = content
@@ -223,7 +223,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						local f: TextLabel = new("TextLabel", {
 							Name = "Member" .. i,
 							LayoutOrder = i,
-							Text = if job and job.attackType == "magic" then "◈" else "⚔",
+							Text = "",
 							TextSize = 21,
 							FontFace = Tokens.font.number,
 							TextColor3 = C.inkLight,
@@ -235,7 +235,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 							},
 							Parent = r3,
 						})
-						local _ = f
+						Components.setText(
+							f,
+							if job and job.attackType == "magic" then "@job_magic" else "@job_physical"
+						)
 					end
 				end
 				label(r3, 8, "⚠", 23)

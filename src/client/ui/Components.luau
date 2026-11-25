@@ -18,16 +18,16 @@ Components.icon = {
 	-- Roblox の書体で出る記号だけを使う（↻・↶・✕ などは出ない：M8-1 の Studio で確認）
 	close = "X", -- ✖ は絵文字で描かれ文字色が効かない
 	check = "✓",
-	reroll = "⇄",
+	reroll = "@reroll",
 	undo = "⬅",
-	home = "⌂",
-	party = "♟",
-	ticket = "🎟", -- ▭ は出ない
-	coin = "G",
+	home = "@guild",
+	party = "@party",
+	ticket = "@ticket", -- ▭ は出ない
+	coin = "@gold",
 	plus = "✚",
-	star = "★",
-	up = "▲",
-	down = "▼",
+	star = "@special",
+	up = "@up",
+	down = "@down",
 	bell = "🔔",
 	search = "⊕",
 	stamp = "◎",
@@ -84,8 +84,180 @@ export type TextProps = {
 	autoSize: boolean?,
 }
 
+-- UIアイコン（Guild UI のアイコン一覧・D-149）。アイコンの表は「@キー」（例 "@guild"）で持ち、
+-- Components.text に渡すと絵（白1色を文字の色で塗る）になる。文字の中に入れるときは Components.plain で記号に戻す
+local ICON_FALLBACK: { [string]: string } = {
+	guild = "⌂",
+	map = "⌂",
+	warehouse = "⌂",
+	inbox = "▤",
+	party = "♟",
+	roster = "♟",
+	friend = "♟",
+	cart_waiting = "⌂",
+	cart_moving = "▶",
+	cart_exploring = "●",
+	cart_returning = "◀",
+	cart = "▶",
+	auto_redispatch = "⇄",
+	chest = "▣",
+	chest_open = "▦",
+	quest = "✔",
+	login = "▦",
+	time = "🕒",
+	rare_dungeon = "◈",
+	raid = "⚡",
+	merchant = "🛒",
+	job_physical = "⚔",
+	job_magic = "◈",
+	attack = "⚔",
+	pdef = "🛡",
+	mdef = "◈",
+	stat_hp = "✚",
+	stat_str = "●",
+	stat_mag = "●",
+	stat_agi = "●",
+	stat_dex = "●",
+	slot_weapon = "⚔",
+	slot_armor = "🛡",
+	slot_sub = "❖",
+	up = "▲",
+	down = "▼",
+	train = "▲",
+	rebirth = "★",
+	inherit = "▼",
+	reroll = "⇄",
+	special = "★",
+	look_change = "🎲",
+	look_keep = "🧪",
+	locked = "🔒",
+	pin = "📌",
+	gold = "G",
+	ticket = "🎟",
+	rest = "🌙",
+	daily = "☀",
+	shop = "G",
+	settings = "⚙",
+	pinch = "♥",
+	vanish = "✕",
+	unknown = "?",
+}
+
+local function iconKey(s: string?): string?
+	return if s then string.match(s, "^@([%w_]+)$") else nil
+end
+
+-- アイコンを文字にする（文字の中に入れるとき）。アイコンでなければそのまま
+function Components.plain(s: string): string
+	local key = iconKey(s)
+	if key == nil then
+		return s
+	end
+	return ICON_FALLBACK[key] or "?"
+end
+
+local iconImage: (key: string) -> string? -- 下で定義する
+
+-- あとから文字を替える（アイコンの「@キー」なら絵に、文字なら文字に）
+function Components.setText(label: any, s: string) -- TextLabel か TextButton
+	local key = iconKey(s)
+	local art = label:FindFirstChild("Art")
+	if key == nil then
+		if art then
+			art:Destroy()
+		end
+		label.Text = s
+		return
+	end
+	local img = iconImage(key)
+	if img == nil then
+		if art then
+			art:Destroy()
+		end
+		label.Text = ICON_FALLBACK[key] or "?"
+		return
+	end
+	label.Text = ""
+	if label.AutomaticSize ~= Enum.AutomaticSize.None then
+		label.AutomaticSize = Enum.AutomaticSize.None
+		label.Size = UDim2.fromOffset(label.TextSize + 4, label.TextSize + 4)
+	end
+	if art == nil then
+		-- 文字の大きさの絵を真ん中に（広いボタンでも大きくしない）
+		art = new("ImageLabel", {
+			Name = "Art",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(label.TextSize + 4, label.TextSize + 4),
+			ScaleType = Enum.ScaleType.Fit,
+			ZIndex = label.ZIndex,
+			Parent = label,
+		})
+	end
+	local a = art :: ImageLabel
+	a.Image = img
+	a.ImageColor3 = label.TextColor3
+end
+
+function Components.isIcon(s: string?): boolean
+	return iconKey(s) ~= nil
+end
+
+local artModule: any = nil
+iconImage = function(key: string): string?
+	if artModule == nil then
+		-- 絵の表（Master）は Roblox の中でだけ読める。読めなければ記号のまま
+		local ok, m = pcall(function()
+			return require("./Art") :: any
+		end)
+		artModule = if ok then m else false
+	end
+	if artModule then
+		return artModule.ui(key)
+	end
+	return nil
+end
+
 function Components.text(p: TextProps): TextLabel
 	local size = math.max(p.size or Tokens.text.body, Tokens.text.caption)
+	local key = iconKey(p.text)
+	if key then
+		-- アイコン：文字の枠の中に絵を置く（並べる枠では文字と同じ大きさで並ぶ）
+		local img = iconImage(key)
+		local holder: TextLabel = new("TextLabel", {
+			Name = "Icon_" .. key,
+			BackgroundTransparency = 1,
+			Text = if img then "" else (ICON_FALLBACK[key] or "?"),
+			TextSize = size,
+			TextColor3 = p.color or C.inkDark,
+			FontFace = Tokens.font.number,
+			AutomaticSize = Enum.AutomaticSize.None,
+			Size = UDim2.fromOffset(size + 4, size + 4),
+		})
+		if img then
+			local art: ImageLabel = new("ImageLabel", {
+				Name = "Art",
+				Image = img,
+				ImageColor3 = p.color or C.inkDark,
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 1),
+				ScaleType = Enum.ScaleType.Fit,
+				Parent = holder,
+			})
+			-- 枠の重なり順・色をあとから替えても絵がついてくるように
+			holder:GetPropertyChangedSignal("ZIndex"):Connect(function()
+				art.ZIndex = holder.ZIndex
+			end)
+			holder:GetPropertyChangedSignal("TextColor3"):Connect(function()
+				art.ImageColor3 = holder.TextColor3
+			end)
+			holder:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+				art.ImageTransparency = holder.TextTransparency
+			end)
+		end
+		return holder
+	end
 	local label: TextLabel = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = p.text,
@@ -230,7 +402,9 @@ function Components.panel(p: PanelProps): (Frame, Frame)
 						font = Tokens.font.display,
 						stroke = true,
 					})
-					t.Size = UDim2.fromOffset(0, Tokens.size.plaqueH)
+					if not Components.isIcon(p.title) then
+						t.Size = UDim2.fromOffset(0, Tokens.size.plaqueH)
+					end
 					t.ZIndex = 7
 					return t
 				end)(),
@@ -487,16 +661,10 @@ function Components.statRow(p: StatRowProps): Frame
 		inst.LayoutOrder = order
 		inst.Parent = row
 	end
-	-- アイコン（仮：能力の色の丸）
-	put(
-		new("Frame", {
-			Name = "Icon",
-			Size = UDim2.fromOffset(30, 30),
-			BackgroundColor3 = STAT_COLOR[p.stat] or C.inkMid,
-			[CHILDREN] = { Components.corner(15), Components.stroke(C.inkDark, 2) },
-		}),
-		1
-	)
+	-- アイコン：能力の形（拳・星・羽・的・ハート）を能力の色で（D-149・D-222 ⑩）
+	local statIcon = Components.text({ text = "@stat_" .. p.stat, size = 28, color = STAT_COLOR[p.stat] or C.inkMid })
+	statIcon.Name = "Icon"
+	put(statIcon, 1)
 	local label = Components.text({
 		text = p.label,
 		size = Tokens.text.body,
@@ -508,7 +676,7 @@ function Components.statRow(p: StatRowProps): Frame
 	label.Size = UDim2.fromOffset(64, 30)
 	put(label, 2)
 	local marks = Components.text({
-		text = string.rep(Components.icon.up, p.marks or 0),
+		text = string.rep(Components.plain(Components.icon.up), p.marks or 0),
 		size = 21,
 		color = C.inkMid,
 		font = Tokens.font.number,
@@ -563,7 +731,10 @@ function Components.statRow(p: StatRowProps): Frame
 	num.Parent = track
 	if p.prev then
 		local d = p.value - p.prev
-		local txt = if d > 0 then Components.icon.up .. d elseif d < 0 then Components.icon.down .. -d else ""
+		local txt = if d > 0
+			then Components.plain(Components.icon.up) .. d
+			elseif d < 0 then Components.plain(Components.icon.down) .. -d
+			else ""
 		local delta = Components.text({
 			text = txt,
 			size = Tokens.text.body,

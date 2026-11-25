@@ -28,39 +28,39 @@ ChestCommon.deps = { value = Formulas.bulkSellValue, canEquip = Inventory.canEqu
 
 -- 仮のアイコン（文字）。素材ができたら画像に差し替える（D-227 ②）
 ChestCommon.icon = {
-	chest = "▣",
-	all = "▦",
-	inbox = "▤",
+	chest = "@chest",
+	all = "@chest_open",
+	inbox = "@inbox",
 	claim = "✓",
-	sword = "⚔",
-	armor = "🛡",
-	recycle = "⇄",
-	warehouse = "⌂",
-	pin = "📌", -- 保護＝ピン（D-217）
-	equip = "♟",
+	sword = "@slot_weapon",
+	armor = "@slot_armor",
+	recycle = "@gold",
+	warehouse = "@warehouse",
+	pin = "@pin", -- 保護＝ピン（D-217）
+	equip = "@slot_weapon",
 	next = "▶",
 	warn = "⚠",
-	gold = "G",
-	ticket = "🎟",
-	unique = "★",
+	gold = "@gold",
+	ticket = "@ticket",
+	unique = "@special",
 }
 
 -- 特別な宝箱の山のアイコン（D-166）
 local SPECIAL_ICON = {
-	["special:quest"] = "✓",
-	["special:login"] = "▦",
-	["special:playtime"] = "◉",
-	["special:raid"] = "⚡",
-	["special:rare"] = "◈",
+	["special:quest"] = "@quest",
+	["special:login"] = "@login",
+	["special:playtime"] = "@time",
+	["special:raid"] = "@raid",
+	["special:rare"] = "@rare_dungeon",
 }
 
 -- 受け取り箱の出どころのアイコン（D-164）
 ChestCommon.sourceIcon = {
-	quest = "✓",
-	login = "▦",
-	playtime = "◉",
-	raid = "⚡",
-	referral = "❖",
+	quest = "@quest",
+	login = "@login",
+	playtime = "@time",
+	raid = "@raid",
+	referral = "@friend",
 }
 -- 受け取り箱の行の記号に添える語（D-251 ①）
 ChestCommon.sourceWord = {
@@ -293,7 +293,7 @@ function ChestCommon.compareRow(slot: string, value: number, current: number): F
 	num.Parent = track
 	local d = value - current
 	local delta = Components.text({
-		text = if d > 0 then Components.icon.up .. d else "",
+		text = if d > 0 then Components.plain(Components.icon.up) .. d else "",
 		size = 25,
 		color = C.up,
 		font = Tokens.font.number,

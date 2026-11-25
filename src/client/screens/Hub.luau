@@ -33,7 +33,8 @@ local CHILDREN = Create.Children
 local Hub = {}
 
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV" }
-local STATE_GLYPH = { moving = "▶", exploring = "●", returning = "◀", waiting = "⌂" }
+local STATE_GLYPH =
+	{ moving = "@cart_moving", exploring = "@cart_exploring", returning = "@cart_returning", waiting = "@cart_waiting" }
 
 local layer: Frame
 local map: ScrollingFrame
@@ -507,7 +508,7 @@ local function buildEdges(parent: Frame)
 	local chest = Components.button({
 		kind = "gold",
 		width = 300,
-		icon = "▣",
+		icon = "@chest",
 		label = Words.chests,
 		glyph = "A",
 		name = "ChestButton",
@@ -656,7 +657,7 @@ local function refreshMoving(view: any)
 		local i = party.index
 		local s = HubState.status(view, i)
 		local r = rowFor(i)
-		r.glyph.Text = STATE_GLYPH[s.state]
+		Components.setText(r.glyph, STATE_GLYPH[s.state])
 		-- 帰るまでの残り（D-249 ①）：出ている間は印を上に、時計を下に
 		local out = s.remaining ~= nil and s.state ~= "waiting"
 		r.timer.Visible = out

@@ -123,7 +123,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = "Tab_" .. id,
 				LayoutOrder = i,
-				Text = I[id] .. " " .. Words.slot[id], -- 語を添える（D-245）
+				Text = Components.plain(I[id]) .. " " .. Words.slot[id], -- 語を添える（D-245）
 				TextSize = 21,
 				FontFace = Tokens.font.display,
 				TextColor3 = if on then C.inkDark else C.inkLight,
@@ -376,7 +376,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local main = Components.button({
 			kind = if pick ~= nil then "gold" else "disabled",
 			width = 320,
-			icon = if unequip then I[tab] .. "→" else I.party .. I.attack, -- 外す＝枠＋外への矢印（D-232 ⑥）
+			icon = if unequip
+				then Components.plain(I[tab]) .. "→"
+				else Components.plain(I.party) .. Components.plain(I.attack), -- 外す＝枠＋外への矢印（D-232 ⑥）
 			label = if unequip then Words.unequip else Words.equip,
 			name = if unequip then "Unequip" else "Equip",
 			glyph = "A",

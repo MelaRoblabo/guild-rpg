@@ -128,9 +128,9 @@ local function face(parent: GuiObject, order: number, adv: any, fav: string?, di
 		g.Visible = false
 	end
 	local isFav = fav ~= nil and job ~= nil and job.attackType == fav
-	new("TextLabel", {
+	local attackBadge = new("TextLabel", {
 		Name = "Attack",
-		Text = if job and job.attackType == "magic" then "◈" else "⚔",
+		Text = "",
 		TextSize = 16,
 		FontFace = Tokens.font.number,
 		TextColor3 = C.inkLight,
@@ -145,6 +145,8 @@ local function face(parent: GuiObject, order: number, adv: any, fav: string?, di
 		},
 		Parent = f,
 	})
+	-- 攻撃の種類のアイコン（物理＝交差した剣、魔法＝光の玉：D-149）
+	Components.setText(attackBadge, if job and job.attackType == "magic" then "@job_magic" else "@job_physical")
 	if partyTag then
 		local tag = WarehouseCommon.pill("", partyTag, 21)
 		tag.AnchorPoint = Vector2.new(0, 0)
@@ -298,7 +300,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			est.BackgroundTransparency = 1
 			label(est, 1, "⚠", 25)
 			bar(est, 2, evade, 190, 26)
-			label(est, 3, "🕒", 25) -- ◷ は出ない
+			label(est, 3, "@time", 25)
 			local secs = math.floor(travel + 0.5)
 			local tp = WarehouseCommon.pill("", string.format("%d:%02d", secs // 60, secs % 60), 23)
 			tp.LayoutOrder = 4
@@ -486,7 +488,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			cond.BackgroundTransparency = 1
 			cond:FindFirstChildOfClass("UIListLayout").HorizontalAlignment = Enum.HorizontalAlignment.Center
 			cond:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 16)
-			label(cond, 1, "🔒", 30)
+			label(cond, 1, "@locked", 30)
 			label(cond, 2, "→", 30)
 			if prev then
 				local circle = WarehouseCommon.pill("✓", roman(prev), 23)

@@ -23,8 +23,13 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local ICON =
-	{ partySlots = "♟", candidateSlots = "📜", rosterSize = "♟♟", warehouseSize = "⌂", trainingLevel = "▲" }
+local ICON = {
+	partySlots = "@party",
+	candidateSlots = "📜",
+	rosterSize = "@roster",
+	warehouseSize = "@warehouse",
+	trainingLevel = "@train",
+}
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
 local SUMMARY_W = 320
 
@@ -117,14 +122,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			-- 状態の札（条件もお金も足りないときは両方：D-237 ①）
 			if r.step then
 				if r.needLevel then
-					local p = WarehouseCommon.pill("🔒", "⌂ Lv" .. r.needLevel, 21)
+					local p = WarehouseCommon.pill("@locked", Components.plain("@guild") .. " Lv" .. r.needLevel, 21)
 					p.LayoutOrder = 4
 					p.Parent = b
 				end
 				if r.needClear then
 					local d = master.dungeons[r.needClear]
 					local p = WarehouseCommon.pill(
-						"🔒",
+						"@locked",
 						"⛩ " .. (if d then ROMAN[d.tier] or tostring(d.tier) else "?"),
 						21
 					)

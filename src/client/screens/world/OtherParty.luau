@@ -24,7 +24,7 @@ local CHILDREN = Create.Children
 
 local PANEL_W, PANEL_H = 720, 470
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
-local STATE_GLYPH = { moving = "▶", exploring = "●", returning = "◀" }
+local STATE_GLYPH = { moving = "@cart_moving", exploring = "@cart_exploring", returning = "@cart_returning" }
 
 local names: { [number]: string } = {}
 
@@ -243,7 +243,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local now = Session.now()
 		local pos = OtherCarts.position(detail, now)
 		local left = detail.departAt + detail.totalSeconds - now
-		local st = Components.chip(if pos then STATE_GLYPH[pos.state] else "⌂", clock(left), C.inkLight)
+		local st = Components.chip(if pos then STATE_GLYPH[pos.state] else "@cart_waiting", clock(left), C.inkLight)
 		st.Name = "State"
 		st.LayoutOrder = 3
 		st.Parent = where
@@ -328,7 +328,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				local now = Session.now()
 				local pos = OtherCarts.position(detail, now)
 				if labels[1] then
-					labels[1].Text = if pos then STATE_GLYPH[pos.state] else "⌂"
+					Components.setText(labels[1], if pos then STATE_GLYPH[pos.state] else "@cart_waiting")
 				end
 				if labels[2] then
 					labels[2].Text = clock(detail.departAt + detail.totalSeconds - now)

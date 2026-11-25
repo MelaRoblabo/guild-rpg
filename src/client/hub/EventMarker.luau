@@ -20,7 +20,7 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local KIND_ICON = { rareDungeon = "◈", raid = "⚡", merchant = "🛒" }
+local KIND_ICON = { rareDungeon = "@rare_dungeon", raid = "@raid", merchant = "@merchant" }
 local ENDING_SECONDS = master.K.mapEventEndingSeconds -- 残りわずか（D-213 ⑫・D-238 ③）
 
 local EventMarker = {}
@@ -61,7 +61,7 @@ function EventMarker.mount(mapContent: Frame)
 	icon.Position = UDim2.fromScale(0.5, 0.5)
 	icon.ZIndex = 7
 	icon.Parent = m
-	local timer = Components.chip("🕒", "0:00", C.bronzeHi)
+	local timer = Components.chip("@time", "0:00", C.bronzeHi)
 	timer.Name = "Timer"
 	timer.AnchorPoint = Vector2.new(0, 1)
 	timer.Position = UDim2.fromScale(0.7, 0)
@@ -96,7 +96,7 @@ local function setChip(chip: Frame, icon: string, text: string, color: Color3?)
 		end
 	end
 	if labels[1] then
-		labels[1].Text = icon
+		Components.setText(labels[1], icon)
 	end
 	if labels[2] then
 		labels[2].Text = text
@@ -130,7 +130,7 @@ function EventMarker.refresh(view: any)
 	local p = MapLayout.eventPlace(placeIndex(ev.placeId))
 	m.Position = UDim2.fromOffset(p.x, p.y)
 	local icon = m:FindFirstChild("Icon") :: TextLabel
-	icon.Text = KIND_ICON[ev.kind] or "?"
+	Components.setText(icon, KIND_ICON[ev.kind] or "?")
 	icon.TextTransparency = if notice then 0.4 else 0
 	local stroke = m:FindFirstChildOfClass("UIStroke") :: UIStroke
 	local timer = m:FindFirstChild("Timer") :: Frame
@@ -138,7 +138,7 @@ function EventMarker.refresh(view: any)
 	if notice then
 		stroke.Color = C.ch45
 		stroke.Thickness = 3
-		setChip(timer, "🕒", clock(ev.startsIn or 0))
+		setChip(timer, "@time", clock(ev.startsIn or 0))
 		joinedChip.Visible = false
 		return
 	end
@@ -155,7 +155,7 @@ function EventMarker.refresh(view: any)
 		stroke.Thickness = 3
 		stroke.Transparency = 0
 	end
-	setChip(timer, "🕒", clock(left), if ending then C.warnDark else nil)
+	setChip(timer, "@time", clock(left), if ending then C.warnDark else nil)
 	-- 出発済み・買った印
 	local tag = nil
 	if ev.kind == "rareDungeon" then

@@ -163,11 +163,11 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		end
 		slider(1, 1, "♪", "Music", "musicVolume")
 		slider(1, 2, "🔊", "Sound", "soundVolume")
-		switch(1, 3, "▣", "Chest opening", "chestAnimation")
+		switch(1, 3, "@chest_open", "Chest opening", "chestAnimation")
 		switch(1, 4, "⚡", "Less flashing", "lessFlashing")
 		switch(2, 1, "💬", "Return alerts", "returnToast")
-		switch(2, 2, "★", "Cut-ins", "cutIns")
-		switch(2, 3, "▶", "Other carts", "otherCarts")
+		switch(2, 2, "@special", "Cut-ins", "cutIns")
+		switch(2, 3, "@cart", "Other carts", "otherCarts")
 		local nr = row(2, 4, "🔔", "Notifications")
 		local ok = canNotify == true
 		local nb = Components.button({
