@@ -163,7 +163,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = "Tab_" .. id,
 				LayoutOrder = i,
-				Text = Components.plain(I[id]) .. " " .. Words.slot[id], -- 語を添える（D-245）
+				Text = "", -- アイコン＋語（D-245・D-256）は下の setParts
 				TextSize = 21,
 				FontFace = Tokens.font.display,
 				TextColor3 = if on then C.inkDark else C.inkLight,
@@ -174,6 +174,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				[CHILDREN] = { Components.corner(33) },
 				Parent = tabs,
 			})
+			Components.setParts(b, { I[id], Words.slot[id] })
 			b.Activated:Connect(function()
 				if tab ~= id then
 					tab = id
@@ -195,10 +196,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if isGear then
 			local sortBtn = WarehouseCommon.tool(
 				"Sort",
-				Words.sort
-					.. " "
-					.. Components.plain(WarehouseCommon.sortIcon[prefs.whSort])
-					.. Components.plain(if prefs.whDesc then I.desc else I.asc),
+				{ Words.sort, WarehouseCommon.sortIcon[prefs.whSort], if prefs.whDesc then I.desc else I.asc },
 				150,
 				function()
 					overlay = "sort"
@@ -210,14 +208,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			x += 150 + 16
 		end
 		-- 自動売却の設定（S-51）。オンなら緑の点
-		local auto = WarehouseCommon.tool(
-			"AutoSell",
-			Components.plain(I.recycle) .. " " .. Words.autoSell,
-			170,
-			function()
-				api.open("AutoSell")
-			end
-		)
+		local auto = WarehouseCommon.tool("AutoSell", { I.recycle, Words.autoSell }, 170, function()
+			api.open("AutoSell")
+		end)
 		auto.Position = UDim2.fromOffset(x, band + 16)
 		auto.Parent = body
 		if view.settings and view.settings.autoSell and view.settings.autoSell.enabled then

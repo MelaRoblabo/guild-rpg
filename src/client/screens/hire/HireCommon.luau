@@ -143,12 +143,23 @@ function HireCommon.statPanel(parent: Frame, candidate: any, roll: any, prev: an
 			},
 			Parent = tags,
 		})
-		local l = Components.text({ text = text, size = 21, color = C.inkLight, font = Tokens.font.bodyStrong })
+		local l = Components.text({
+			text = if type(text) == "string" then text else "",
+			size = 21,
+			color = C.inkLight,
+			font = Tokens.font.bodyStrong,
+		})
 		l.Size = UDim2.fromOffset(0, 36)
+		if type(text) == "table" then
+			Components.setParts(l, text)
+		end
 		l.ZIndex = 9
 		l.Parent = t
 	end
-	tag((if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.nameEn else candidate.jobId))
+	tag({
+		if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
+		if job then job.nameEn else candidate.jobId,
+	})
 	for _, g in candidate.giftIds or {} do
 		local gift = master.gifts[g]
 		tag(if gift then gift.nameEn else g)

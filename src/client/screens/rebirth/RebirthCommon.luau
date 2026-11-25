@@ -261,15 +261,11 @@ function RebirthCommon.statPanel(
 		HorizontalAlignment = Enum.HorizontalAlignment.Center,
 		Parent = content,
 	})
-	local tags = Components.chip(
-		if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
-		(if job then job.nameEn else adv.jobId)
-			.. "   "
-			.. Components.plain(RebirthCommon.icon.rebirth)
-			.. " "
-			.. tostring(rebirthCount or adv.rebirthCount),
-		C.inkLight
-	)
+	local tags = Components.chip(if job and job.attackType == "magic" then "@job_magic" else "@job_physical", {
+		if job then job.nameEn else adv.jobId,
+		RebirthCommon.icon.rebirth,
+		tostring(rebirthCount or adv.rebirthCount),
+	}, C.inkLight)
 	tags.Name = "Tags"
 	tags.AnchorPoint = Vector2.new(1, 0.5)
 	tags.Position = UDim2.new(1, -96, 0, 0) -- 右上の × を避ける

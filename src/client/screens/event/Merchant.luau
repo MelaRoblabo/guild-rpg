@@ -41,6 +41,8 @@ local function clock(s: number): string
 	return string.format("%d:%02d", s // 60, s % 60)
 end
 
+local NPC_W = 300 -- 商人の絵の枠の幅
+
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local slot = (params :: any).slot :: number
 	local band = Root.bandBottom()
@@ -95,9 +97,23 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			Components.stroke(C.warnDark, 2).Parent = gold
 		end
 		gold.Parent = body
+		-- 旅の商人の絵（D-239。受付嬢と同じ暗い枠：S-20）。絵がなければ品の面を全幅に
+		local left = 40
+		local npc = Art.npc("npc_merchant")
+		if npc then
+			local stall, stallContent = Components.panel({
+				size = UDim2.fromOffset(NPC_W, 504),
+				position = UDim2.fromOffset(40, band + 90),
+				dark = true,
+			})
+			stall.Name = "MerchantNpc"
+			stall.Parent = body
+			Art.put(stallContent, npc, { scaleType = Enum.ScaleType.Crop })
+			left = 40 + NPC_W + 16
+		end
 		local panel, content = Components.panel({
-			size = UDim2.new(1, -80, 0, 504),
-			position = UDim2.fromOffset(40, band + 90),
+			size = UDim2.new(1, -(left + 40), 0, 504),
+			position = UDim2.fromOffset(left, band + 90),
 			title = "@merchant",
 		})
 		panel.Name = "Panel"

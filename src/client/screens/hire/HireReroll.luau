@@ -79,15 +79,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local unique = candidate.kind == "unique"
 	local kind: Components.ButtonKind
 	local costText: string?
+	local costIcon = "" -- 費用の札のアイコン（チケットのときだけ）
 	if unique or showingPrevious then
 		-- ユニークは能力が決まっている。前回に戻したあとの引き直しは、捨てた今回が「前回」になるため止める（Q 候補）
 		kind, costText = "disabled", nil
 	elseif h.freeRerollsLeft > 0 then
 		kind, costText = "gold", "Free ×" .. h.freeRerollsLeft
 	elseif tickets > 0 then
-		kind, costText = "gold", Components.plain(I.ticket) .. " " .. tickets
+		kind, costText, costIcon = "gold", tostring(tickets), I.ticket
 	else
-		kind, costText = "gold", Components.plain(I.ticket) .. " " .. I.plus
+		kind, costText, costIcon = "gold", I.plus, I.ticket
 	end
 	local reroll = Components.button({
 		kind = kind,
@@ -96,7 +97,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		label = "Reroll",
 		name = "Reroll",
 		cost = costText,
-		costIcon = "",
+		costIcon = costIcon,
 		glyph = "X",
 		onClick = function()
 			if h.freeRerollsLeft <= 0 and tickets <= 0 then

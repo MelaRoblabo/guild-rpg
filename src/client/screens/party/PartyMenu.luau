@@ -109,7 +109,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local panel, content = Components.panel({
 			size = UDim2.new(1, -80, 0, 444),
 			position = UDim2.fromOffset(40, band + 44),
-			title = Components.plain(I.party) .. " " .. partyIndex .. "  " .. Components.plain("@cart_waiting"),
+			title = { I.party, tostring(partyIndex), "@cart_waiting" },
 		})
 		panel.Name = "Formation"
 		panel.Parent = body
@@ -255,12 +255,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				jt.LayoutOrder = 2
 				jt.Parent = info
 				local lv = Components.text({
-					text = Components.plain(I.rebirth) .. (adv.rebirthCount or 0) .. "   Lv" .. adv.level,
+					text = "",
 					size = 21,
 					color = C.inkDark,
 					font = Tokens.font.number,
 					xAlign = Enum.TextXAlignment.Left,
 				})
+				Components.setParts(lv, { I.rebirth, tostring(adv.rebirthCount or 0), "Lv" .. adv.level })
 				lv.LayoutOrder = 3
 				lv.Parent = info
 				-- 攻撃・物防・魔防（自動装備の差は ▲▼）
@@ -535,7 +536,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local equip = Components.button({
 				kind = "gold",
 				width = 320,
-				icon = Components.plain(I.party) .. "✓",
+				icon = "@slot_weapon", -- Equip＝武器の枠（D-256）
 				label = Words.equip,
 				name = "Equip",
 				glyph = "A",

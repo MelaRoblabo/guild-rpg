@@ -38,9 +38,9 @@ end
 
 -- 角の丸い印
 local function dot(parent: GuiObject, text: string, fill: Color3, ink: Color3, pos: UDim2): TextLabel
-	return new("TextLabel", {
+	local d: TextLabel = new("TextLabel", {
 		Name = "Ticker",
-		Text = text,
+		Text = "",
 		TextSize = 21,
 		FontFace = Tokens.font.number,
 		TextColor3 = ink,
@@ -52,6 +52,8 @@ local function dot(parent: GuiObject, text: string, fill: Color3, ink: Color3, p
 		[CHILDREN] = { Components.corner(16), Components.stroke(C.ch13, 2) },
 		Parent = parent,
 	})
+	Components.setText(d, text) -- 「@キー」なら絵（D-256）
+	return d
 end
 
 local function card(view: any, adv: any, order: number, onClick: () -> ()): TextButton
@@ -93,7 +95,9 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 			[CHILDREN] = { Components.corner(10), Components.padding(0, 10, 0, 8), Components.stroke(C.ch16, 2) },
 			Parent = b,
 		})
-		smallText(badge, 21, C.inkLight, tag, 12).Size = UDim2.fromOffset(0, 40)
+		local bt = smallText("", 21, C.inkLight, tag, 12)
+		bt.Size = UDim2.fromOffset(0, 40)
+		Components.setParts(bt, badge)
 	end
 	-- 右上：転生できる「!」、もっと良い装備の ▲
 	if adv.level >= adv.levelCap then
@@ -134,14 +138,12 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 		[CHILDREN] = { Components.corner(17), Components.padding(0, 8, 0, 8) },
 		Parent = b,
 	})
-	smallText(
-		(if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.nameEn else adv.jobId),
-		21,
-		C.inkLight,
-		jobTag,
-		11
-	).Size =
-		UDim2.fromOffset(0, 34)
+	local jt = smallText("", 21, C.inkLight, jobTag, 11)
+	jt.Size = UDim2.fromOffset(0, 34)
+	Components.setParts(jt, {
+		if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
+		if job then job.nameEn else adv.jobId,
+	})
 	local lv: Frame = new("Frame", {
 		Name = "Level",
 		AnchorPoint = Vector2.new(1, 0),
@@ -232,9 +234,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		-- 並べ方のボタン（今の並べ方と向き）
 		local sortBtn: TextButton = new("TextButton", {
 			Name = "Sort",
-			Text = Words.sort .. " " .. Components.plain(SORT_GLYPH[prefs.advSort]) .. (if prefs.advDesc
-				then "▼"
-				else "▲"),
+			Text = "",
 			TextSize = 21,
 			FontFace = Tokens.font.number,
 			TextColor3 = C.inkLight,
@@ -245,6 +245,11 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			ZIndex = 10,
 			[CHILDREN] = { Components.corner(18), Components.stroke(C.secondaryRim, 3) },
 			Parent = body,
+		})
+		Components.setParts(sortBtn, {
+			Words.sort,
+			SORT_GLYPH[prefs.advSort],
+			if prefs.advDesc then Components.icon.down else Components.icon.up,
 		})
 		sortBtn.Activated:Connect(function()
 			sheetOpen = not sheetOpen

@@ -182,11 +182,12 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 		for i, l in LoginFlow.dayRewards(master.loginBonus.fallback, goldOf) do
 			local icon = lineIcon(l)
 			local tx = Components.text({
-				text = Components.plain(icon) .. " ×" .. HubState.formatNumber(l.n),
+				text = "",
 				size = 25,
 				color = C.inkLight,
 				font = Tokens.font.number,
 			})
+			Components.setParts(tx, { icon, "×" .. HubState.formatNumber(l.n) })
 			tx.LayoutOrder = i
 			tx.Parent = foot
 		end

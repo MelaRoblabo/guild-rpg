@@ -78,7 +78,7 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 	name.Position = UDim2.fromOffset(74, 4)
 	name.Parent = head
 	local jobText = Components.text({
-		text = (if job and job.attackType == "magic" then "◈ " else "⚔ ") .. (if job then job.nameEn else ""),
+		text = "",
 		size = 21,
 		color = C.inkDark,
 		font = Tokens.font.body,
@@ -86,6 +86,10 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 	})
 	jobText.Position = UDim2.fromOffset(74, 38)
 	jobText.Parent = head
+	Components.setParts(jobText, {
+		if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
+		if job then job.nameEn else "",
+	})
 	-- 能力の行（表記と伸びやすさの ▲。値はまだ決まっていない＝サイコロ。ユニークは決まった値）
 	local marks = HireCommon.growthMarks(candidate.jobId)
 	local fixed = if unique and master.uniques[candidate.uniqueId]

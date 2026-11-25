@@ -200,6 +200,93 @@ function Components.setText(label: any, s: string) -- TextLabel か TextButton
 	a.ImageColor3 = label.TextColor3
 end
 
+-- 文字の札に、アイコンと語を横に並べて入れる（D-256：文字とつながった記号を絵にする）。
+-- parts は「@キー」か文字の並び（例 { "@pin", "Lock" }）。札の文字の大きさ・字体・色・透明度に合わせ、
+-- あとから札の色・透明度・重なり順を替えても中身がついてくる。絵が1つもないときは文字をつないで出す。
+function Components.setParts(target: any, parts: { string }) -- TextLabel か TextButton
+	local old = target:FindFirstChild("Parts")
+	if old then
+		old:Destroy()
+	end
+	local hasArt = false
+	for _, s in parts do
+		local k = iconKey(s)
+		if k and iconImage(k) then
+			hasArt = true
+		end
+	end
+	if not hasArt then
+		local t = {}
+		for _, s in parts do
+			table.insert(t, Components.plain(s))
+		end
+		target.Text = table.concat(t, " ")
+		return
+	end
+	target.Text = ""
+	local auto = target.AutomaticSize ~= Enum.AutomaticSize.None
+	local align = target.TextXAlignment
+	local row: Frame = new("Frame", {
+		Name = "Parts",
+		BackgroundTransparency = 1,
+		-- 伸びる札でも高さが決まっていれば（題の札など）、その高さの中で縦の真ん中に並べる
+		Size = if auto
+			then UDim2.fromOffset(0, math.max(target.TextSize + 4, target.Size.Y.Offset))
+			else UDim2.fromScale(1, 1),
+		AutomaticSize = if auto then Enum.AutomaticSize.XY else Enum.AutomaticSize.None,
+		-- 横にだけ伸びる札（高さは決まっている）では縦の真ん中に置く
+		AnchorPoint = if target.AutomaticSize == Enum.AutomaticSize.X then Vector2.new(0, 0.5) else Vector2.zero,
+		Position = if target.AutomaticSize == Enum.AutomaticSize.X then UDim2.fromScale(0, 0.5) else UDim2.new(),
+		ZIndex = target.ZIndex,
+		[CHILDREN] = {
+			new("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				HorizontalAlignment = if align == Enum.TextXAlignment.Left
+					then Enum.HorizontalAlignment.Left
+					elseif align == Enum.TextXAlignment.Right then Enum.HorizontalAlignment.Right
+					else Enum.HorizontalAlignment.Center,
+				Padding = UDim.new(0, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		},
+		Parent = target,
+	})
+	local kids: { TextLabel } = {}
+	for i, s in parts do
+		local c: TextLabel
+		if iconKey(s) then
+			c = Components.text({ text = s, size = target.TextSize, color = target.TextColor3 })
+		else
+			c = new("TextLabel", {
+				BackgroundTransparency = 1,
+				Text = s,
+				TextSize = target.TextSize,
+				FontFace = target.FontFace,
+				TextColor3 = target.TextColor3,
+				AutomaticSize = Enum.AutomaticSize.XY,
+				Size = UDim2.fromOffset(0, target.TextSize),
+			})
+		end
+		c.LayoutOrder = i
+		c.ZIndex = target.ZIndex
+		c.TextTransparency = target.TextTransparency
+		c.Parent = row
+		table.insert(kids, c)
+	end
+	local function sync()
+		row.ZIndex = target.ZIndex
+		for _, c in kids do
+			c.TextColor3 = target.TextColor3
+			c.TextTransparency = target.TextTransparency
+			c.ZIndex = target.ZIndex
+		end
+	end
+	target:GetPropertyChangedSignal("TextColor3"):Connect(sync)
+	target:GetPropertyChangedSignal("TextTransparency"):Connect(sync)
+	target:GetPropertyChangedSignal("ZIndex"):Connect(sync)
+end
+
 function Components.isIcon(s: string?): boolean
 	return iconKey(s) ~= nil
 end
@@ -332,7 +419,7 @@ export type PanelProps = {
 	size: UDim2,
 	position: UDim2?,
 	anchor: Vector2?,
-	title: string?, -- 題の札（固有名など）
+	title: (string | { string })?, -- 題の札（固有名など）。アイコンと語の並びも可（Components.setParts）
 	dark: boolean?, -- 暗い木の面（一覧・情報）。既定は羊皮紙（D-222 ⑨）
 }
 
@@ -395,15 +482,19 @@ function Components.panel(p: PanelProps): (Frame, Frame)
 				Components.stroke(C.bronze, 2),
 				Components.padding(0, 30, 0, 30),
 				(function()
+					local parts = if type(p.title) == "table" then p.title else nil
 					local t = Components.text({
-						text = p.title :: string,
+						text = if parts then "" else p.title :: string,
 						size = Tokens.text.title,
 						color = C.inkLight,
 						font = Tokens.font.display,
 						stroke = true,
 					})
-					if not Components.isIcon(p.title) then
+					if parts or not Components.isIcon(p.title :: string) then
 						t.Size = UDim2.fromOffset(0, Tokens.size.plaqueH)
+					end
+					if parts then
+						Components.setParts(t, parts)
 					end
 					t.ZIndex = 7
 					return t
@@ -753,7 +844,17 @@ end
 -- 札・吹き出し
 
 -- 一時的な札（ゴールドなどが増減する瞬間だけ出す：D-218 ⑥）
-function Components.chip(icon: string, text: string, iconColor: Color3?): Frame
+-- text は文字か、アイコンと語の並び（{ "Warrior", "@rebirth", "1" }：Components.setParts）
+function Components.chip(icon: string, text: string | { string }, iconColor: Color3?): Frame
+	local word = Components.text({
+		text = if type(text) == "string" then text else "",
+		size = Tokens.text.body,
+		color = C.inkLight,
+		font = Tokens.font.number,
+	})
+	if type(text) == "table" then
+		Components.setParts(word, text)
+	end
 	return new("Frame", {
 		Name = "Chip",
 		Size = UDim2.fromOffset(0, Tokens.size.chipH),
@@ -770,7 +871,7 @@ function Components.chip(icon: string, text: string, iconColor: Color3?): Frame
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
 			Components.text({ text = icon, size = 25, color = iconColor or C.coinGold, font = Tokens.font.number }),
-			Components.text({ text = text, size = Tokens.text.body, color = C.inkLight, font = Tokens.font.number }),
+			word,
 		},
 	})
 end

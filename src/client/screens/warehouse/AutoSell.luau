@@ -96,11 +96,12 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		-- 修飾語つきを残す
 		local r3 = row(3, 84, not a.enabled)
 		local keepIc = Components.text({
-			text = I.modifier .. " " .. Components.plain(I.warehouse),
+			text = "",
 			size = 30,
 			color = C.inkDark,
 			font = Tokens.font.number,
 		})
+		Components.setParts(keepIc, { I.modifier, I.warehouse })
 		keepIc.AnchorPoint = Vector2.new(0, 0.5)
 		keepIc.Position = UDim2.fromScale(0, 0.5)
 		keepIc.Parent = r3

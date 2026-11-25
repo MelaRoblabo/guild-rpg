@@ -120,7 +120,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		-- 保護のピン（D-217）。語を添える（D-245）
 		local pin: TextButton = new("TextButton", {
 			Name = "Pin",
-			Text = Components.plain(I.pin) .. " " .. (if adv.locked then Words.locked else Words.lock),
+			Text = "",
 			TextSize = 21,
 			FontFace = Tokens.font.display,
 			TextColor3 = if adv.locked then C.inkDark else C.inkLight,
@@ -134,6 +134,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			[CHILDREN] = { Components.corner(33), Components.stroke(C.bronze, 3), Components.padding(0, 18, 0, 16) },
 			Parent = portrait,
 		})
+		Components.setParts(pin, { I.pin, if adv.locked then Words.locked else Words.lock })
 		pin.Activated:Connect(function()
 			if not busy then
 				send({ type = "SetLock", uid = uid, locked = not adv.locked })
@@ -169,7 +170,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = name,
 				LayoutOrder = order,
-				Text = Components.plain(icon) .. " " .. word,
+				Text = "",
 				TextSize = 21,
 				FontFace = Tokens.font.display,
 				TextColor3 = C.inkLight,
@@ -181,6 +182,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				[CHILDREN] = { Components.corner(18), Components.stroke(C.secondaryRim, 3) },
 				Parent = tools,
 			})
+			Components.setParts(b, { icon, word })
 			if count then
 				local c = pill("", tostring(count), 21)
 				c.AnchorPoint = Vector2.new(1, 1)
@@ -241,12 +243,9 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		panel.Parent = body
 		local tags = Components.chip(
 			if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
-			(if job then job.nameEn else adv.jobId)
-				.. (if (adv.rebirthCount or 0) > 0
-					then "   " .. Components.plain(I.rebirth) .. " " .. adv.rebirthCount
-					else "")
-				.. "   Lv "
-				.. adv.level,
+			if (adv.rebirthCount or 0) > 0
+				then { if job then job.nameEn else adv.jobId, I.rebirth, tostring(adv.rebirthCount), "Lv " .. adv.level }
+				else { if job then job.nameEn else adv.jobId, "Lv " .. adv.level },
 			C.inkLight
 		)
 		tags.Name = "Tags"
@@ -479,8 +478,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		-- 右下：メイン（トレーニング／Rebirth）と、探索中なら理由の札
 		local actions = Screen.actionRow(body)
 		if exploring then
-			local badge = AdvCommon.partyBadge(view, uid) or ""
-			local why = pill("", badge, 25)
+			local why = pill("", AdvCommon.partyBadge(view, uid) or "", 25)
 			why.LayoutOrder = 1
 			why.Parent = actions
 		end
@@ -669,11 +667,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			q.LayoutOrder = 1
 			q.Parent = sc
-			local back = pill(
-				Components.plain(I.weapon) .. Components.plain(I.armor) .. Components.plain(I.sub),
-				"→ " .. Components.plain(WarehouseCommon.icon.warehouse),
-				25
-			)
+			local back = pill("", { I.weapon, I.armor, I.sub, "→", WarehouseCommon.icon.warehouse }, 25)
 			back.LayoutOrder = 2
 			back.Parent = sc
 			local yes = Components.button({

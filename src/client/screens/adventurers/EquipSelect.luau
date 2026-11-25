@@ -123,7 +123,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local b: TextButton = new("TextButton", {
 				Name = "Tab_" .. id,
 				LayoutOrder = i,
-				Text = Components.plain(I[id]) .. " " .. Words.slot[id], -- 語を添える（D-245）
+				Text = "", -- アイコン＋語（D-245・D-256）は下の setParts
 				TextSize = 21,
 				FontFace = Tokens.font.display,
 				TextColor3 = if on then C.inkDark else C.inkLight,

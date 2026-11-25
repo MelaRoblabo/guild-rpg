@@ -85,14 +85,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local tickets = (view.items and view.items.itm_slot_ticket) or 0
 	local kind: Components.ButtonKind = "gold"
 	local costText: string? = nil
+	local costIcon = "" -- 費用の札のアイコン（チケットのときだけ）
 	if showingPrevious then
 		kind = "disabled"
 	elseif r.freeRerollsLeft > 0 then
 		costText = "Free ×" .. r.freeRerollsLeft
 	elseif tickets > 0 then
-		costText = Components.plain(I.ticket) .. " " .. tickets
+		costText, costIcon = tostring(tickets), I.ticket
 	else
-		costText = Components.plain(I.ticket) .. " " .. I.plus
+		costText, costIcon = I.plus, I.ticket
 	end
 	local reroll = Components.button({
 		kind = kind,
@@ -100,7 +101,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		icon = I.reroll,
 		label = "Reroll",
 		cost = costText,
-		costIcon = "",
+		costIcon = costIcon,
 		name = "Reroll",
 		glyph = "X",
 		onClick = function()

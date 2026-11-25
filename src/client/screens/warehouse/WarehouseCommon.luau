@@ -87,7 +87,8 @@ function WarehouseCommon.jobs(item: any): { string }
 end
 
 -- 暗い凹みの札（アイコンと文字）
-function WarehouseCommon.pill(icon: string, text: string, size: number?, iconColor: Color3?): Frame
+-- text は文字か、アイコンと語の並び（Components.setParts）
+function WarehouseCommon.pill(icon: string, text: string | { string }, size: number?, iconColor: Color3?): Frame
 	local h = if size and size < 25 then 36 else 44
 	local pill: Frame = new("Frame", {
 		Name = "Pill",
@@ -115,7 +116,15 @@ function WarehouseCommon.pill(icon: string, text: string, size: number?, iconCol
 		ic.LayoutOrder = 1
 		ic.Parent = pill
 	end
-	local t = Components.text({ text = text, size = size or 25, color = C.inkLight, font = Tokens.font.number })
+	local t = Components.text({
+		text = if type(text) == "string" then text else "",
+		size = size or 25,
+		color = C.inkLight,
+		font = Tokens.font.number,
+	})
+	if type(text) == "table" then
+		Components.setParts(t, text)
+	end
 	t.LayoutOrder = 2
 	t.Parent = pill
 	return pill
@@ -123,9 +132,9 @@ end
 
 -- 角の小さな丸（レアリティの形・ピン・選んだ印）
 local function badge(parent: GuiObject, text: string, fill: Color3, ink: Color3, pos: UDim2, z: number): TextLabel
-	return new("TextLabel", {
+	local b: TextLabel = new("TextLabel", {
 		Name = "Badge",
-		Text = text,
+		Text = "",
 		TextSize = 17,
 		FontFace = Tokens.font.number,
 		TextColor3 = ink,
@@ -137,6 +146,8 @@ local function badge(parent: GuiObject, text: string, fill: Color3, ink: Color3,
 		[CHILDREN] = { Components.corner(15), Components.stroke(C.ch13, 2) },
 		Parent = parent,
 	})
+	Components.setText(b, text) -- 「@キー」なら絵（D-256）
+	return b
 end
 
 export type TileProps = {
@@ -221,7 +232,8 @@ function WarehouseCommon.tile(p: TileProps): TextButton
 end
 
 -- 押せる丸角の道具ボタン（茶。66×66 以上）
-function WarehouseCommon.tool(name: string, icon: string, width: number, onClick: () -> ()): TextButton
+-- icon はアイコン1つ（語なし）か、アイコンと語の並び（{ "@gold", "Auto Sell" }：Components.setParts）
+function WarehouseCommon.tool(name: string, icon: string | { string }, width: number, onClick: () -> ()): TextButton
 	local b: TextButton = new("TextButton", {
 		Name = name,
 		Text = "",
@@ -232,13 +244,17 @@ function WarehouseCommon.tool(name: string, icon: string, width: number, onClick
 		[CHILDREN] = { Components.corner(18), Components.stroke(C.secondaryRim, 3) },
 	})
 	-- 語を含むときは語の大きさ（D-245）
-	local hasWord = utf8.len(icon) ~= nil and (utf8.len(icon) :: number) > 3
+	local parts = if type(icon) == "table" then icon else nil
+	local hasWord = parts ~= nil or (utf8.len(icon :: string) ~= nil and (utf8.len(icon :: string) :: number) > 3)
 	local t = Components.text({
-		text = icon,
+		text = if parts then "" else icon :: string,
 		size = if hasWord then 21 else 30,
 		color = C.inkLight,
 		font = if hasWord then Tokens.font.display else Tokens.font.number,
 	})
+	if parts then
+		Components.setParts(t, parts)
+	end
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
 	t.Position = UDim2.fromScale(0.5, 0.5)
 	t.ZIndex = 11

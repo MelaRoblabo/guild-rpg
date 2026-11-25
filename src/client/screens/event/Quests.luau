@@ -140,7 +140,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 					Parent = b,
 				})
 				local word = Components.text({
-					text = (if locked then "🔒 " else "") .. (if row then row.nameEn else e.questId),
+					text = if locked then "" else (if row then row.nameEn else e.questId),
 					size = 23,
 					color = C.inkDark,
 					font = Tokens.font.bodyStrong,
@@ -148,6 +148,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				})
 				word.Position = UDim2.fromOffset(0, 0)
 				word.Parent = r
+				if locked then
+					Components.setParts(word, { "@locked", if row then row.nameEn else e.questId })
+				end
 				if e.done then
 					local ok =
 						Components.text({ text = "✓", size = 23, color = C.inkDark, font = Tokens.font.number })

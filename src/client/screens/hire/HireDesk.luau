@@ -315,12 +315,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			emptyParty = true
 		end
 	end
-	local markText = if emptyParty
-		then "♟✚"
-		else Components.plain(Components.icon.reroll) .. master.K.hireFreeRerolls
-	new("TextLabel", {
+	local mark: TextLabel = new("TextLabel", {
 		Name = "HireMark",
-		Text = markText,
+		Text = "",
 		TextSize = 21,
 		FontFace = Tokens.font.number,
 		TextColor3 = if emptyParty then C.inkDark else C.inkLight,
@@ -331,6 +328,12 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		[CHILDREN] = { Components.corner(16), Components.stroke(C.bronze, 2) },
 		Parent = call,
 	})
+	Components.setParts(
+		mark,
+		if emptyParty
+			then { Components.icon.party, "✚" }
+			else { Components.icon.reroll, tostring(master.K.hireFreeRerolls) }
+	)
 	return { frame = frame, scrim = 1 }
 end
 

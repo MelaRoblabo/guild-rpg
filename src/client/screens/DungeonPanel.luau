@@ -200,7 +200,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local panel, content = Components.panel({
 			size = UDim2.fromOffset(PANEL_W, if mode == "locked" then 300 else 452), -- ヒントが2行になったぶん低い（D-250 ③）
 			position = UDim2.fromOffset(PANEL_X, band + 44),
-			title = roman(d) .. "  " .. d.nameEn .. (if mode == "locked" then "  🔒" else ""),
+			title = if mode == "locked" then { roman(d), d.nameEn, "@locked" } else roman(d) .. "  " .. d.nameEn,
 		})
 		panel.Name = "Panel"
 		panel.Parent = body
