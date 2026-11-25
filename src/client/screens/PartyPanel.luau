@@ -18,6 +18,7 @@ local Replay = require("../party/Replay")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
+local Guide = require("../hub/Guide")
 local Words = require("../ui/Words")
 local master = require("../Master")
 
@@ -103,6 +104,7 @@ end
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local partyIndex = (params :: any).partyIndex :: number
+	Guide.done("wagon") -- 初回の誘導：馬車（パーティの面を開いた：D-244 ①）
 	local band = Root.bandBottom()
 	local frame: Frame = new("Frame", {
 		Name = "PartyPanel",
@@ -298,6 +300,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			go.LayoutOrder = 2
 			go.Parent = actions
+			Guide.mark(go, Guide.is("go") and dest ~= nil, 18) -- 初回の誘導：Go
 		else
 			-- 自動再派遣のスイッチ（D-125・D-214 ⑥）
 			local on = party.autoRepeat ~= nil

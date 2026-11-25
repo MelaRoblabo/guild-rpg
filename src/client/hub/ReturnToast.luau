@@ -1,5 +1,5 @@
 --!strict
--- 帰還のトースト（11章 §5・D-116・D-128・D-162・D-214・D-236 ④）。メイン画面の帯のすぐ下の真ん中に暗い木のカプセル。
+-- 帰還のトースト（11章 §5・D-116・D-128・D-162・D-214・D-236 ④）。メイン画面の帯のすぐ下、左の一覧の右に暗い木のカプセル（右上のボタンに重ねない）。
 --   - オンライン中の帰還（ExpeditionReturned、留守番でないもの）で出す。少しの間に帰ったパーティは1つにまとめる（D-128）。
 --   - 中身：馬車（帰る向き）＋パーティの番号（まとめは重ねる）＋宝箱の数＋XP の札（休息ボーナス＝月、日替わり＝太陽。
 --     両方なら掛け合わせた倍率：06章 §14・§16）。右の端の Go＝同じ所へもう一度（待機のパーティだけ）。
@@ -62,9 +62,10 @@ local function show(group: { any })
 	local band = Root.bandBottom()
 	local toast: Frame = new("Frame", {
 		Name = "ReturnToast",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, band + 12),
-		Size = UDim2.fromOffset(600, 80),
+		-- 左の一覧のすぐ右から。右上のボタン（Quests・Settings：D-245 で語が付き広がった）に重ねない
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.fromOffset(200, band + 12),
+		Size = UDim2.fromOffset(560, 80),
 		BackgroundColor3 = C.ch10,
 		ZIndex = 50,
 		[CHILDREN] = { Components.corner(40), Components.stroke(C.bronze, 3) },

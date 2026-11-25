@@ -13,6 +13,7 @@ local HubState = require("../hub/HubState")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
 local EventMarker = require("../hub/EventMarker")
+local Guide = require("../hub/Guide")
 local PickMode = require("../hub/PickMode")
 local LoginSequence = require("../hub/LoginSequence")
 local ReturnToast = require("../hub/ReturnToast")
@@ -43,6 +44,7 @@ local markers: { [string]: TextButton } = {}
 local goldText: TextLabel
 local chestCount: TextLabel
 local chestNotice: Frame
+local chestButton: Frame
 
 ---------------------------------------------------------------------------
 -- マップ
@@ -226,6 +228,21 @@ local function wagonFor(partyIndex: number): Frame
 		[CHILDREN] = { Components.corner(15), Components.stroke(C.warnDark, 2) },
 		Parent = w,
 	})
+	-- 馬車を触ってもパーティの面を開く（D-212。一覧の行と同じ）
+	local tap: TextButton = new("TextButton", {
+		Name = "Tap",
+		Text = "",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 9,
+		Parent = w,
+	})
+	tap.Activated:Connect(function()
+		HubState.selected = partyIndex
+		HubState.following = true
+		PickMode.stop()
+		Nav.open("PartyPanel", { partyIndex = partyIndex })
+	end)
 	wagons[partyIndex] = w
 	return w
 end
@@ -418,6 +435,7 @@ local function buildEdges(parent: Frame)
 	chest.Position = UDim2.new(1, -40, 1, -24)
 	chest.ZIndex = 20
 	chest.Parent = parent
+	chestButton = chest
 	local face = chest:FindFirstChild("Face") :: TextButton
 	chestCount = Components.text({ text = "0", size = 40, color = C.inkDark, font = Tokens.font.number })
 	chestCount.LayoutOrder = 5
@@ -515,12 +533,32 @@ local function refreshStatic(view: any)
 	end
 end
 
+-- 初回の誘導（D-244 ①）：馬車（待機の最初のパーティ）→ 帰還のあとの宝箱ボタン
+local function refreshGuide(view: any)
+	local first = view.parties and view.parties[1]
+	local wagonOn = false
+	-- 重ねた画面（ログインのまとめなど）があるときは光らせない。
+	-- Go の段でパーティの面を閉じたときも、戻る道として馬車を光らせ続ける（Open All の段の宝箱ボタンも同じ）
+	if first and (Guide.is("wagon") or Guide.is("go")) and Nav.depth() == 0 then
+		wagonOn = HubState.status(view, first.index).state == "waiting"
+	end
+	if first then
+		Guide.mark(wagons[first.index], wagonOn, 10)
+	end
+	local total = 0
+	for _, c in view.chests or {} do
+		total += c.count
+	end
+	Guide.mark(chestButton, (Guide.is("chests") or Guide.is("openAll")) and total > 0 and Nav.depth() == 0, 18, true)
+end
+
 local function refreshMoving(view: any)
 	EventMarker.refresh(view)
 	WorldCarts.refresh(view)
 	if view == nil then
 		return
 	end
+	refreshGuide(view)
 	for _, party in view.parties or {} do
 		local i = party.index
 		local s = HubState.status(view, i)
@@ -561,6 +599,7 @@ function Hub.mount()
 	buildEdges(layer)
 	ReturnToast.mount() -- 帰還のトースト（11章 §5、M8-6）
 	LoginSequence.mount() -- ログイン時のまとめ・カットイン・カレンダー（D-132・D-208、M8-6）
+	Guide.mount() -- 初回の誘導（D-244 ①）
 	Session.changed:connect(function(view)
 		refreshStatic(view)
 		refreshMoving(view)

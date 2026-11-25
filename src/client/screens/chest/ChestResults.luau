@@ -15,6 +15,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Guide = require("../../hub/Guide")
 local Words = require("../../ui/Words")
 local master = require("../../Master")
 
@@ -27,6 +28,8 @@ local CARDS = 2 -- 1枚に並べるカードの数（D-223 ①の見本）
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local batch: ChestCommon.Batch = (params :: any).batch
+	-- 初回の誘導は最初の開封の結果で終わる（強くなる品がなく Equip が出なかったときも：D-244 ①）
+	Guide.done("equip")
 	local band = Root.bandBottom()
 	local frame = Screen.scene("ChestResults")
 	Screen.closeTopRight(frame, api.close)

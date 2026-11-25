@@ -19,6 +19,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Guide = require("../../hub/Guide")
 local Words = require("../../ui/Words")
 local Upgrades = require("../../chest/Upgrades")
 local master = require("../../Master")
@@ -347,12 +348,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			onClick = function()
 				local r = Session.sendAndWait({ type = "Equip", adventurerUid = adv.uid, equipmentUid = item.uid })
 				if r and r.ok then
+					Guide.done("equip")
 					goNext()
 				end
 			end,
 		})
 		equip.LayoutOrder = 2
 		equip.Parent = actions
+		Guide.mark(equip, Guide.is("equip"), 18, true) -- 初回の誘導：Equip（最後の段）
 	end
 
 	-- 触ると速まる・長押しで飛ばす（溜めの間だけ）

@@ -17,6 +17,7 @@ local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
+local Guide = require("../../hub/Guide")
 local Words = require("../../ui/Words")
 local master = require("../../Master")
 
@@ -125,6 +126,7 @@ end
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local tab = if params and (params :: any).tab == "inbox" then "inbox" else "chests"
+	Guide.done("chests") -- 初回の誘導：宝箱ボタン（一覧を開いた：D-244 ①）
 	local band = Root.bandBottom()
 	local frame = Screen.scene("ChestList")
 	Screen.closeTopRight(frame, api.close)
@@ -145,6 +147,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if busy or #piles == 0 then
 			return
 		end
+		Guide.done("openAll") -- 初回の誘導：開けた（Open All でも山ごとでも）
 		busy = true
 		local batch = ChestCommon.open(piles, all)
 		busy = false
@@ -386,6 +389,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			all.LayoutOrder = 2
 			all.Parent = actions
+			Guide.mark(all, Guide.is("openAll") and not blocked and total > 0, 18, true) -- 初回の誘導：Open All
 		else
 			-- 受け取り箱
 			local panel, content = Components.panel({
