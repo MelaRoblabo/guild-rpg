@@ -9,6 +9,7 @@
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
+local Guide = require("./Guide")
 local MapLayout = require("./MapLayout")
 local Nav = require("../ui/Nav")
 local Session = require("../Session")
@@ -148,6 +149,12 @@ function EventMarker.refresh(view: any)
 	stroke.Color = if ev.kind == "raid" then C.warnDark else C.barFill
 	stroke.Thickness = 6
 	stroke.Transparency = if blink then 0.7 else 0
+	-- 初回の誘導の間は、誘導の輪と見分けが付かないので予告と同じ細い暗い輪にする（光るのは同時に1つだけ：D-244）
+	if Guide.current() ~= nil then
+		stroke.Color = C.ch45
+		stroke.Thickness = 3
+		stroke.Transparency = 0
+	end
 	setChip(timer, "🕒", clock(left), if ending then C.warnDark else nil)
 	-- 出発済み・買った印
 	local tag = nil

@@ -192,7 +192,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			end,
 		})
 		nb.AnchorPoint = Vector2.new(1, 0.5)
-		nb.Position = UDim2.new(1, 0, 0.5, -3)
+		nb.Position = UDim2.fromScale(1, 0.5) --行（72）の中に収める（ボタンは縁を含めて 70）
 		nb.Parent = nr
 	end
 

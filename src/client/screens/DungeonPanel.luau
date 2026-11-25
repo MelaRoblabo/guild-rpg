@@ -452,7 +452,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local canGo = pickParty ~= nil and members > 0
 			local go = Components.button({
 				kind = if canGo then "gold" else "disabled",
-				width = 240,
+				width = 220, -- Form（150）と並べて面の幅に収める
 				icon = "▶",
 				label = Words.go,
 				name = "Go",
