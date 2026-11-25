@@ -88,6 +88,7 @@ Protocol.CLIENT_COMMANDS = {
 	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
 	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179
 	MarkNotifyPrompt = { stage = enum({ "firstReturn", "loginDay2" }) }, -- D-196。通知の許可の画面を出した記録
+	SetGuideStep = { step = int(1, 99) }, -- D-244 ①。初回の誘導の済んだ段の数
 } :: { [string]: { [string]: Field } }
 
 -- 読み取り専用のコマンド（状態を変えない。Game.execute を通さず、サーバーが答える。回数制限の対象：11章（システム）§6.2）
@@ -294,6 +295,8 @@ function Protocol.view(state: any, master: any): any
 	v.inbox = Game.query.inbox(state)
 	-- 通知の許可の画面を今出すか（D-196。"firstReturn" / "loginDay2" / nil）。初めての帰還は stats にあり送らないので、ここで判定して渡す
 	v.notifyPromptDue = Game.query.notifyPromptDue(state)
+	-- 初回の誘導の済んだ段の数（D-244 ①）。誘導の前からのセーブかは stats（送らない）で判定するので、ここで渡す
+	v.guideStep = Game.query.guideStep(state)
 	for _, e in v.expeditions or {} do
 		e.seed = nil
 		e.log = Protocol.redactLog(e.log)

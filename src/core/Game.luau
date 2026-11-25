@@ -1379,6 +1379,17 @@ handlers.MarkNotifyPrompt = function(state, cmd, ctx)
 	return { ok = true, events = { { type = "NotifyPromptMarked", at = ctx.now, stage = cmd.stage } } }
 end
 
+-- 初回の誘導の進み（D-244 ①）。済んだ段の数を settings.guideStep に保存する（設定と一緒にサーバーへ：D-117）。
+-- 戻らない（小さい数は無視）。段の中身（馬車→Go→宝箱ボタン→Open All→Equip）は画面が持つ
+handlers.SetGuideStep = function(state, cmd, _ctx)
+	state.settings = state.settings or {}
+	local cur = state.settings.guideStep or 0
+	if cmd.step > cur then
+		state.settings.guideStep = cmd.step
+	end
+	return { ok = true, events = {} }
+end
+
 -- マップイベント（05章 DispatchEvent・BuyFromMerchant、06章 §12、D-152, D-179） ---------------------
 -- コマンドはオンラインでだけ届く。留守中（advance の ctx.online == false）はイベントに参加しない（D-161）
 
@@ -1804,6 +1815,19 @@ end
 -- 自動装備の提案（D-120・D-231 ⑨）：{ { advUid, slot, from, to } }。空なら付け替えるものがない
 function Game.query.autoEquipPlan(state: any, partyIndex: number, master: any): { any }
 	return AutoEquip.plan(state, partyIndex, master)
+end
+
+-- 初回の誘導の済んだ段の数（D-244 ①）。保存がなく、もう一度でも帰還していれば（誘導の前からのセーブ）全部済んだ扱い
+Game.GUIDE_DONE = 99
+function Game.query.guideStep(state: any): number
+	local saved = state.settings and state.settings.guideStep
+	if saved then
+		return saved
+	end
+	if state.stats and state.stats.firstReturnAt then
+		return Game.GUIDE_DONE
+	end
+	return 0
 end
 
 -- 設定（保存がなければ StarterSet.preferences の初期値。D-117・D-237 ③）

@@ -139,6 +139,8 @@ export type PlayerState = {
 		notifyPrompt: { firstReturn: boolean, loginDay2: boolean },
 		                              -- 通知の許可の画面を出した記録（D-196 ③。設定と一緒にサーバーへ保存：D-117）。version 11
 		                              -- firstReturn：初めての帰還で出した / loginDay2：ログインボーナス2日目で出した。MarkNotifyPrompt で付ける
+		guideStep: number?,           -- 初回の誘導（D-244 ①）の済んだ段の数。SetGuideStep で増える（戻らない）。
+		                              -- なければ Game.query.guideStep が、帰還したことのあるセーブは全部済んだ扱い・ほかは 0 とする（移行なし）
 	},
 	stats: { [string]: number },      -- 集計用カウンタ（指標・実績）。クライアントには送らない
 	                                  -- stats.rebirths：これまでに転生した回数の累計（RebirthChoose で +1。解雇で戻らない）。
