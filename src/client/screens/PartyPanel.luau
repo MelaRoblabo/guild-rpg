@@ -274,7 +274,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			menu.LayoutOrder = 1
 			menu.Parent = actions
-			local dest = party.lastDungeonId -- 最後の行き先（D-228）
+			-- 最後の行き先（D-228）。まだ一度も出ていなければ、解放済みで一番浅いダンジョン（D-244 ②）
+			local dest = party.lastDungeonId or HubState.firstUnlocked(view)
 			local go = Components.button({
 				kind = if dest then "gold" else "disabled",
 				width = 200,

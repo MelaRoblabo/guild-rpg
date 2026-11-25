@@ -25,6 +25,16 @@ function HubState.dungeonIndex(id: string?): number?
 	return nil
 end
 
+-- 解放済みで一番浅いダンジョン（行き先のない Go の行き先：D-244 ②）
+function HubState.firstUnlocked(view: any): string?
+	for _, d in master.dungeonList do
+		if view.unlockedDungeons and view.unlockedDungeons[d.id] then
+			return d.id
+		end
+	end
+	return nil
+end
+
 -- そのパーティの状態（今何をしているか・ピンチ：D-212）
 function HubState.status(view: any, partyIndex: number): PartyStatus.Status
 	local e = Game.query.expeditionOf(view, partyIndex)

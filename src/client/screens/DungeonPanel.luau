@@ -3,7 +3,8 @@
 --   マップのダンジョンを触って開く。パーティの面と同じ位置・形（x196・幅420・羊皮紙・× は面の角）。中身は3通り：
 --   ① パーティから（S-12 の金 → マップで選ぶ：hub/PickMode）：攻略ヒント＋このパーティの4人（有利な区分の人に緑の輪）
 --      ＋罠の避けやすさの棒＋移動時間。右下の金＝Go（馬車＋パーティの番号）。
---   ② マップから：攻略ヒント＋適性のある4人（D-114）。下に待機のパーティの札（番号＋状態）を並べて選び、金＝この4人で編成。
+--   ② マップから：攻略ヒント＋適性のある4人（D-114）。下に待機のパーティの札（番号＋状態）を並べて選び、
+--      金＝選んだパーティでこのダンジョンへ Go、茶のサブ＝この4人で編成（D-244 ③。D-235 ① の「金＝編成」を置き換え）。
 --      探索中の人・ほかのパーティの人は入れられないので、空いている人と選んだパーティの人から選び直す（D-235 ①）。
 --   ③ 未解放：ヒントは出す。解放の条件は「鍵 → 前のダンジョンの丸（踏破の印）」。ボタンはない（解放は無料・自動）。
 --   攻略ヒント：攻撃の種類の割合（剣と光の玉の帯）、多い種族（英語の短い語を多い順、一番多いものは濃い縁）、罠Lv、フロアの印。
@@ -265,6 +266,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					FillDirection = Enum.FillDirection.Horizontal,
 					HorizontalAlignment = Enum.HorizontalAlignment.Right,
 					VerticalAlignment = Enum.VerticalAlignment.Bottom,
+					Padding = UDim.new(0, 12), -- サブはメインのすぐ左（D-219 ③）
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
 			},
@@ -418,11 +420,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 			actions.Parent = content
 			local form = Components.button({
-				kind = if pickParty and #suited > 0 then "gold" else "disabled",
-				width = 240,
+				kind = if pickParty and #suited > 0 then "brown" else "disabled",
+				width = 130,
+				height = 66,
 				icon = "♟✚",
 				name = "Form",
-				glyph = "A",
+				glyph = "X",
 				onClick = function()
 					if busy or pickParty == nil then
 						return
@@ -441,7 +444,43 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					api.close()
 				end,
 			})
+			form.LayoutOrder = 1
 			form.Parent = actions
+			-- 金＝選んだパーティでこのダンジョンへ Go（D-244 ③）。メンバーがいなければ押せない色
+			local members = 0
+			if pickParty then
+				for _, uid in view.parties[pickParty].slots do
+					if view.adventurers[uid] then
+						members += 1
+					end
+				end
+			end
+			local canGo = pickParty ~= nil and members > 0
+			local go = Components.button({
+				kind = if canGo then "gold" else "disabled",
+				width = 240,
+				icon = "▶",
+				label = if pickParty then tostring(pickParty) else nil,
+				name = "Go",
+				glyph = "A",
+				onClick = function()
+					if busy or not canGo then
+						return
+					end
+					busy = true
+					local r = Session.sendAndWait({ type = "Dispatch", partyIndex = pickParty, dungeonId = dungeonId })
+					busy = false
+					if r and r.ok then
+						HubState.selected = pickParty
+						HubState.following = true
+						api.close()
+					else
+						render()
+					end
+				end,
+			})
+			go.LayoutOrder = 2
+			go.Parent = actions
 		else
 			-- ③ 未解放：鍵 → 前のダンジョン（踏破の印）
 			local prev = if d.unlockAfterClear then master.dungeons[d.unlockAfterClear] else nil
