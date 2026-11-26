@@ -39,7 +39,7 @@ WarehouseCommon.icon = {
 -- 並べ替えの種類のアイコン（レアリティ＝形、性能＝剣、売却額＝コイン、新しい順＝＋）
 WarehouseCommon.sortIcon = { rarity = "@special", power = "@attack", sell = "@gold", new = "✚" }
 
--- 品の性能の札：{ icon, text }（武器＝攻撃、防具・盾＝防御、指輪＝能力、護符＝XP の倍率。D-231 ⑭）
+-- 品の性能の札：{ icon, text }（武器＝攻撃、防具・盾＝物理防御と魔法防御を別の札、指輪＝能力、護符＝XP の倍率。D-231 ⑭）
 function WarehouseCommon.values(item: any): { { icon: string, text: string } }
 	local base = master.equipmentBases[item.baseId]
 	if base == nil then
@@ -50,9 +50,12 @@ function WarehouseCommon.values(item: any): { { icon: string, text: string } }
 	if base.atk then
 		table.insert(out, { icon = "@attack", text = tostring(math.floor(base.atk * mult)) })
 	end
-	local def = math.floor((base.pdef or 0) * mult) + math.floor((base.mdef or 0) * mult)
-	if base.pdef or base.mdef then
-		table.insert(out, { icon = "@pdef", text = tostring(def) })
+	-- 物理防御と魔法防御は足さずに別の札にする（合計の行の pdef・mdef とそろえる）
+	if base.pdef then
+		table.insert(out, { icon = "@pdef", text = tostring(math.floor(base.pdef * mult)) })
+	end
+	if base.mdef then
+		table.insert(out, { icon = "@mdef", text = tostring(math.floor(base.mdef * mult)) })
 	end
 	for stat, v in base.stats or {} do
 		table.insert(out, { icon = "", text = string.upper(stat) .. " " .. math.floor(v * mult) })
