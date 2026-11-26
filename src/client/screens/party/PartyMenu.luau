@@ -3,7 +3,10 @@
 --   開き方：待機中のパーティの面の Edit Party、採用の後の Add to Party、冒険者の詳細の Add to Party。× は右上。
 --   - 上：羊皮紙のパネルに隊列1〜4のカード（左が1番）。題の札＝パーティの印＋番号＋Edit Party。
 --     カード：肖像＋名前＋職業の札＋★転生＋Lv／ATK・DEF・MDEF の凹み（語つき：D-269 ④）／最大HP の棒／装備の枠3つ（押すと S-42）。
---     被弾の ⚠＋棒は出さない（D-269 ①）。
+--     被弾の ⚠＋棒は出さない（D-269 ①）。代わりにカードの下の縁に的の印（D-284）：よく狙われる隊列ほど大きく明るい。
+--     率は D-005 の hitWeights（マスターデータ）を入っている人だけで按分する（HitMark）。文字・数字は出さない。
+--   - パーティの中の並び替え（D-284）：隊列のカードを持ち上げてほかの隊列へ落とすと入れ替わる（空きなら移る）。
+--     SetPartySlot 1回で入れ替わる（同じパーティの人なら入れ替え）。2人の顔が互いの隊列へ飛ぶ。
 --   - 左下：控えの列（Reserve）を常に出す。カードは顔の絵・名前・Lv・職業のアイコン。新しく来た人は先頭に NEW で脈打つ。
 --     ほかのパーティの人は番号つきで沈める（入れられない）。
 --   - 入れ替え（D-265 ④）：
@@ -12,7 +15,7 @@
 --     初めて雇った人がいるときは、控えの列の上に1行の案内（Drag a reserve onto a member：D-264 ④）。
 --   - 控えから入った人は、その人の分だけ Auto Equip を確認なしで行う。装備が枠へ飛び、数字がカウントアップする（D-266 ②）。
 --     Undo で入れ替えと自動装備をまとめて戻す（D-266 ③）。
---   - 右下：茶＝Undo（入れ替えた直後だけ）・Auto Equip（付け替えがなくても押せて理由を出す：D-266 ④）、金＝行き先を選ぶ。
+--   - 右下：茶＝Undo（入れ替えた直後だけ）・Auto Equip（付け替えがなくても押せて理由を出す：D-266 ④）、金＝▶ Go（行けるダンジョンの一覧の窓 DungeonPick：D-282）。
 --     Auto Equip は押すとすぐ決めず、変わるカードの差（▲▼）を見せる。金の Equip で決め、茶の Cancel でやめる（D-231 ⑨・D-235 ③）。
 
 local UserInputService = game:GetService("UserInputService")
@@ -25,11 +28,12 @@ local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Art = require("../../ui/Art")
+local HitMark = require("./HitMark")
 local HubState = require("../../hub/HubState")
 local Motion = require("../../ui/Motion")
 local Portrait = require("../../ui/Portrait")
 local Nav = require("../../ui/Nav")
-local PickMode = require("../../hub/PickMode")
+require("./DungeonPick") -- 行き先の一覧の窓を登録する（D-282）
 local Root = require("../../ui/Root")
 local Screen = require("../Screen")
 local Session = require("../../Session")
@@ -43,7 +47,6 @@ local I = AdvCommon.icon
 local new = Create.new
 local CHILDREN = Create.Children
 
-local MAP_ICON = "@map" -- 行き先を選ぶ（地図）
 local AUTO_ICON = "@auto_equip" -- 自動装備（D-258 の ui_auto_equip。絵がなければ記号）
 local PANEL_H = 408 -- 隊列のパネルの高さ（被弾の帯をやめた分だけ低い）
 local RESERVE_W = 560 -- 控えの列の幅（右下のボタンと重ならない幅）
@@ -115,6 +118,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local cards: { [number]: Frame } = {} -- 隊列のカード（ドラッグの落とし先・飛ぶ先）
 	local statLabels: { [number]: { [string]: TextLabel } } = {}
 	local reserveCards: { [string]: GuiObject } = {}
+	local markSize: { [number]: number } = {} -- 前に描いた的の直径（変わったら育つ・縮む）
 	local render: () -> ()
 
 	local function send(cmd: any): any?
@@ -221,9 +225,76 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		render()
 	end
 
-	-- ドラッグ（控えのカードを持ち上げて隊列へ落とす）
-	local drag: { uid: string, start: Vector2, ghost: GuiObject?, moved: boolean }? = nil
+	-- 顔の絵（飛ばす物）
+	local function faceVisual(adv: any): Frame
+		local face: Frame = new("Frame", {
+			BackgroundColor3 = C.ch13,
+			[CHILDREN] = { Components.corner(12) },
+		})
+		Portrait.fill(face, adv.appearanceId)
+		return face
+	end
+
+	-- パーティの中で隊列 from の人を隊列 to へ（to に人がいれば入れ替え、空きなら移る：D-284）。
+	--   SetPartySlot は同じパーティの人なら1回で入れ替えるので、途中の状態はできない。
+	--   from が空きで to に人がいるときは、to の人を from へ移す（タップで空きを先に選んだとき）。
+	--   fromAt：持ち上げた顔が飛び立つ所（ドラッグなら落とした所）
+	local function moveWithin(from: number, to: number, fromAt: Vector2?)
+		local view = Session.view
+		if view == nil or busy or from == to then
+			render()
+			return
+		end
+		local party = view.parties[partyIndex]
+		local a, b = party.slots[from], party.slots[to]
+		local advA, advB = view.adventurers[a], view.adventurers[b]
+		if advA == nil and advB == nil then
+			render()
+			return
+		end
+		local atFrom = if cards[from] then Motion.center(cards[from]) else nil
+		local atTo = if cards[to] then Motion.center(cards[to]) else nil
+		pickSlot, pickAdv = nil, nil
+		undo = nil -- Undo は控えから入れた直後だけ（D-266 ③）
+		local r = if advA
+			then send({ type = "SetPartySlot", partyIndex = partyIndex, slot = to, adventurerUid = a })
+			else send({ type = "SetPartySlot", partyIndex = partyIndex, slot = from, adventurerUid = b })
+		render()
+		if not (r and r.ok) then
+			return
+		end
+		-- 2人の顔が互いの隊列へ飛ぶ（D-269 ⑤ の Fly）
+		if advA and cards[to] and (fromAt or atFrom) then
+			Motion.fly({
+				from = (fromAt or atFrom) :: Vector2,
+				to = cards[to],
+				visual = faceVisual(advA),
+				size = 96,
+				endSize = 96,
+				duration = 0.35,
+			})
+		end
+		if advB and cards[from] and atTo then
+			Motion.fly({
+				from = atTo,
+				to = cards[from],
+				visual = faceVisual(advB),
+				size = 96,
+				endSize = 96,
+				duration = 0.35,
+			})
+		end
+	end
+
+	-- ドラッグ（控えのカードを隊列へ落とす。隊列のカードをほかの隊列へ落とす：D-265 ④・D-284）
+	--   from：隊列から持ち上げたときのその隊列（控えからなら nil）
+	local drag: { uid: string, from: number?, start: Vector2, ghost: GuiObject?, moved: boolean }? = nil
 	local justDragged = false
+	-- ドラッグ中か、ドラッグを終えた直後か（指を離した所のボタンの Activated を無視する）
+	local function dragging(): boolean
+		local d = drag
+		return justDragged or (d ~= nil and d.moved)
+	end
 	local function dropSlotAt(pos: Vector2): number?
 		local pg = (game:GetService("Players").LocalPlayer :: Player):FindFirstChildOfClass("PlayerGui")
 		if pg == nil then
@@ -271,9 +342,22 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					Portrait.fill(ghost, adv.appearanceId)
 				end
 				d.ghost = ghost
-				-- 隊列のカードが脈打って「ここに落とせる」を示す
-				for _, card in cards do
-					table.insert(stops, Motion.pulse(card))
+				-- 隊列のカードが脈打って「ここに落とせる」を示す（持ち上げた隊列は除く）
+				for slot, card in cards do
+					if slot ~= d.from then
+						table.insert(stops, Motion.pulse(card))
+					end
+				end
+				-- 持ち上げた隊列のカードは顔を薄くして「ここから動いている」を示す
+				local src = if d.from then cards[d.from] else nil
+				local srcFace = if src then src:FindFirstChild("Face") else nil
+				if srcFace and srcFace:IsA("Frame") then
+					srcFace.BackgroundTransparency = 0.6
+					for _, g in srcFace:GetDescendants() do
+						if g:IsA("ImageLabel") then
+							g.ImageTransparency = 0.6
+						end
+					end
 				end
 			end
 			if d.ghost then
@@ -302,9 +386,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				task.defer(function()
 					justDragged = false
 				end)
-				local slot = dropSlotAt(Vector2.new(input.Position.X, input.Position.Y))
+				local at = Vector2.new(input.Position.X, input.Position.Y)
+				local slot = dropSlotAt(at)
 				pickAdv, pickSlot = nil, nil
-				if slot then
+				if slot and d.from then
+					moveWithin(d.from, slot, toCanvas(at)) -- パーティの中の入れ替え（D-284）
+				elseif slot then
 					swapIn(slot, d.uid)
 				else
 					render()
@@ -361,6 +448,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				hpTop = math.max(hpTop, Formulas.memberSnapshot(Party.memberDef(view, a, 1), master).maxHp / 0.75)
 			end
 		end
+		-- 被弾の割合（D-005 を入っている人だけで按分）。的の大きさと明るさにする（D-284）
+		local shares = HitMark.shares(party.slots, master.K.hitWeights, Party.EMPTY)
+		local topShare = HitMark.top(shares)
+		local sizes: { [number]: number } = {}
 		for slot = 1, Party.SIZE do
 			local uid = party.slots[slot]
 			local adv = view.adventurers[uid]
@@ -405,8 +496,35 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				t.Size = UDim2.fromScale(1, 1)
 				t.Parent = face
 			end
+			-- 被弾の的（カードの下の縁。空いている隊列には出さない：D-284）
+			local share = shares[slot]
+			if adv and share then
+				local d = HitMark.diameter(share, topShare)
+				local mark = HitMark.make(d, if topShare > 0 then share / topShare else 0, markSize[slot])
+				mark.Position = UDim2.new(0.5, 0, 1, 4)
+				mark.Parent = card
+				sizes[slot] = d
+			end
+			-- 隊列のカードを持ち上げて、ほかの隊列へ落とす（D-284。マウスと指）
+			if adv then
+				card.InputBegan:Connect(function(input)
+					local t = input.UserInputType
+					if
+						(t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch)
+						and not busy
+						and not equipMode
+					then
+						drag = {
+							uid = adv.uid,
+							from = slot,
+							start = Vector2.new(input.Position.X, input.Position.Y),
+							moved = false,
+						}
+					end
+				end)
+			end
 			card.Activated:Connect(function()
-				if equipMode or busy then
+				if equipMode or busy or dragging() then
 					return
 				end
 				if pickAdv ~= nil then
@@ -422,17 +540,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					pickSlot = nil
 					render()
 				else
-					-- 同じパーティ内の入れ替え（SetPartySlot は同じパーティの人なら入れ替える）
-					local a = party.slots[pickSlot]
-					local from = pickSlot
-					pickSlot = nil
-					undo = nil
-					if a ~= Party.EMPTY then
-						send({ type = "SetPartySlot", partyIndex = partyIndex, slot = slot, adventurerUid = a })
-					elseif uid ~= Party.EMPTY then
-						send({ type = "SetPartySlot", partyIndex = partyIndex, slot = from, adventurerUid = uid })
-					end
-					render()
+					-- 同じパーティ内の入れ替え（ドラッグと同じ。SetPartySlot は同じパーティの人なら入れ替える）
+					moveWithin(pickSlot :: number, slot)
 				end
 			end)
 			if adv then
@@ -614,13 +723,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						b.Text = "" -- 付けている品の絵（D-254）
 					end
 					b.Activated:Connect(function()
-						if not equipMode and pickSlot == nil and pickAdv == nil then
+						if not equipMode and pickSlot == nil and pickAdv == nil and not dragging() then
 							api.open("EquipSelect", { uid = adv.uid, slot = s })
 						end
 					end)
 				end
 			end
 		end
+
+		markSize = sizes
 
 		-- 控えの列（常に出す：D-265 ④）
 		local reserve: Frame = new("Frame", {
@@ -804,7 +915,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					end
 				end)
 				rc.Activated:Connect(function()
-					if busy or equipMode or justDragged then
+					if busy or equipMode or dragging() then
 						return
 					end
 					if pickSlot ~= nil then
@@ -914,14 +1025,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local dest = Components.button({
 				kind = "gold",
 				width = 260,
-				icon = MAP_ICON,
-				label = Words.destination,
-				name = "Destination",
+				icon = "▶",
+				label = Words.go,
+				name = "Go",
 				glyph = "A",
 				onClick = function()
-					-- マップで選ぶ（D-231 ⑦）。メインの画面に戻って、ダンジョンを触ると S-15 がこのパーティから開く
-					PickMode.start(partyIndex)
-					api.home()
+					-- 行けるダンジョンの一覧の窓（パーティの面の Go と同じ：D-282）。選ぶとこのパーティで出発する
+					api.open("DungeonPick", { partyIndex = partyIndex })
 				end,
 			})
 			dest.LayoutOrder = 2

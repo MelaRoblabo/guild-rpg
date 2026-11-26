@@ -1,14 +1,17 @@
 --!strict
--- S-21e 採用（D-220・D-265 ①②）。HIRED のハンコのあと、決まった能力と金の「Add to Party」を出す。
---   - 待機中のパーティがあれば：雇った人のカードが画面の下（控えの列）へ飛び、そのまま編成の面（Edit Party）が開く。
---     控えの列では雇った人が先頭で NEW・脈打つ。
+-- S-21e 採用（D-220・D-265 ①②・D-283）。HIRED のハンコのあと、決まった能力（Total つき）と、
+-- 右下に金の「Add to Party」、その左に茶の「Back」（ギルド＝受付の広間へ戻る：D-283）を出す。
+--   - Add to Party：待機中のパーティを 1, 2, … の順に見て、最初の空き枠に入れる（SetPartySlot：D-283）。
+--     入れた瞬間に Auto Equip（D-266）。カードがその隊列の辺りへ飛び、そのパーティの編成の面（Edit Party）が開く。
+--   - 待機中のパーティに空き枠がなければ：カードが画面の下（控えの列）へ飛び、最初の待機中のパーティの編成の面が開く。
+--     控えの列では雇った人が先頭で NEW・脈打つ（D-265 ①）。
 --   - 全員が冒険中なら：「Can't add to a party on an adventure」のアラートを出し、カードはマップのギルドの建物へ
 --     飛び込む（建物に NEW の顔）。パーティが帰ったら、馬車 → Edit Party を一度だけ光らせる（HubState.newcomers）。
---   - 閉じる × はメイン画面へ。「もう一度呼ぶ」は出さない（D-226 ③ の Home・Party の2つは D-265 で置き換え）。
+--   - 閉じる × はメイン画面へ。「もう一度呼ぶ」は出さない（D-226 ③ の Home・Party の2つは D-265・D-283 で置き換え）。
 
 local TweenService = game:GetService("TweenService")
 
-local Party = require("@game/ReplicatedStorage/Core/Party")
+local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local HireCommon = require("./HireCommon")
@@ -16,9 +19,11 @@ local HubState = require("../../hub/HubState")
 local Motion = require("../../ui/Motion")
 local Nav = require("../../ui/Nav")
 local Portrait = require("../../ui/Portrait")
+local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
 local Words = require("../../ui/Words")
+local master = require("../../Master")
 
 local C = Tokens.color
 local I = Components.icon
@@ -27,6 +32,11 @@ local CHILDREN = Create.Children
 
 -- 控えの列が出る所（編成の面の左下。PartyMenu の Reserve と同じ辺り。基準の単位）
 local RESERVE_AT = Vector2.new(260, 650)
+
+-- 編成の面の隊列のカードの辺り（PartyMenu の Formation：左右 40 空けた面を4等分。基準の単位）
+local function slotPoint(slot: number): Vector2
+	return Vector2.new(64 + (slot - 0.5) * 288, Root.bandBottom() + 190)
+end
 
 -- 飛ばす顔のカード
 local function faceCard(appearanceId: string?): Frame
@@ -37,17 +47,6 @@ local function faceCard(appearanceId: string?): Frame
 	})
 	Portrait.fill(card, appearanceId)
 	return card
-end
-
--- 最初の待機中のパーティ
-local function waitingParty(): number?
-	local v = Session.view
-	for _, p in (v and v.parties) or {} do
-		if not Party.isBusy(v, p.index) then
-			return p.index
-		end
-	end
-	return nil
 end
 
 local function build(params: any?, api: Nav.Api): Nav.Built
@@ -89,10 +88,41 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				return
 			end
 			sent = true
-			local target = waitingParty()
 			local card = faceCard(adv.appearanceId)
-			if target then
-				-- カードが控えの列へ飛び、着いたら編成の面を開く（画面が切り替わらず、つながって見える）
+			-- 1) 待機中のパーティの空き枠（パーティ1から）に入れる（D-283）
+			local target, slot = HireCommon.openSlot(Session.view)
+			if target and slot then
+				local r = Session.sendAndWait({
+					type = "SetPartySlot",
+					partyIndex = target,
+					slot = slot,
+					adventurerUid = uid,
+				})
+				if r and r.ok then
+					HubState.newcomers[uid] = nil
+					-- パーティに入れた瞬間に Auto Equip（確認なし：D-266）
+					local v2 = Session.view
+					if v2 and #AutoEquip.plan(v2, target, master, uid) > 0 then
+						Session.sendAndWait({ type = "AutoEquip", partyIndex = target, adventurerUid = uid })
+					end
+					local partyIndex = target
+					Motion.fly({
+						from = portrait,
+						to = slotPoint(slot),
+						visual = card,
+						size = 220,
+						endSize = 96,
+						onArrive = function()
+							api.home()
+							Nav.open("PartyMenu", { partyIndex = partyIndex })
+						end,
+					})
+					return
+				end
+			end
+			-- 2) 空き枠がない：控えの列へ飛び、最初の待機中のパーティの編成の面を開く（D-265 ①）
+			local idle = HireCommon.idleParty(Session.view)
+			if idle then
 				Motion.fly({
 					from = portrait,
 					to = RESERVE_AT,
@@ -101,11 +131,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					endSize = 80,
 					onArrive = function()
 						api.home()
-						Nav.open("PartyMenu", { partyIndex = target, newcomer = uid })
+						Nav.open("PartyMenu", { partyIndex = idle, newcomer = uid })
 					end,
 				})
 			else
-				-- 全員が冒険中：アラート → カードはギルドの建物へ（D-265 ②）
+				-- 3) 全員が冒険中：アラート → カードはギルドの建物へ（D-265 ②）
 				HubState.newcomers[uid] = true
 				Motion.alert(Words.reason.partyOut)
 				local from = Motion.center(portrait)
@@ -122,7 +152,27 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 		end,
 	})
+	add.LayoutOrder = 2
 	add.Parent = actions
+	-- Back（茶）：ギルド＝受付の広間へ戻る（D-283）
+	local back = Components.button({
+		kind = "brown",
+		width = 220,
+		height = 66,
+		icon = I.home,
+		label = Words.back,
+		name = "Back",
+		glyph = "B",
+		onClick = function()
+			if sent then
+				return
+			end
+			sent = true
+			api.replace("HireDesk")
+		end,
+	})
+	back.LayoutOrder = 1
+	back.Parent = actions
 	task.delay(0.9, function()
 		if frame.Parent then
 			TweenService:Create(stamp, TweenInfo.new(0.3), { Size = UDim2.fromOffset(110, 110) }):Play()

@@ -5,6 +5,7 @@
 --     条件もお金も足りないときは両方を並べる（D-237 ①）。鍵は「まだ解放していない」だけの意味（D-209）。
 --   - 右＝羊皮紙の要約：今の値（暗い凹み）と次の段の増え方（▲＋数）。トレーニング場は上げられる Lv と1回の XP の2行。
 --   - 右下の金＝買う（ハンマー＋費用。確認なし：D-231 ①）。条件を満たさないときは押せない色。
+--     押せない色でも押せて、押すとボタンの上に理由の吹き出しを2秒（Reach Guild Lv 5 first など：D-264 ②）。
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
@@ -249,6 +250,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			cost = if cur and cur.step then HubState.formatNumber(cur.step.gold) else nil,
 			name = "Buy",
 			glyph = "A",
+			-- 灰色でも押せて、何をすれば押せるかを1行・2秒（ギルドLv・踏破・お金：D-264 ②）
+			reason = if cur and not cur.canBuy then ExpandInfo.blockReason(cur, master) else nil,
 			onClick = function()
 				if busy or not (cur and cur.canBuy) then
 					return

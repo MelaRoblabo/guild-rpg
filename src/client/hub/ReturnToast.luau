@@ -1,8 +1,11 @@
 --!strict
--- 帰還のトースト（11章 §5・D-116・D-128・D-162・D-214・D-236 ④）。メイン画面の帯のすぐ下、左の一覧の右に暗い木のカプセル（右上のボタンに重ねない）。
+-- 帰還のトースト（11章 §5・D-116・D-128・D-214・D-236 ④・D-281）。メイン画面の帯のすぐ下、左の一覧の右に暗い木のカプセル（右上のボタンに重ねない）。
 --   - オンライン中の帰還（ExpeditionReturned、留守番でないもの）で出す。少しの間に帰ったパーティは1つにまとめる（D-128）。
---   - 中身：馬車（帰る向き）＋パーティの番号（まとめは重ねる）＋宝箱の数＋XP の札（休息ボーナス＝月、日替わり＝太陽。
---     両方なら掛け合わせた倍率：06章 §14・§16）。右の端の Go＝同じ所へもう一度（待機のパーティだけ）。
+--   - ログインでは、まとめ（S-01）を閉じたあと、留守の間に帰ったパーティごとに1つずつ出す（playLogin：D-281）。
+--     触るか時間がたつと次のパーティへ。全部出し終えたらカットインへ（hub/LoginSequence）。
+--   - 中身：馬車（帰る向き）＋パーティの番号（まとめは重ねる）＋宝箱の数（0 からカウントアップ：D-269 ⑤）＋
+--     XP の札（日替わり＝太陽と倍率：06章 §16。留守番の探索は経験値なし：D-280。休息ボーナスは廃止：D-280）。
+--     右の端の Go＝同じ所へもう一度（待機のパーティだけ）。
 --   - レベルが上がった人がいれば「Lv▲ 人数」の札を足し、その人をパーティの面で一度光らせる（D-246 ④）。
 --   - トーストを触るとそのパーティを選ぶ（D-116）。画面を重ねている間（開封・面接・転生など）と、設定でオフのときは出さない。
 
@@ -11,6 +14,7 @@ local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local HubState = require("./HubState")
 local LevelUpMarks = require("./LevelUpMarks")
+local Motion = require("../ui/Motion")
 local Nav = require("../ui/Nav")
 local Root = require("../ui/Root")
 local Session = require("../Session")
@@ -33,10 +37,11 @@ local pendingLevelUps: { [string]: boolean } = {} -- まとめる間にレベル
 local current: Frame? = nil
 local token = 0
 
+-- 経験値の倍率（日替わりの expMult）。留守番の探索は経験値を得ないので 1（D-280）
 local function xpMult(e: any): number
 	local m = 1
-	if e.restBonus then
-		m *= master.K.restBonusExpMult
+	if e.offline then
+		return m
 	end
 	local trait = if e.dailyTraitId then master.dailyTraits[e.dailyTraitId] else nil
 	if trait and trait.effect == "expMult" then
@@ -45,22 +50,24 @@ local function xpMult(e: any): number
 	return m
 end
 
-local function show(group: { any }, levelUps: number)
+-- onEnd：トーストが消えたとき（時間・触る・Go）に1回だけ呼ぶ（ログインの流れで次へ進む：D-281）
+local function show(group: { any }, levelUps: number, onEnd: (() -> ())?)
 	if current then
 		current:Destroy()
 		current = nil
 	end
 	token += 1
 	local my = token
-	local parties, chests, rest, daily, mult = {}, 0, false, false, 1
+	local parties, seen, chests, mult = {}, {}, 0, 1
 	for _, e in group do
-		table.insert(parties, e.partyIndex)
+		if not seen[e.partyIndex] then
+			seen[e.partyIndex] = true
+			table.insert(parties, e.partyIndex) -- 同じパーティが何度も帰っても番号は1つ（ログインの留守番）
+		end
 		chests += e.chests or 0
-		rest = rest or e.restBonus == true
-		local trait = if e.dailyTraitId then master.dailyTraits[e.dailyTraitId] else nil
-		daily = daily or (trait ~= nil and trait.effect == "expMult")
 		mult = math.max(mult, xpMult(e))
 	end
+	local daily = mult > 1
 	table.sort(parties)
 	local band = Root.bandBottom()
 	local toast: Frame = new("Frame", {
@@ -75,6 +82,30 @@ local function show(group: { any }, levelUps: number)
 		Parent = Root.canvas,
 	})
 	current = toast
+	local ended = false
+	local function close()
+		if toast.Parent then
+			toast:Destroy()
+		end
+		if current == toast then
+			current = nil
+		end
+		if not ended then
+			ended = true
+			if onEnd then
+				onEnd()
+			end
+		end
+	end
+	toast.Destroying:Connect(function()
+		-- 次のトーストに差し替えられたときも、流れを止めない
+		if not ended then
+			ended = true
+			if onEnd then
+				task.defer(onEnd)
+			end
+		end
+	end)
 	local tap: TextButton = new("TextButton", {
 		Name = "Select",
 		Text = "",
@@ -93,21 +124,28 @@ local function show(group: { any }, levelUps: number)
 		},
 		Parent = toast,
 	})
-	local function label(order: number, text: string, size: number, color: Color3)
+	local function label(order: number, text: string, size: number, color: Color3): TextLabel
 		local t = Components.text({ text = text, size = size, color = color, font = Tokens.font.number })
 		t.LayoutOrder = order
 		t.ZIndex = 52
 		t.Parent = tap
+		return t
 	end
 	local nums = {}
 	for _, p in parties do
 		table.insert(nums, tostring(p))
 	end
 	label(1, "◀ " .. table.concat(nums, " "), 28, C.inkLight)
-	label(2, "▣ +" .. chests, 30, C.numHi)
-	if rest or daily then
-		-- 休息ボーナス＝月（☾ は Roblox の書体で出ないので 🌙）、日替わり＝太陽
-		label(3, (if rest then "🌙" else "") .. (if daily then "☀" else "") .. " XP ×" .. mult, 23, C.inkLight)
+	local chestLabel = label(2, "▣ +0", 30, C.numHi)
+	-- 宝箱の数は 0 からカウントアップ（D-269 ⑤）
+	task.defer(function()
+		if chestLabel.Parent then
+			Motion.countUp(chestLabel, 0, chests, { prefix = "▣ +", float = false })
+		end
+	end)
+	if daily then
+		-- 日替わり＝太陽
+		label(3, "☀ XP ×" .. mult, 23, C.inkLight)
 	end
 	if levelUps > 0 then
 		label(4, "Lv▲ " .. levelUps, 23, C.upDark) -- レベルが上がった人数（D-246 ④）
@@ -115,8 +153,7 @@ local function show(group: { any }, levelUps: number)
 	tap.Activated:Connect(function()
 		HubState.selected = parties[1]
 		HubState.following = true
-		toast:Destroy()
-		current = nil
+		close()
 	end)
 	-- 右の端：同じ所へもう一度（待機のパーティだけ）
 	local go: TextButton = new("TextButton", {
@@ -143,15 +180,34 @@ local function show(group: { any }, levelUps: number)
 				end
 			end
 		end
-		toast:Destroy()
-		current = nil
+		close()
 	end)
 	task.delay(SHOW_SECONDS, function()
 		if token == my and toast.Parent then
-			toast:Destroy()
-			current = nil
+			close()
 		end
 	end)
+end
+
+-- ログイン：留守の間に帰ったパーティごとに1つずつ出し、全部終えたら done（D-281）。
+--   groups はパーティごとの帰還の出来事（LoginFlow.summarize の returned）。設定でオフなら出さずに done
+function ReturnToast.playLogin(groups: { { any } }, done: () -> ())
+	local view = Session.view
+	if #groups == 0 or view == nil or not Game.query.preferences(view, master).returnToast then
+		done()
+		return
+	end
+	local i = 0
+	local function nextOne()
+		i += 1
+		local g = groups[i]
+		if g == nil then
+			done()
+			return
+		end
+		show(g, 0, nextOne)
+	end
+	nextOne()
 end
 
 function ReturnToast.mount()

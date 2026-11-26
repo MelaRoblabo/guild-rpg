@@ -1,7 +1,7 @@
 --!strict
 -- パーティの面（S-10 の中。D-212〜D-216・D-225 ③）。一覧の行か馬車を触って開く。
 --   - 羊皮紙の面、題の札＝パーティの番号、× は面の右上の角、後ろの暗幕は 50%（D-225 ③）。
---   - 待機：同じ所へ再出発（Go、金）と Menu（茶。S-12 は M8-6）。探索中：フロアの進みと自動再派遣のスイッチだけ（D-214 ⑥）。
+--   - 待機：Go（金。行けるダンジョンの一覧の窓 party/DungeonPick を開く：D-282）と Edit Party（茶。S-12）。探索中：フロアの進みと自動再派遣のスイッチだけ（D-214 ⑥）。
 --   - 移動中・帰還中：残り時間。メンバーの HP は探索中だけ（戦闘不能は暗くする：D-214 ⑤）。
 --   - S-11 探索ウィンドウ（D-213 ⑦・D-236）：出発してから帰るまで、面の上に一枚絵の枠（高さ160）を出す。
 --     戦闘はモンスター（仮の名前）と HP の棒、与えたダメージは出た瞬間だけ白い数字（クリティカルは大きく黄色）、回復は緑。
@@ -19,8 +19,8 @@ local World3D = require("../hub/World3D")
 local HubState = require("../hub/HubState")
 local LevelUpMarks = require("../hub/LevelUpMarks")
 local Nav = require("../ui/Nav")
-local PickMode = require("../hub/PickMode")
 local Replay = require("../party/Replay")
+require("./party/DungeonPick") -- 行き先の一覧の窓を登録する（D-282）
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -36,7 +36,6 @@ local PANEL_W = 420
 local PANEL_H = 470
 local PANEL_H_EXPLORE = 554 -- 探索ウィンドウ（一枚絵の枠つき）
 local SCENE_H = 160
-local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
 local EVENT_GLYPH = { chest = "@chest", item = "@ticket", trap = "⚠", fountain = "@stat_hp", none = "…" }
 
 local function clock(seconds: number): string
@@ -424,65 +423,24 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			menu.LayoutOrder = 1
 			menu.Parent = actions
 			Guide.mark(menu, #HubState.pendingNewcomers(view) > 0, 18) -- 帰還後の誘導：Edit Party（D-265 ②）
-			-- 最後の行き先（D-228）。まだ一度も出ていなければ、解放済みで一番浅いダンジョン（D-244 ②）
-			local dest = party.lastDungeonId or HubState.firstUnlocked(view)
-			-- Go の行き先の札（D-250 ④）：Go のすぐ上に「ローマ数字＋名前」。押すとマップで行き先を選ぶ
-			local dd = if dest then master.dungeons[dest] else nil
-			if dd then
-				local idx = HubState.dungeonIndex(dest)
-				local holder: Frame = new("Frame", {
-					Name = "Destination",
-					LayoutOrder = 100,
-					Size = UDim2.new(1, 0, 0, 52),
-					BackgroundTransparency = 1,
-					Parent = body,
-				})
-				local tag: TextButton = new("TextButton", {
-					Name = "Tag",
-					-- 押すと選べる形（開くもの）に見えるよう、末尾に ▼（D-269 ②）
-					Text = (if idx then (ROMAN[idx] or tostring(idx)) .. "  " else "") .. dd.nameEn .. "  ▼",
-					TextSize = 21,
-					FontFace = Tokens.font.display,
-					TextColor3 = C.inkLight,
-					AutoButtonColor = false,
-					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.fromScale(1, 0.5),
-					Size = UDim2.fromOffset(0, 48),
-					AutomaticSize = Enum.AutomaticSize.X,
-					BackgroundColor3 = C.ch28,
-					[CHILDREN] = {
-						Components.corner(24),
-						Components.stroke(C.bronze, 2),
-						Components.padding(0, 18, 0, 18),
-					},
-					Parent = holder,
-				})
-				tag.Activated:Connect(function()
-					PickMode.start(partyIndex)
-					api.home()
-				end)
-			end
+			-- Go は行けるダンジョンの一覧の窓を開く（D-282。D-244 ② の「一番浅いダンジョンへ」と行き先の札は置き換え）
+			local canGo = HubState.firstUnlocked(view) ~= nil -- 解放済みのダンジョンがあるか
 			local go = Components.button({
-				kind = if dest then "gold" else "disabled",
+				kind = if canGo then "gold" else "disabled",
 				width = 190,
 				icon = "▶",
 				label = Words.go,
 				name = "Go",
 				glyph = "A",
 				onClick = function()
-					if dest then
-						local r = Session.send({ type = "Dispatch", partyIndex = partyIndex, dungeonId = dest })
-						if r and r.ok then
-							HubState.selected = partyIndex
-							HubState.following = true
-							api.close()
-						end
+					if canGo then
+						api.open("DungeonPick", { partyIndex = partyIndex }) -- 行き先の一覧（party/DungeonPick）
 					end
 				end,
 			})
 			go.LayoutOrder = 2
 			go.Parent = actions
-			Guide.mark(go, Guide.is("go") and dest ~= nil, 18) -- 初回の誘導：Go
+			Guide.mark(go, Guide.is("go") and canGo, 18) -- 初回の誘導：Go（一覧の窓でも金の Go を光らせる）
 		else
 			-- 自動再派遣のスイッチ（D-125・D-214 ⑥）。オン／オフが形で分かるスイッチの形と「Auto Repeat」（D-269 ②）
 			local on = party.autoRepeat ~= nil
@@ -509,7 +467,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				icon = "@party",
 				label = Words.editParty,
 				name = "Menu",
-				reason = Words.reason.partyOut,
+				reason = Words.reason.editOut,
 			})
 			menu.LayoutOrder = 1
 			menu.Parent = actions
@@ -742,7 +700,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			task.wait(0.25)
 		end
 	end)
-	local conn = Session.changed:connect(render)
+	local conn = Session.changed:connect(function(view)
+		if alive then -- 閉じたあとに届いた知らせでは描かない
+			render(view)
+		end
+	end)
 	render(Session.view)
 	return {
 		frame = frame,

@@ -74,6 +74,8 @@ local Words = {
 	arrivesIn = "Arrives in", -- パーティが商人に着くまで
 	oneWay = "One way", -- 商人までの片道
 	shopping = "Shopping", -- パーティが商人のところにいる
+	unlock = "Unlock", -- ゴールドでダンジョンを先に解放する（D-279）
+	unlocked = "Unlocked", -- 解放できたときのハンコ（D-279・D-269）
 }
 
 -- 押せない理由・アラート（1行・12語まで：D-264 ②③）
@@ -83,6 +85,9 @@ Words.reason = {
 	allOut = "All parties are out", -- D-269 ④
 	noneCanEquip = "No one can equip this now", -- D-265 ⑤（付けられる人がいない・全員が冒険中）
 	partyOnTheWay = "Your party is still on the way", -- D-274（商人に着くまで買えない）
+	equipOut = "Can't equip during an adventure", -- 冒険中の人には付けられない（宝箱の結果の Equip：D-264）
+	editOut = "Can't edit a party on an adventure", -- 冒険中は編成できない（パーティの面の Edit Party：D-265 ②）
+	prevLocked = "Unlock the previous dungeon first", -- D-279（前のダンジョンが未解放）
 }
 
 -- 画面のタイトル（1〜3語：D-264 ②）
@@ -98,5 +103,24 @@ Words.hint = {
 -- 装備の枠・倉庫のタブの語（D-245）と、語が入るタブの幅
 Words.slot = { weapon = "Weapons", armor = "Armor", sub = "Accessories", items = "Items" }
 Words.slotWidth = { weapon = 160, armor = 140, sub = 190, items = 130 }
+
+-- ログイン時のまとめ（S-01、D-281）：題の札と、組の見出し
+Words.title.welcomeBack = "Welcome Back"
+Words.gold = "Gold"
+
+-- 拡張（S-22）の押せない理由（D-264 ②。%d＝ギルドLv、%s＝ダンジョン名）
+Words.reason.expandNeedLevel = "Reach Guild Lv %d first"
+Words.reason.expandNeedClear = "Clear %s first"
+Words.reason.expandNeedBoth = "Reach Guild Lv %d and clear %s"
+Words.reason.fullyExpanded = "Fully expanded"
+
+-- 雇用の画面（D-283）
+Words.back = "Back" -- 採用の後にギルド（受付の広間）へ戻る
+Words.growth = "Growth" -- 求人票の職業を押すと出る伸びやすさの見出し（D-046・D-269 ④）
+Words.total = "Total" -- 面接の最後の合計（HP を除く4項目：Q-006）
+Words.great = "Great" -- Total が hireTotalGreat 以上
+Words.amazing = "Amazing" -- Total が hireTotalAmazing 以上
+Words.reason.pickPosting = "Pick a posting first" -- 求人票を選ぶ前の Hire
+Words.leftCount = "%d left" -- 開封の Next の残りの数（点を並べない）
 
 return Words

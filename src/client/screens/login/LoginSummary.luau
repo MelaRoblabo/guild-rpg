@@ -1,92 +1,48 @@
 --!strict
--- S-01 ログイン時のまとめ（D-109・D-132・D-161・D-162・D-164・D-208・D-231・D-232）。ログインで留守の間の出来事があれば1枚だけ出す。
---   - 羊皮紙の面（1200×466）。左の凹み＝パーティごとの行：番号・状態（⇄＝留守の間も出た／⌂＝出なかった＋赤い！）・
---     メンバーの顔（Lv が上がった人に▲）・持ち帰った宝箱の数。下の行＝持ち帰ったゴールドの合計と、上がったギルドLv。
---   - 右の上＝休息ボーナス：月の円に水色がたまる（上限に対する割合）＋「XP ×2」。右の下＝受け取り箱（届いたものの件数と！）。
---   - × はない。右下の金＝次へ（▶）だけ（D-231 ⑬・D-232 ④）。次へで、カットイン（最大1回）→ カレンダー（1回）へ。
---   - 休息ボーナスは、Roblox で弧が描けないため、月の円に下から水色がたまる形で出す（D-238 ①）。
+-- S-01 ログイン時のまとめ（D-132・D-208・D-231 ⑬・D-232 ④・D-281）。留守の間に受け取った報酬があれば1枚だけ出す。
+--   - 羊皮紙の面（1200×466）に題の札「Welcome Back」。中身は受け取った報酬の合計だけ（D-281）：
+--     Gold＝持ち帰ったゴールドの合計／Chests＝宝箱（レアリティごとの数。分からないときはレアリティを表さない閉じた箱：D-087）／
+--     Inbox＝受け取り箱に届いた物（アイコン＋数）。増えたものだけ出す（D-218 ⑥）。
+--   - 数字は 0 からカウントアップ（共通の動きの部品：D-269 ⑤）。
+--   - パーティの行・メンバーの顔・休息ボーナスの月・ギルドLv の行は出さない（D-280・D-281）。
+--     パーティごとの獲得は、閉じたあと左の帰還のトーストで見せる（hub/LoginSequence）。
+--   - × はない。右下の金＝次へ（▶）だけ（D-231 ⑬・D-232 ④）。
 
+local Art = require("../../ui/Art")
+local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
-local Portrait = require("../../ui/Portrait")
 local HubState = require("../../hub/HubState")
 local LoginFlow = require("../../login/LoginFlow")
+local Motion = require("../../ui/Motion")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
-local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
 local Words = require("../../ui/Words")
-local master = require("../../Master")
 
 local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local I = { loop = "@auto_redispatch", stay = "@cart_waiting", chest = "@chest", inbox = "@inbox", face = "@party" }
+local I = {
+	chest = "@chest",
+	inbox = "@inbox",
+	itm_slot_ticket = Components.icon.ticket,
+	itm_potion_appearance_change = "@look_change",
+	itm_potion_appearance_keep = "@look_keep",
+}
 
-local function circle(size: number, fill: Color3, rim: Color3?, rimW: number?): Frame
-	local f: Frame = new("Frame", {
-		Size = UDim2.fromOffset(size, size),
-		BackgroundColor3 = fill,
-		[CHILDREN] = { Components.corner(size / 2) },
-	})
-	if rim then
-		Components.stroke(rim, rimW or 2).Parent = f
-	end
-	return f
-end
+local TILE_ICON = 84 -- 物の絵の大きさ
+local WELL_H = 54 -- 数字の暗い凹みの高さ
+local GROUP_GAP = 16
+local TILE_GAP = 10
+local CONTENT_W = 1100 -- 面の中の使える幅（基準の単位）
 
-local function glyph(parent: GuiObject, t: string, size: number, color: Color3)
-	local l = Components.text({ text = t, size = size, color = color, font = Tokens.font.number })
-	l.AnchorPoint = Vector2.new(0.5, 0.5)
-	l.Position = UDim2.fromScale(0.5, 0.5)
-	l.Parent = parent
-	return l
-end
-
-local function badge(parent: GuiObject, t: string, fill: Color3, ink: Color3, size: number, pos: UDim2)
-	local b = circle(size, fill, C.ch75, 2)
-	b.Name = "Badge"
-	b.AnchorPoint = Vector2.new(0.5, 0.5)
-	b.Position = pos
-	b.ZIndex = 4
-	b.Parent = parent
-	local l = glyph(b, t, 21, ink)
-	l.ZIndex = 5
-	return b
-end
-
--- 暗い凹みの札（宝箱の数・ゴールドなど）
-local function well(icon: string, iconColor: Color3, text: string, h: number): Frame
-	local f: Frame = new("Frame", {
-		Size = UDim2.fromOffset(0, h),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = C.ch13,
-		[CHILDREN] = {
-			Components.corner(8),
-			Components.padding(0, 18, 0, 14),
-			new("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, 10),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-		},
-	})
-	local a = Components.text({ text = icon, size = 30, color = iconColor, font = Tokens.font.number })
-	a.LayoutOrder = 1
-	a.Parent = f
-	local b = Components.text({ text = text, size = 30, color = C.numHi, font = Tokens.font.number })
-	b.Name = "Value"
-	b.LayoutOrder = 2
-	b.Parent = f
-	return f
-end
+type Tile = { icon: string?, image: string?, color: Color3, rank: number?, n: number, prefix: string }
 
 local function build(params: any?, _api: Nav.Api): Nav.Built
 	local sum = (params :: any).summary :: LoginFlow.Summary
 	local onNext = (params :: any).onNext :: () -> ()
-	local view = Session.view
 	local band = Root.bandBottom()
 	local frame: Frame = new("Frame", {
 		Name = "LoginSummary",
@@ -96,207 +52,221 @@ local function build(params: any?, _api: Nav.Api): Nav.Built
 	local panel, content = Components.panel({
 		size = UDim2.new(1, -80, 0, 466),
 		position = UDim2.fromOffset(40, band + 16),
+		title = Words.title.welcomeBack,
 	})
 	panel.Name = "Panel"
 	panel.Parent = frame
-
-	-- 左：パーティの行と、ゴールド・ギルドLv
-	local left: Frame = new("Frame", {
-		Name = "Parties",
-		Size = UDim2.new(1, -372, 1, 0),
-		BackgroundColor3 = C.ch50,
-		[CHILDREN] = {
-			Components.corner(8),
-			Components.padding(10, 10, 10, 10),
-			new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
-		},
+	new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, GROUP_GAP),
+		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = content,
 	})
-	for order, p in sum.parties do
-		local row: Frame = new("Frame", {
-			Name = "Party" .. p.index,
-			LayoutOrder = order,
-			Size = UDim2.new(1, 0, 0, 86),
-			BackgroundColor3 = if p.moved then C.ch75 else C.ch68,
+
+	-- 出す物の組（増えたものだけ：D-218 ⑥）
+	local groups: { { name: string, word: string, tiles: { Tile } } } = {}
+	if sum.gold > 0 then
+		table.insert(groups, {
+			name = "Gold",
+			word = Words.gold,
+			tiles = { { icon = Components.icon.coin, color = C.coinGold, n = sum.gold, prefix = "+" } },
+		})
+	end
+	if sum.chests > 0 then
+		local tiles: { Tile } = {}
+		for _, c in sum.chestsByRank do
+			table.insert(tiles, {
+				icon = I.chest,
+				image = if c.rank then Art.chest(c.rank, false) else nil,
+				color = if c.rank then ChestCommon.rarityColor(c.rank) else C.bronzeHi,
+				rank = c.rank,
+				n = c.n,
+				prefix = "×",
+			})
+		end
+		table.insert(groups, { name = "Chests", word = Words.chests, tiles = tiles })
+	end
+	if sum.inboxCount > 0 then
+		local tiles: { Tile } = {}
+		for _, l in sum.inbox do
+			if l.kind == "gold" then
+				table.insert(tiles, { icon = Components.icon.coin, color = C.coinGold, n = l.n, prefix = "+" })
+			elseif l.kind == "chest" then
+				table.insert(tiles, {
+					icon = I.chest,
+					image = if l.rank then Art.chest(l.rank, false) else nil,
+					color = if l.rank then ChestCommon.rarityColor(l.rank) else C.bronzeHi,
+					rank = l.rank,
+					n = l.n,
+					prefix = "×",
+				})
+			elseif l.kind == "item" then
+				local id = l.id or ""
+				table.insert(
+					tiles,
+					{ icon = (I :: any)[id] or "◈", image = Art.item(id), color = C.inkLight, n = l.n, prefix = "×" }
+				)
+			else
+				table.insert(tiles, { icon = Components.icon.party, color = C.inkLight, n = l.n, prefix = "×" })
+			end
+		end
+		if #tiles == 0 then
+			-- 中身が要約にまだない：届いた件数だけ
+			table.insert(tiles, { icon = I.inbox, color = C.bronzeHi, n = sum.inboxCount, prefix = "×" })
+		end
+		table.insert(groups, { name = "Inbox", word = Words.inbox, tiles = tiles })
+	end
+
+	-- 物の数に合わせて札の幅を決める（入りきらないときは狭める）
+	local total = 0
+	for _, g in groups do
+		total += #g.tiles
+	end
+	local nGroups = #groups
+	local free = CONTENT_W
+		- nGroups * 20
+		- math.max(0, total - nGroups) * TILE_GAP
+		- math.max(0, nGroups - 1) * GROUP_GAP
+	local tileW = math.clamp(math.floor(free / math.max(total, 1)), TILE_ICON, 150)
+	-- 数字が入る幅（ゴールドなど桁の多い数は札を広げる。語を縮めない：D-264）
+	local function widthOf(t: Tile): number
+		return math.max(tileW, utf8.len(t.prefix .. HubState.formatNumber(t.n)) :: number * 17 + 24)
+	end
+
+	local counters: { { label: TextLabel, n: number, prefix: string } } = {}
+	for gi, grp in groups do
+		local box: Frame = new("Frame", {
+			Name = grp.name,
+			LayoutOrder = gi,
+			Size = UDim2.new(0, 0, 1, -10),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = C.ch50,
 			[CHILDREN] = {
 				Components.corner(8),
-				Components.padding(0, 16, 0, 16),
+				Components.padding(14, 10, 14, 10),
 				new("UIListLayout", {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
 					Padding = UDim.new(0, 14),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
 			},
-			Parent = left,
+			Parent = content,
 		})
-		local num = circle(52, C.ch45, C.bronze, 3)
-		num.LayoutOrder = 1
-		num.Parent = row
-		glyph(num, tostring(p.index), 25, C.inkLight).FontFace = Tokens.font.display
-		local st = circle(44, C.ch13, C.bronze, 2)
-		st.Name = "State"
-		st.LayoutOrder = 2
-		st.Parent = row
-		glyph(st, if p.moved then I.loop else I.stay, 25, C.inkLight)
-		if not p.moved then
-			badge(st, "!", C.notice, C.inkWhite, 28, UDim2.fromScale(1, 0))
-		end
-		local faces: Frame = new("Frame", {
-			Name = "Faces",
-			LayoutOrder = 3,
-			Size = UDim2.new(1, -(52 + 44 + 14 * 3 + 170), 0, 56),
+		-- 組の見出し（Gold・Chests・Inbox）
+		local head = Components.text({
+			text = grp.word,
+			size = Tokens.text.label,
+			color = C.inkLight,
+			font = Tokens.font.display,
+			stroke = true,
+		})
+		head.Name = "Title"
+		head.LayoutOrder = 1
+		head.Parent = box
+		local row: Frame = new("Frame", {
+			Name = "Tiles",
+			LayoutOrder = 2,
+			Size = UDim2.fromOffset(0, TILE_ICON + 14 + WELL_H),
+			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
 			[CHILDREN] = {
 				new("UIListLayout", {
 					FillDirection = Enum.FillDirection.Horizontal,
-					Padding = UDim.new(0, 8),
+					Padding = UDim.new(0, TILE_GAP),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
 			},
-			Parent = row,
+			Parent = box,
 		})
-		for i, m in p.members do
-			local f = circle(56, C.ch28, C.ch16, 2)
-			f.Name = "Face" .. i
-			f.LayoutOrder = i
-			f.Parent = faces
-			local who = view and view.adventurers[m.uid]
-			if not Portrait.fill(f, who and who.appearanceId) then
-				glyph(f, I.face, 30, C.inkLight)
+		for ti, t in grp.tiles do
+			local tile: Frame = new("Frame", {
+				Name = "Tile" .. ti,
+				LayoutOrder = ti,
+				Size = UDim2.fromOffset(widthOf(t), TILE_ICON + 14 + WELL_H),
+				BackgroundTransparency = 1,
+				Parent = row,
+			})
+			local pic: Frame = new("Frame", {
+				Name = "Pic",
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, 0),
+				Size = UDim2.fromOffset(TILE_ICON, TILE_ICON),
+				BackgroundTransparency = 1,
+				Parent = tile,
+			})
+			if not Art.put(pic, t.image) then
+				local glyph = Components.text({
+					text = t.icon or "◈",
+					size = 60,
+					color = t.color,
+					font = Tokens.font.number,
+				})
+				glyph.AutomaticSize = Enum.AutomaticSize.None
+				glyph.Size = UDim2.fromScale(1, 1)
+				glyph.Parent = pic
 			end
-			if m.up then
-				badge(f, Components.icon.up, C.ch75, C.up, 26, UDim2.new(1, -4, 1, -4))
+			if t.rank then
+				-- レアリティの形（色だけで分けない：ChestCommon）
+				local mark: Frame = new("Frame", {
+					Name = "Rarity",
+					AnchorPoint = Vector2.new(1, 1),
+					Position = UDim2.new(1, 6, 1, 4),
+					Size = UDim2.fromOffset(36, 36),
+					BackgroundColor3 = C.ch13,
+					ZIndex = 4,
+					[CHILDREN] = { Components.corner(18), Components.stroke(t.color, 2) },
+					Parent = pic,
+				})
+				local shape = Components.text({
+					text = ChestCommon.rarityShape(t.rank),
+					size = 21,
+					color = t.color,
+					font = Tokens.font.number,
+				})
+				shape.AutomaticSize = Enum.AutomaticSize.None
+				shape.Size = UDim2.fromScale(1, 1)
+				shape.ZIndex = 5
+				shape.Parent = mark
 			end
+			local well: Frame = new("Frame", {
+				Name = "Well",
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.fromScale(0.5, 1),
+				Size = UDim2.new(1, 0, 0, WELL_H),
+				BackgroundColor3 = C.ch13,
+				[CHILDREN] = { Components.corner(8) },
+				Parent = tile,
+			})
+			local value = Components.text({
+				text = t.prefix .. "0",
+				size = if t.prefix == "+" then 30 else 28,
+				color = C.numHi,
+				font = Tokens.font.number,
+			})
+			value.Name = "Value"
+			value.AutomaticSize = Enum.AutomaticSize.None
+			value.Size = UDim2.fromScale(1, 1)
+			value.Parent = well
+			table.insert(counters, { label = value, n = t.n, prefix = t.prefix })
 		end
-		if p.moved then
-			local chest = well(I.chest, C.bronzeHi, "+" .. HubState.formatNumber(p.chests), 60)
-			chest.Name = "Chests"
-			chest.LayoutOrder = 4
-			chest.Parent = row
-		end
-		if not p.moved then
-			row.BackgroundTransparency = 0.3
-		end
-	end
-	local foot: Frame = new("Frame", {
-		Name = "Totals",
-		LayoutOrder = 99,
-		Size = UDim2.new(1, 0, 0, 88),
-		BackgroundColor3 = C.ch75,
-		[CHILDREN] = {
-			Components.corner(8),
-			Components.padding(0, 16, 0, 16),
-			new("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, 12),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-		},
-		Parent = left,
-	})
-	-- 増えたものだけ出す（D-218 ⑥）。どちらもなければ行ごと出さない
-	foot.Visible = sum.gold > 0 or sum.guildLevel ~= nil
-	if sum.gold > 0 then
-		local gold = well(Components.icon.coin, C.coinGold, "+" .. HubState.formatNumber(sum.gold), 60)
-		gold.Name = "Gold"
-		gold.LayoutOrder = 1
-		gold.Parent = foot
-	end
-	if sum.guildLevel then
-		local lv = well("Lv", C.inkLight, tostring(sum.guildLevel) .. " " .. Components.plain(Components.icon.up), 60)
-		lv.Name = "GuildLevel"
-		lv.LayoutOrder = 2
-		lv.Parent = foot
-		local v = lv:FindFirstChild("Value") :: TextLabel
-		v.TextColor3 = C.lvOrange
 	end
 
-	-- 右：休息ボーナスと受け取り箱
-	local right: Frame = new("Frame", {
-		Name = "Right",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(0, 348, 1, 0),
-		BackgroundTransparency = 1,
-		[CHILDREN] = { new("UIListLayout", { Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder }) },
-		Parent = content,
-	})
-	local rest: Frame = new("Frame", {
-		Name = "Rest",
-		LayoutOrder = 1,
-		Size = UDim2.new(1, 0, 0.62, -6),
-		BackgroundColor3 = C.ch13,
-		[CHILDREN] = { Components.corner(8) },
-		Parent = right,
-	})
-	local moon: CanvasGroup = new("CanvasGroup", {
-		Name = "Moon",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 18),
-		Size = UDim2.fromOffset(150, 150),
-		BackgroundColor3 = C.ch10,
-		[CHILDREN] = { Components.corner(75) },
-		Parent = rest,
-	})
-	local share = if view then LoginFlow.restShare(view, master) else 0
-	local fill: Frame = new("Frame", {
-		Name = "Fill",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.fromScale(1, 0),
-		BackgroundColor3 = C.rest,
-		Parent = moon,
-	})
-	new("UIStroke", { Color = C.ch16, Thickness = 6, Parent = moon })
-	-- たまる動き（D-162：休息ボーナスが月にたまる）
+	-- 数字は 0 からカウントアップ（D-269 ⑤）。左から少しずつずらす
 	task.defer(function()
-		if fill.Parent then
-			game:GetService("TweenService")
-				:Create(fill, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					Size = UDim2.fromScale(1, share),
-				})
-				:Play()
+		for i, c in counters do
+			task.delay((i - 1) * 0.12, function()
+				if c.label.Parent then
+					Motion.countUp(c.label, 0, c.n, {
+						prefix = c.prefix,
+						format = HubState.formatNumber,
+						float = false,
+					})
+				end
+			end)
 		end
 	end)
-	local xp = Components.chip("", "XP ×" .. tostring(master.K.restBonusExpMult))
-	xp.Name = "RestMult"
-	xp.AnchorPoint = Vector2.new(0.5, 1)
-	xp.Position = UDim2.new(0.5, 0, 1, -14)
-	xp.Parent = rest
-	local box: Frame = new("Frame", {
-		Name = "Inbox",
-		LayoutOrder = 2,
-		Size = UDim2.new(1, 0, 0.38, -6),
-		BackgroundColor3 = C.ch13,
-		[CHILDREN] = {
-			Components.corner(8),
-			new("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, 22),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-		},
-		Parent = right,
-	})
-	local count = if view then LoginFlow.inboxCount(view) else 0
-	local boxIcon = circle(96, C.ch16, C.bronze, 3)
-	boxIcon.Name = "Icon"
-	boxIcon.LayoutOrder = 1
-	boxIcon.Parent = box
-	glyph(boxIcon, I.inbox, 52, C.bronzeHi)
-	if count > 0 then
-		badge(boxIcon, "!", C.notice, C.inkWhite, 34, UDim2.new(1, -8, 0, 8))
-		local n = well("×", C.inkLight, HubState.formatNumber(count), 60)
-		n.Name = "Count"
-		n.LayoutOrder = 2
-		n.Parent = box
-	else
-		box.BackgroundTransparency = 0.45
-	end
 
 	-- 右下の金：次へ
 	local nextBtn = Components.button({

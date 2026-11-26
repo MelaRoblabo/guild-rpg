@@ -1,14 +1,15 @@
 --!strict
--- S-15 行き先・ダンジョンの面（D-048・D-113・D-114・D-130・D-163・D-209・D-225 ③・D-231 ⑤⑦・D-232 ⑨・D-235 ①②）。
---   マップのダンジョンを触って開く。パーティの面と同じ位置・形（x196・幅420・羊皮紙・× は面の角）。中身は3通り：
---   ① パーティから（S-12 の金 → マップで選ぶ：hub/PickMode）：攻略ヒント＋このパーティの4人（有利な区分の人に緑の輪）
---      ＋罠の避けやすさの棒＋移動時間。右下の金＝Go（馬車＋パーティの番号）。
---   ② マップから：攻略ヒント＋適性のある4人（D-114）。下に待機のパーティの札（番号＋状態）を並べて選び、
---      金＝選んだパーティでこのダンジョンへ Go、茶のサブ＝この4人で編成（D-244 ③。D-235 ① の「金＝編成」を置き換え）。
---      探索中の人・ほかのパーティの人は入れられないので、空いている人と選んだパーティの人から選び直す（D-235 ①）。
---   ③ 未解放：ヒントは出す。解放の条件は「鍵 → 前のダンジョンの丸（踏破の印）」。ボタンはない（解放は無料・自動）。
+-- S-15 行き先・ダンジョンの面（D-048・D-113・D-130・D-163・D-209・D-225 ③・D-231 ⑤⑦・D-232 ⑨・D-272・D-279・D-282）。
+--   マップのダンジョンを触って開く。パーティの面と同じ位置・形（x196・幅420・羊皮紙・× は面の角）。
+--   上にそのダンジョンの中の背景の絵を大きく出す（D-282。主役はこの絵）。中身は3通り：
+--   ① パーティから（S-12 の金 → マップで選ぶ：hub/PickMode）：中の絵＋攻略ヒント＋罠の避けやすさの棒＋移動時間。
+--      右下の金＝Go。
+--   ② マップから：中の絵＋攻略ヒント。ボタンは ▶ Go だけ（D-282。冒険者の一覧（D-113）と ＋Form は消した）。
+--      Go を押すと待機中のパーティの一覧を出し、選ぶとそのダンジョンへ出発（D-272）。待機中がいなければ灰色で理由。
+--   ③ 未解放：中の絵を暗く沈めて鍵と「前のダンジョンの踏破で解放」の印。右下に金の Unlock と金額（D-279）。
+--      前のダンジョンが解放済みで、ゴールドが足りるときだけ押せる。押せないときも押せて、理由の吹き出し2秒（D-264）。
+--      解放できたらハンコ（D-269）を押して、同じ面を ② の形で作り直す（そのまま Go できる）。
 --   攻略ヒント（D-250 ③）：Foes＝多い種族（英語の短い語を多い順、一番多いものは濃い縁）、Traps＝罠Lv の2行だけ。
---   攻撃の種類の割合の帯とフロアの印は出さない（フロアは探索の窓で見える）。
 --   派遣費は出さない（D-163）。マップイベント（レアダンジョン・レイド）の面は ④ の画面で作る。
 
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
@@ -16,11 +17,12 @@ local ExclusiveGift = require("@game/ReplicatedStorage/Core/ExclusiveGift")
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Party = require("@game/ReplicatedStorage/Core/Party")
+local Art = require("../ui/Art")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
-local Portrait = require("../ui/Portrait")
 local Hint = require("../party/Hint")
 local HubState = require("../hub/HubState")
+local Motion = require("../ui/Motion")
 local Nav = require("../ui/Nav")
 local PartyIcon = require("../ui/PartyIcon")
 local PickMode = require("../hub/PickMode")
@@ -38,6 +40,9 @@ local CHILDREN = Create.Children
 
 local PANEL_X = 196
 local PANEL_W = 420
+local ART_H = 190 -- 中の背景の絵の高さ（D-282）
+local HINT_H = 2 * 46 + 6 + 12
+local ACTIONS_H = 82
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
 
 local deps = {
@@ -103,67 +108,50 @@ local function label(parent: GuiObject, order: number, text: string, size: numbe
 	return t
 end
 
--- 顔の札（66×66。右下に攻撃の区分の丸：有利なら緑の縁）
-local function face(parent: GuiObject, order: number, adv: any, fav: string?, dim: boolean, partyTag: string?): Frame
-	local job = master.jobs[adv.jobId]
-	local holder: Frame = new("Frame", {
-		Name = "Face_" .. adv.uid,
-		LayoutOrder = order,
-		Size = UDim2.fromOffset(78, 96),
-		BackgroundTransparency = 1,
+-- 中の背景の絵（D-282）。locked は暗く沈める（色相は茶のまま：D-222）
+local function artFrame(parent: GuiObject, d: any, locked: boolean): Frame
+	local f: Frame = new("Frame", {
+		Name = "Art",
+		LayoutOrder = 0,
+		Size = UDim2.new(1, 0, 0, ART_H),
+		BackgroundColor3 = C.ch13,
+		ClipsDescendants = true,
+		[CHILDREN] = { Components.corner(8) },
 		Parent = parent,
 	})
-	local f: Frame = new("Frame", {
-		Name = "Face",
-		Position = UDim2.fromOffset(6, 0),
-		Size = UDim2.fromOffset(66, 66),
-		BackgroundColor3 = C.ch13,
-		BackgroundTransparency = if dim then 0.5 else 0,
-		[CHILDREN] = { Components.corner(12), Components.stroke(C.ch16, 2) },
-		Parent = holder,
-	})
-	local g = Components.text({ text = "♟", size = 30, color = C.ch45, font = Tokens.font.number })
-	g.AnchorPoint = Vector2.new(0.5, 0.5)
-	g.Position = UDim2.fromScale(0.5, 0.5)
-	g.Parent = f
-	if Portrait.fill(f, adv.appearanceId, dim) then
-		g.Visible = false
+	local img = Art.put(f, Art.background(d.id), { scaleType = Enum.ScaleType.Crop, zIndex = f.ZIndex + 1 })
+	if img then
+		img.Name = "Bg"
+		if locked then
+			img.ImageColor3 = C.ch45
+		end
+	else
+		-- 絵がまだないダンジョンは、ローマ数字を大きく（仮）
+		local t = Components.text({ text = roman(d), size = Tokens.text.display, color = C.ch45 })
+		t.AnchorPoint = Vector2.new(0.5, 0.5)
+		t.Position = UDim2.fromScale(0.5, 0.5)
+		t.Parent = f
 	end
-	local isFav = fav ~= nil and job ~= nil and job.attackType == fav
-	local attackBadge = new("TextLabel", {
-		Name = "Attack",
-		Text = "",
-		TextSize = 16,
-		FontFace = Tokens.font.number,
-		TextColor3 = C.inkLight,
-		BackgroundColor3 = C.ch16,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -4, 1, -4),
-		Size = UDim2.fromOffset(30, 30),
-		ZIndex = 3,
-		[CHILDREN] = {
-			Components.corner(15),
-			Components.stroke(if isFav then C.okGreen else C.bronze, if isFav then 3 else 2),
-		},
+	if locked then
+		new("Frame", {
+			Name = "Shade",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = C.scrim,
+			BackgroundTransparency = 0.45,
+			ZIndex = f.ZIndex + 2,
+			Parent = f,
+		})
+	end
+	-- 縁（絵の上に重ねる）
+	new("Frame", {
+		Name = "Rim",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ZIndex = f.ZIndex + 3,
+		[CHILDREN] = { Components.corner(8), Components.stroke(C.ch16, 2) },
 		Parent = f,
 	})
-	-- 攻撃の種類のアイコン（物理＝交差した剣、魔法＝光の玉：D-149）
-	Components.setText(attackBadge, if job and job.attackType == "magic" then "@job_magic" else "@job_physical")
-	if partyTag then
-		local tag = WarehouseCommon.pill("", partyTag, 21)
-		tag.AnchorPoint = Vector2.new(0, 0)
-		tag.Position = UDim2.fromOffset(-8, -8)
-		tag.ZIndex = 3
-		tag.Parent = f
-	end
-	local nm = Components.text({ text = adv.name, size = 21, color = C.inkDark, font = Tokens.font.number })
-	nm.AnchorPoint = Vector2.new(0.5, 0)
-	nm.Position = UDim2.new(0.5, 0, 0, 70)
-	nm.AutomaticSize = Enum.AutomaticSize.None
-	nm.Size = UDim2.fromOffset(90, 26)
-	nm.TextTruncate = Enum.TextTruncate.AtEnd
-	nm.Parent = holder
-	return holder
+	return f
 end
 
 local function build(params: any?, api: Nav.Api): Nav.Built
@@ -181,8 +169,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		BackgroundTransparency = 1,
 		Parent = frame,
 	})
+	-- 作り直しで消えない演出の置き場（解放のハンコ）。絵と同じ位置
+	local inset = Tokens.spacing.frame + 14
+	local fx: Frame = new("Frame", {
+		Name = "Fx",
+		Position = UDim2.fromOffset(PANEL_X + inset, band + 44 + Tokens.spacing.frame + Tokens.spacing.panelPadPlaque),
+		Size = UDim2.fromOffset(PANEL_W - inset * 2, ART_H),
+		BackgroundTransparency = 1,
+		ZIndex = 30,
+		Parent = frame,
+	})
 	local busy = false
-	local chooser: { action: string }? = nil -- Go／Form の後に出す待機のパーティの一覧（D-272）
+	local choosing = false -- Go の後に出す待機のパーティの一覧（D-272）
 	local render: () -> ()
 	-- ダンジョンを選んだときは、カメラがそのダンジョンへ寄って旋回する（メニューから開いたときも：D-270 ⑤）
 	World3D.focusDungeon(dungeonId)
@@ -199,10 +197,20 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			fromParty = nil
 		end
 		local mode = if not unlocked then "locked" elseif fromParty then "party" else "map"
-		local fav = Hint.favored(d)
 
+		local panelH = Tokens.spacing.panelPadPlaque
+			+ ART_H
+			+ 10
+			+ HINT_H
+			+ 10
+			+ ACTIONS_H
+			+ 14
+			+ 2 * Tokens.spacing.frame
+		if mode == "party" then
+			panelH += 44 + 10 -- 罠の避けやすさと移動時間の行
+		end
 		local panel, content = Components.panel({
-			size = UDim2.fromOffset(PANEL_W, if mode == "locked" then 300 else 452), -- ヒントが2行になったぶん低い（D-250 ③）
+			size = UDim2.fromOffset(PANEL_W, panelH),
 			position = UDim2.fromOffset(PANEL_X, band + 44),
 			title = if mode == "locked" then { roman(d), d.nameEn, "@locked" } else roman(d) .. "  " .. d.nameEn,
 		})
@@ -215,11 +223,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		close.Parent = panel
 		new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = content })
 
+		-- 中の背景の絵（D-282）
+		local art = artFrame(content, d, mode == "locked")
+
 		-- 攻略ヒント（D-048。初めての人に読める2行だけ：D-250 ③）
 		local hint: Frame = new("Frame", {
 			Name = "Hint",
 			LayoutOrder = 1,
-			Size = UDim2.new(1, 0, 0, 2 * 46 + 6 + 12),
+			Size = UDim2.new(1, 0, 0, HINT_H),
 			BackgroundColor3 = C.ch50,
 			[CHILDREN] = {
 				Components.corner(8),
@@ -262,7 +273,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local actions: Frame = new("Frame", {
 			Name = "Actions",
 			LayoutOrder = 9,
-			Size = UDim2.new(1, 0, 0, 82),
+			Size = UDim2.new(1, 0, 0, ACTIONS_H),
 			BackgroundTransparency = 1,
 			[CHILDREN] = {
 				new("UIListLayout", {
@@ -273,32 +284,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
 			},
+			Parent = content,
 		})
 
 		if mode == "party" then
-			-- ① パーティから：4人（有利な区分に緑の輪）、罠の避けやすさ、移動時間、Go
+			-- ① パーティから：罠の避けやすさ、移動時間、Go
 			local p = fromParty :: number
-			local faces: Frame = new("Frame", {
-				Name = "Members",
-				LayoutOrder = 2,
-				Size = UDim2.new(1, 0, 0, 96),
-				BackgroundTransparency = 1,
-				[CHILDREN] = {
-					new("UIListLayout", {
-						FillDirection = Enum.FillDirection.Horizontal,
-						HorizontalAlignment = Enum.HorizontalAlignment.Center,
-						Padding = UDim.new(0, 8),
-						SortOrder = Enum.SortOrder.LayoutOrder,
-					}),
-				},
-				Parent = content,
-			})
-			for i, uid in view.parties[p].slots do
-				local adv = view.adventurers[uid]
-				if adv then
-					face(faces, i, adv, fav, false, nil)
-				end
-			end
 			local evade, travel = Hint.forParty(view, p, d, master, deps)
 			local est = row(content, 3, 44)
 			est.BackgroundTransparency = 1
@@ -314,7 +305,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			local tp = WarehouseCommon.pill("", string.format("%d:%02d", secs // 60, secs % 60), 23)
 			tp.LayoutOrder = 5
 			tp.Parent = est
-			actions.Parent = content
 			local go = Components.button({
 				kind = "gold",
 				width = 240,
@@ -343,7 +333,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			go.Parent = actions
 		elseif mode == "map" then
-			-- ② マップから：適性の4人＋ Form（この4人で編成）＋ Go。どちらも押すと待機のパーティの一覧を出す（D-272）
+			-- ② マップから：ボタンは Go だけ（D-282）。押すと待機のパーティの一覧を出す（D-272）
 			local waiting = {}
 			for _, party in view.parties or {} do
 				if HubState.status(view, party.index).state == "waiting" then
@@ -356,58 +346,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					table.insert(waiting, { index = party.index, members = members })
 				end
 			end
-			-- 入れられる人：探索中でない人（どのパーティに入れるかは一覧で選ぶ）
-			local sub = table.clone(view)
-			local advs = {}
-			for uid, a in view.adventurers do
-				if not Party.isAdventurerBusy(view, uid) then
-					advs[uid] = a
-				end
-			end
-			sub.adventurers = advs
-			local suited = Hint.suited(sub, d, true, master, deps)
-			local faces: Frame = new("Frame", {
-				Name = "Suited",
-				LayoutOrder = 2,
-				Size = UDim2.new(1, 0, 0, 96),
-				BackgroundTransparency = 1,
-				[CHILDREN] = {
-					new("UIListLayout", {
-						FillDirection = Enum.FillDirection.Horizontal,
-						HorizontalAlignment = Enum.HorizontalAlignment.Center,
-						Padding = UDim.new(0, 8),
-						SortOrder = Enum.SortOrder.LayoutOrder,
-					}),
-				},
-				Parent = content,
-			})
-			for i, uid in suited do
-				local inParty = Party.find(view, uid)
-				face(faces, i, view.adventurers[uid], fav, false, if inParty then "♟" .. inParty else nil)
-			end
-			actions.Parent = content
 			local anyWaiting = #waiting > 0
-			local form = Components.button({
-				kind = if anyWaiting and #suited > 0 then "brown" else "disabled",
-				width = 150,
-				height = 66,
-				icon = "♟✚",
-				label = Words.form,
-				name = "Form",
-				glyph = "X",
-				reason = Words.reason.allOut,
-				onClick = function()
-					if anyWaiting and #suited > 0 then
-						chooser = { action = "form" }
-						render()
-					end
-				end,
-			})
-			form.LayoutOrder = 1
-			form.Parent = actions
 			local go = Components.button({
 				kind = if anyWaiting then "gold" else "disabled",
-				width = 220,
+				width = 240,
 				icon = "▶",
 				label = Words.go,
 				name = "Go",
@@ -415,16 +357,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				reason = Words.reason.allOut, -- 待機中のパーティがいない（D-272 ②）
 				onClick = function()
 					if anyWaiting then
-						chooser = { action = "go" }
+						choosing = true
 						render()
 					end
 				end,
 			})
-			go.LayoutOrder = 2
 			go.Parent = actions
 			-- 待機中のパーティの一覧（リーダーのアイコンと名前：D-272 ①・D-271 ③）
-			local ch = chooser
-			if ch and anyWaiting then
+			if choosing and anyWaiting then
 				local scrim: TextButton = new("TextButton", {
 					Name = "PartyChooser",
 					Text = "",
@@ -436,14 +376,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					Parent = body,
 				})
 				scrim.Activated:Connect(function()
-					chooser = nil
+					choosing = false
 					render()
 				end)
 				local sheet, sc = Components.panel({
 					size = UDim2.fromOffset(420, 120 + #waiting * 84),
 					position = UDim2.fromScale(0.5, 0.5),
 					anchor = Vector2.new(0.5, 0.5),
-					title = if ch.action == "go" then Words.go else Words.form,
+					title = Words.go,
 				})
 				sheet.ZIndex = 41
 				sheet.Parent = scrim
@@ -487,25 +427,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 							return
 						end
 						busy = true
-						if ch.action == "form" then
-							for slot, uid in suited do
-								Session.sendAndWait({
-									type = "SetPartySlot",
-									partyIndex = w.index,
-									slot = slot,
-									adventurerUid = uid,
-								})
-							end
-							busy = false
-							chooser = nil
-							HubState.selected = w.index
-							api.close()
-							return
-						end
 						local r =
 							Session.sendAndWait({ type = "Dispatch", partyIndex = w.index, dungeonId = dungeonId })
 						busy = false
-						chooser = nil
+						choosing = false
 						if r and r.ok then
 							HubState.selected = w.index
 							api.close()
@@ -519,25 +444,120 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				end
 			end
 		else
-			-- ③ 未解放：鍵 → 前のダンジョン（踏破の印）
-			local prev = if d.unlockAfterClear then master.dungeons[d.unlockAfterClear] else nil
-			local cond = row(content, 2, 66)
-			cond.BackgroundTransparency = 1
-			cond:FindFirstChildOfClass("UIListLayout").HorizontalAlignment = Enum.HorizontalAlignment.Center
-			cond:FindFirstChildOfClass("UIListLayout").Padding = UDim.new(0, 16)
-			label(cond, 1, "@locked", 30)
-			label(cond, 2, "→", 30)
+			-- ③ 未解放：絵の上に「鍵 → 前のダンジョン（踏破の印）」。踏破の無料の解放は残す（D-279）
+			local prevId = d.unlockAfterClear
+			local prev = if prevId then master.dungeons[prevId] else nil
+			local cond: Frame = new("Frame", {
+				Name = "Condition",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.new(1, 0, 0, 66),
+				BackgroundTransparency = 1,
+				ZIndex = art.ZIndex + 4,
+				[CHILDREN] = {
+					new("UIListLayout", {
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, 16),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+				},
+				Parent = art,
+			})
+			local function onArt(g: GuiObject)
+				g.ZIndex = art.ZIndex + 5
+				for _, x in g:GetDescendants() do
+					if x:IsA("GuiObject") then
+						x.ZIndex = art.ZIndex + 6
+					end
+				end
+			end
+			onArt(label(cond, 1, "@locked", 48, C.inkLight))
 			if prev then
+				onArt(label(cond, 2, "→", 30, C.inkLight))
 				local circle = WarehouseCommon.pill("✓", roman(prev), 23)
 				circle.LayoutOrder = 3
 				circle.Parent = cond
+				onArt(circle)
+			end
+			-- 金の Unlock と金額（D-279）。前のダンジョンが解放済みで、ゴールドが足りるときだけ押せる
+			local price = (d :: any).unlockGold :: number?
+			if price then
+				local prevOpen = prevId == nil or (view.unlockedDungeons and view.unlockedDungeons[prevId] == true)
+				local enough = (view.gold or 0) >= price
+				local can = prevOpen and enough
+				local unlockBtn = Components.button({
+					kind = if can then "gold" else "disabled",
+					width = 300,
+					icon = "@locked",
+					label = Words.unlock,
+					cost = HubState.formatNumber(price),
+					name = "Unlock",
+					glyph = "A",
+					reason = if not prevOpen then Words.reason.prevLocked else Words.reason.notEnoughGold,
+					onClick = function()
+						if busy then
+							return
+						end
+						busy = true
+						local r = Session.sendAndWait({ type = "UnlockDungeon", dungeonId = dungeonId })
+						busy = false
+						if r and r.ok then
+							render() -- 解放済みの形（② の Go）で作り直す
+							-- 解放のハンコ（D-269）。絵の上に押して、少し見せたら消す
+							local stamp = Motion.stamp(fx, Words.unlocked, C.okGreen, 170)
+							task.delay(Motion.T.bubble, function()
+								stamp:Destroy()
+							end)
+							return
+						end
+						local why = if r and r.error == "NOT_ENOUGH_GOLD"
+							then Words.reason.notEnoughGold
+							elseif r and r.error == "DUNGEON_PREV_LOCKED" then Words.reason.prevLocked
+							else nil
+						-- DUNGEON_ALREADY_UNLOCKED などは作り直せば解放済みの形になる
+						render()
+						if why then
+							local b = body:FindFirstChild("Unlock", true)
+							local face = if b then b:FindFirstChild("Face") else nil
+							if face and face:IsA("GuiObject") then
+								Motion.reason(face, why)
+							end
+						end
+					end,
+				})
+				unlockBtn.Parent = actions
 			end
 		end
 	end
 
+	-- 面の中身が変わるもの（解放・ゴールド・待機のパーティ・選んだパーティのメンバー）が変わったときだけ作り直す。
+	-- 毎回作り直すと中の絵の読み込みがちらつくため
+	local function keyOf(view: any): string
+		local parts = {
+			tostring(view.unlockedDungeons and view.unlockedDungeons[dungeonId]),
+			tostring(view.unlockedDungeons and d and d.unlockAfterClear and view.unlockedDungeons[d.unlockAfterClear]),
+			tostring(view.gold),
+			tostring(PickMode.partyIndex),
+		}
+		for _, party in view.parties or {} do
+			table.insert(parts, HubState.status(view, party.index).state .. ":" .. table.concat(party.slots, ","))
+		end
+		return table.concat(parts, "|")
+	end
+	local lastKey = ""
 	render()
-	local conn = Session.changed:connect(function()
-		if not busy then
+	if Session.view then
+		lastKey = keyOf(Session.view)
+	end
+	local conn = Session.changed:connect(function(view: any)
+		if busy or view == nil then
+			return
+		end
+		local key = keyOf(view)
+		if key ~= lastKey then
+			lastKey = key
 			render()
 		end
 	end)

@@ -1,24 +1,25 @@
 --!strict
--- ログインの流れ（S-01 まとめ → カットイン最大1回 → カレンダー1回。D-109・D-132・D-155・D-208）。純粋な関数（Lune でテストする）。
+-- ログインの流れ（S-01 まとめ → 帰ったパーティの獲得演出 → カットイン最大1回 → カレンダー1回。D-132・D-155・D-208・D-281）。
+-- 純粋な関数（Lune でテストする）。
 --   summarize(events, view)：ログイン（reason "load"）で届いた出来事を1枚のまとめにする。
---     - parties：メンバーのいるパーティごとに、留守の間に帰ったか（moved）、持ち帰った宝箱・ゴールド、Lv が上がった人。
---       動かなかったパーティ（自動再派遣がオフ）は moved = false（D-161・D-162）。
---     - gold：持ち帰ったゴールド＋自動売却のゴールドの合計。guildLevel：上がったあとの Lv（上がっていなければ nil）。
---     - show：留守番が動いた（帰還）・休息ボーナスがたまった・受け取り箱に届いた、のどれかがあればまとめを出す（D-208 ④）。
---       ギルドLvアップ・ダンジョン解放も出す（D-132）。休息ボーナスは出来事がないので、要約の lastSavedAt（前回の保存＝留守の始まり）
---       から今までの留守に core と同じ式（留守の時間 × restBonusRate、上限 restBonusMaxSeconds：06章 §13）で、たまった分があるかを見る。
+--     - まとめは受け取った報酬の合計だけ（D-281）：gold＝持ち帰ったゴールド＋自動売却のゴールド、
+--       chestsByRank＝宝箱のレアリティごとの数、inbox＝受け取り箱に届いた物（アイコン＋数）。
+--       宝箱のレアリティは、出来事にレアリティごとの数（chestsByRank：{ [rank]: 数 }）があるときだけ分ける。
+--       ないときは rank = nil の1つ（レアリティを表さない閉じた箱：D-087）にまとめる。
+--     - show：受け取った報酬（ゴールド・宝箱・受け取り箱に届いた物）が1つでもあればまとめを出す（D-281）。
+--       休息ボーナスは廃止（D-280）。パーティの行・ギルドLv の行は出さない（D-281）。
+--     - returned：留守の間に帰ったパーティごとの帰還の出来事（パーティの番号の順）。まとめを閉じたあと、
+--       パーティごとに左の帰還のトーストで見せる（D-281）。
 --     - cutIn：最大1回（D-132）。新しいダンジョンの解放を先に（D-238 ②）、なければギルドLvアップ（上がった分の報酬を合わせる）。
 --     - loginBonus：その日の最初のログインで届いたログインボーナス（カレンダーをまとめの後に1回：D-208）。
 
 local LoginFlow = {}
 
-export type PartyRow = {
-	index: number,
-	moved: boolean,
-	chests: number,
-	gold: number,
-	members: { { uid: string, up: boolean } },
-}
+export type ChestCount = { rank: number?, n: number }
+
+export type InboxLine = { kind: "gold" | "chest" | "item" | "unique", id: string?, rank: number?, n: number }
+
+export type ReturnGroup = { partyIndex: number, events: { any } }
 
 export type CutIn =
 	{ kind: "dungeon", dungeonId: string }
@@ -26,35 +27,103 @@ export type CutIn =
 
 export type Summary = {
 	show: boolean,
-	parties: { PartyRow },
 	gold: number,
 	chests: number,
+	chestsByRank: { ChestCount },
+	inbox: { InboxLine },
+	inboxCount: number,
+	returned: { ReturnGroup },
 	guildLevel: number?,
 	unlocked: { string },
 	cutIn: CutIn?,
 	loginBonus: any?,
 }
 
-function LoginFlow.summarize(events: { any }, view: any, now: number, master: any): Summary
-	local ups: { [string]: boolean } = {}
-	local byParty: { [number]: { chests: number, gold: number } } = {}
-	local gold, chests = 0, 0
+-- rank の小さい順（コモンから）。レアリティが分からない箱（nil）は最後
+local function sortChests(byRank: { [number]: number }, unknown: number): { ChestCount }
+	local out: { ChestCount } = {}
+	for rank, n in byRank do
+		if n > 0 then
+			table.insert(out, { rank = rank, n = n })
+		end
+	end
+	table.sort(out, function(a, b)
+		return (a.rank :: number) < (b.rank :: number)
+	end)
+	if unknown > 0 then
+		table.insert(out, { rank = nil, n = unknown })
+	end
+	return out
+end
+
+-- 受け取り箱に届いた物を、ゴールド → 宝箱（rank の順）→ アイテム（id の順）→ ユニークで並べる。
+--   要約の受け取り箱（Game.query.inbox）は宝箱のランクを返さない（D-087）ので、ランクのない宝箱は rank = nil の1つにまとめる。
+--   中身は要約の形（gold・items・chests・uniqueId が件の直下）でも、状態の形（rewards の下）でも読む
+local function inboxLines(entries: { any }): { InboxLine }
+	local gold, uniques, unknownChests = 0, 0, 0
+	local chests: { [number]: number } = {}
+	local items: { [string]: number } = {}
+	for _, entry in entries do
+		local r = entry.rewards or entry
+		gold += r.gold or 0
+		for _, c in r.chests or {} do
+			if c.rank then
+				chests[c.rank] = (chests[c.rank] or 0) + c.count
+			else
+				unknownChests += c.count
+			end
+		end
+		for id, n in r.items or {} do
+			items[id] = (items[id] or 0) + n
+		end
+		if r.uniqueId then
+			uniques += 1
+		end
+	end
+	local out: { InboxLine } = {}
+	if gold > 0 then
+		table.insert(out, { kind = "gold", n = gold })
+	end
+	for _, c in sortChests(chests, unknownChests) do
+		table.insert(out, { kind = "chest", rank = c.rank, n = c.n })
+	end
+	local ids = {}
+	for id in items do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		table.insert(out, { kind = "item", id = id, n = items[id] })
+	end
+	if uniques > 0 then
+		table.insert(out, { kind = "unique", n = uniques })
+	end
+	return out
+end
+
+function LoginFlow.summarize(events: { any }, view: any, _now: number, _master: any): Summary
+	local byParty: { [number]: { any } } = {}
+	local gold, chests, unknownChests = 0, 0, 0
+	local byRank: { [number]: number } = {}
 	local guildLevel: number? = nil
 	local guildRewards: { [string]: number } = {}
 	local unlocked: { string } = {}
 	local loginBonus = nil
-	local inboxArrived = false
+	local inboxUids: { string } = {}
 	for _, e in events do
 		if e.type == "ExpeditionReturned" then
-			local p = byParty[e.partyIndex] or { chests = 0, gold = 0 }
-			local g = (e.gold or 0) + (e.itemsSoldGold or 0)
-			p.chests += e.chests or 0
-			p.gold += g
-			byParty[e.partyIndex] = p
-			gold += g
-			chests += e.chests or 0
-		elseif e.type == "LevelUp" then
-			ups[e.uid] = true
+			local list = byParty[e.partyIndex] or {}
+			table.insert(list, e)
+			byParty[e.partyIndex] = list
+			gold += (e.gold or 0) + (e.itemsSoldGold or 0)
+			local n = e.chests or 0
+			chests += n
+			local ranked = 0
+			for rank, c in e.chestsByRank or {} do
+				byRank[rank] = (byRank[rank] or 0) + c
+				ranked += c
+			end
+			unknownChests += math.max(0, n - ranked)
 		elseif e.type == "GuildLevelUp" then
 			guildLevel = math.max(guildLevel or 0, e.level)
 			for id, n in e.rewards or {} do
@@ -66,28 +135,26 @@ function LoginFlow.summarize(events: { any }, view: any, now: number, master: an
 			loginBonus = e
 		end
 		if e.inboxUid then
-			inboxArrived = true -- ログインボーナス・レイドの報酬など、受け取り箱に届いた（D-164）
+			table.insert(inboxUids, e.inboxUid) -- ログインボーナス・レイドの報酬など、受け取り箱に届いた（D-164）
 		end
 	end
-	local parties: { PartyRow } = {}
-	for i, party in view.parties or {} do
-		local members = {}
-		for _, uid in party.slots or {} do
-			if uid and view.adventurers[uid] then
-				table.insert(members, { uid = uid, up = ups[uid] == true })
+	-- 届いた件の中身は要約（view.inbox）から引く
+	local entries = {}
+	for _, uid in inboxUids do
+		for _, entry in view.inbox or {} do
+			if entry.uid == uid then
+				table.insert(entries, entry)
+				break
 			end
 		end
-		if #members > 0 then
-			local p = byParty[i]
-			table.insert(parties, {
-				index = i,
-				moved = p ~= nil,
-				chests = if p then p.chests else 0,
-				gold = if p then p.gold else 0,
-				members = members,
-			})
-		end
 	end
+	local returned: { ReturnGroup } = {}
+	for index, list in byParty do
+		table.insert(returned, { partyIndex = index, events = list })
+	end
+	table.sort(returned, function(a, b)
+		return a.partyIndex < b.partyIndex
+	end)
 	local cutIn: CutIn? = nil
 	if #unlocked > 0 then
 		cutIn = { kind = "dungeon", dungeonId = unlocked[#unlocked] }
@@ -95,45 +162,18 @@ function LoginFlow.summarize(events: { any }, view: any, now: number, master: an
 		cutIn = { kind = "guild", level = guildLevel, rewards = guildRewards }
 	end
 	return {
-		show = next(byParty) ~= nil or guildLevel ~= nil or #unlocked > 0 or inboxArrived or LoginFlow.restGained(
-			view,
-			now,
-			master
-		),
-		parties = parties,
+		show = gold > 0 or chests > 0 or #inboxUids > 0,
 		gold = gold,
 		chests = chests,
+		chestsByRank = sortChests(byRank, unknownChests),
+		inbox = inboxLines(entries),
+		inboxCount = #inboxUids,
+		returned = returned,
 		guildLevel = guildLevel,
 		unlocked = unlocked,
 		cutIn = cutIn,
 		loginBonus = loginBonus,
 	}
-end
-
--- 留守の間に休息ボーナスがたまったか（D-161・D-162・D-208 ④）。上限に達していれば、たまっていない
-function LoginFlow.restGained(view: any, now: number, master: any): boolean
-	local K = master.K
-	local from = view.lastSavedAt
-	if from == nil or (view.restBonusSeconds or 0) <= 0 then
-		return false
-	end
-	local gained = math.floor(math.max(0, now - from) * K.restBonusRate)
-	local before = (view.restBonusSeconds or 0) - gained
-	return gained > 0 and before < K.restBonusMaxSeconds
-end
-
--- 休息ボーナスの輪の割合（上限に対する今の秒：D-162）
-function LoginFlow.restShare(view: any, master: any): number
-	local max = master.K.restBonusMaxSeconds
-	if max <= 0 then
-		return 0
-	end
-	return math.clamp((view.restBonusSeconds or 0) / max, 0, 1)
-end
-
--- 受け取り箱の件数（宝箱ボタンの中の箱。D-164）
-function LoginFlow.inboxCount(view: any): number
-	return #(view.inbox or {})
 end
 
 export type RewardLine = { kind: "gold" | "chest" | "item", id: string?, n: number }

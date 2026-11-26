@@ -1,14 +1,17 @@
 --!strict
--- ログインの流れ（D-132・D-208）。ログイン（reason "load"）で届いた出来事から、
---   S-01 まとめ（留守番が動いた・休息ボーナスがたまった・受け取り箱に届いた、のどれか：D-208 ④）
+-- ログインの流れ（D-132・D-208・D-281）。ログイン（reason "load"）で届いた出来事から、
+--   S-01 まとめ（受け取った報酬があるとき：D-281）
+--   → 留守の間に帰ったパーティの獲得演出（パーティごとに左の帰還のトースト。画面を閉じてから出す：D-281）
 --   → カットイン（最大1回。設定でオフなら出さない）→ カレンダー（ログインボーナスが届いた日）
 --   の順に1枚ずつ出す。次へで差し替え、最後の次へで閉じる。B・Esc で閉じたら残りは出さない。
+--   休息ボーナスは廃止（D-280）。
 --   ログインボーナスは留守の計算ではなく、ログイン直後の最初のオンラインの時間経過で届く（D-155、Game の advanceOnline）。
 --   そのため LoginBonus はログインの知らせとは別に受け取り、流れの途中なら最後につなぎ、そうでなければ画面が空いたときに出す。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local LoginFlow = require("../login/LoginFlow")
 local Nav = require("../ui/Nav")
+local ReturnToast = require("./ReturnToast")
 local Session = require("../Session")
 local master = require("../Master")
 
@@ -23,25 +26,44 @@ local running = false
 local calendarShown = false
 local startDone = false -- ログインのまとめを出し終えたか（それより先に届いたログインボーナスは、まとめの後ろにつなぐ）
 local pendingCalendar: Step? = nil
+local opened = false -- 流れの画面が開いているか（トーストの間は閉じている）
+local inToasts = false -- 帰還のトーストを出している間（D-281）
 
 local function step()
 	index += 1
 	local s = steps[index]
 	if s == nil then
 		running = false
-		Nav.close()
+		if opened then
+			opened = false
+			Nav.close()
+		end
+		return
+	end
+	if s.id == "ReturnToasts" then
+		-- 帰還のトーストはメイン画面の上に出すので、画面を閉じてから（D-281）
+		if opened then
+			opened = false
+			Nav.close()
+		end
+		inToasts = true
+		ReturnToast.playLogin(s.params.groups, function()
+			inToasts = false
+			step()
+		end)
 		return
 	end
 	s.params.onNext = step
-	if index == 1 then
-		Nav.open(s.id, s.params)
-	else
+	if opened then
 		Nav.replace(s.id, s.params)
+	else
+		opened = true
+		Nav.open(s.id, s.params)
 	end
 end
 
 local function run(list: { Step })
-	steps, index, running = list, 0, true
+	steps, index, running, opened = list, 0, true, false
 	step()
 end
 
@@ -57,7 +79,7 @@ local function queueCalendar(bonus: any)
 		return
 	end
 	-- B・Esc で流れを閉じたときは running が残るので、画面が開いているかでも見る
-	if running and Nav.depth() > 0 then
+	if running and (Nav.depth() > 0 or inToasts) then
 		table.insert(steps, s)
 		return
 	end
@@ -83,6 +105,13 @@ function LoginSequence.start(events: { any })
 	local list: { Step } = {}
 	if sum.show then
 		table.insert(list, { id = "LoginSummary", params = { summary = sum } })
+	end
+	if #sum.returned > 0 then
+		local groups = {}
+		for _, r in sum.returned do
+			table.insert(groups, r.events)
+		end
+		table.insert(list, { id = "ReturnToasts", params = { groups = groups } })
 	end
 	if sum.cutIn and Game.query.preferences(view, master).cutIns then
 		table.insert(list, { id = "CutIn", params = { cutIn = sum.cutIn } })
