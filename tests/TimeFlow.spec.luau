@@ -419,20 +419,19 @@ return function(t)
 				s.lastSavedAt = nil
 				expect(Game.offlineStart(s)).toBe(T0 + 120)
 				-- サーバーが落ちた：最後の定期保存（T0 + 60）の状態から読み込むと、その後のオンラインの進みは失われ、
-				-- 保存した時刻からを留守として計算する（休息ボーナスも保存した時刻から）
+				-- 保存した時刻からを留守として計算する
 				local saved = loggedOutWithRepeat()
 				saved.lastSavedAt = T0 + 60
 				saved.lastAdvancedAt = T0 + 60
 				local login = T0 + 3600
 				Game.advance(saved, ctx(login, false))
-				expect(saved.restBonusSeconds).toBe(
-					math.min(math.floor((login - (T0 + 60)) * K.restBonusRate), K.restBonusMaxSeconds)
-				)
 				expect(saved.lastAdvancedAt).toBe(login)
+				expect(Game.offlineStart(saved)).toBe(login)
 				-- 同じ時刻にもう一度留守の計算をしても、留守は 0（二重にならない）
-				local rest = saved.restBonusSeconds
-				Game.advance(saved, ctx(login, false))
-				expect(saved.restBonusSeconds).toBe(rest)
+				local again = Game.advance(saved, ctx(login, false))
+				for _, ev in again do
+					expect(ev.type == "ExpeditionReturned").toBe(false)
+				end
 			end
 		)
 		it(
@@ -582,29 +581,8 @@ return function(t)
 		end)
 	end)
 
-	describe("休息ボーナス（D-161, D-173、06章 §14）", function()
-		it("D-161 留守にした時間の半分を貯める（上限4時間）", function()
-			local s = newState()
-			s.lastSavedAt = T0
-			Game.advance(s, ctx(T0 + 2 * 3600, false))
-			expect(Game.query.restBonus(s)).toBe(math.floor(2 * 3600 * K.restBonusRate))
-			local s2 = newState()
-			s2.lastSavedAt = T0
-			Game.advance(s2, ctx(T0 + 20 * 3600, false))
-			expect(s2.restBonusSeconds).toBe(K.restBonusMaxSeconds)
-		end)
-		it(
-			"D-173 オンラインの時間だけ減る（探索していなくても減る、0 未満にしない）",
-			function()
-				local s = newState()
-				s.restBonusSeconds = 1000
-				Game.advance(s, ctx(T0 + 600))
-				expect(s.restBonusSeconds).toBe(400)
-				Game.advance(s, ctx(T0 + 5000))
-				expect(s.restBonusSeconds).toBe(0)
-			end
-		)
-		local function playReturn(rest: number, traitId: string?, glutton: boolean?): (any, any, number)
+	describe("留守中の経験値（D-280。休息ボーナスは廃止）", function()
+		local function playReturn(traitId: string?, glutton: boolean?, offline: boolean?): (any, any, number, number)
 			local s = newState(5)
 			local adv = s.adventurers[s.parties[1].slots[1]]
 			adv.level, adv.levelCap, adv.exp = 19, 20, 0
@@ -617,70 +595,66 @@ return function(t)
 				exec(s, { type = "Unequip", adventurerUid = adv.uid, slot = "sub" })
 				exec(s, { type = "Equip", adventurerUid = adv.uid, equipmentUid = amulet.uid })
 			end
-			s.restBonusSeconds = rest
 			exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
 			local e = onlyExpedition(s)
 			e.dailyTraitId = traitId
+			e.offline = if offline then true else nil
 			local raw = e.log.rewards.exp[adv.uid]
+			local gold0 = s.gold
 			local events = Game.advance(s, ctx(e.returnAt))
-			return s, events, raw
+			return s, events, raw, s.gold - gold0
 		end
-		it("D-161 オンライン中の帰還で残りがあれば経験値 × restBonusExpMult", function()
-			local s, events, raw = playReturn(1000)
-			local adv = s.adventurers[s.parties[1].slots[1]]
-			local mult = Growth.expMultiplier(adv, master, s.equipment)
-			expect(adv.exp).toBe(math.floor(raw * mult * K.restBonusExpMult))
-			expect(events[1].restBonus).toBe(true)
-			local s0, events0, raw0 = playReturn(0)
-			local adv0 = s0.adventurers[s0.parties[1].slots[1]]
-			expect(adv0.exp).toBe(math.floor(raw0 * Growth.expMultiplier(adv0, master, s0.equipment)))
-			expect(events0[1].restBonus).toBe(nil)
-		end)
 		it(
-			"D-173 帰還時に残りが尽きていれば掛けない（オンラインの経過で減った分を見る）",
+			"D-280 留守番の探索では冒険者の経験値を得ない（ゴールド・宝箱・ギルド経験値は入る）",
 			function()
-				local _, events = playReturn(1) -- 出発から帰還までに尽きる
+				local s, events, raw, gold = playReturn(nil, nil, true)
+				local adv = s.adventurers[s.parties[1].slots[1]]
+				expect(raw > 0).toBe(true)
+				expect(adv.exp).toBe(0)
+				expect(adv.level).toBe(19)
+				local returned = events[1]
+				expect(returned.type).toBe("ExpeditionReturned")
+				expect(returned.offline).toBe(true)
+				expect(gold).toBe(returned.gold)
+				expect(returned.guildExp > 0).toBe(true)
+				for _, ev in events do
+					expect(ev.type == "LevelUp").toBe(false)
+				end
+			end
+		)
+		it(
+			"D-280 オンライン中の帰還は経験値 × 個人の補正だけ（休息ボーナスはない）",
+			function()
+				local s, events, raw = playReturn()
+				local adv = s.adventurers[s.parties[1].slots[1]]
+				expect(adv.exp).toBe(math.floor(raw * Growth.expMultiplier(adv, master, s.equipment)))
 				expect(events[1].restBonus).toBe(nil)
 			end
 		)
-		it("D-173 修練の護符・日替わりと重ねて、経験値補正の上限の外で掛ける", function()
-			local s, _, raw = playReturn(1000, "dt_exp", true)
-			local adv = s.adventurers[s.parties[1].slots[1]]
-			local mult = Growth.expMultiplier(adv, master, s.equipment)
-			-- 補正（大食らい＋護符）は上限まで
-			expect(mult).toBeCloseTo(1 + K.expBonusCap)
-			expect(adv.exp).toBe(math.floor(raw * mult * K.restBonusExpMult * master.dailyTraits.dt_exp.value))
-		end)
-		it("D-161 留守番の探索には休息ボーナスを使わない", function()
-			local s = newState(5)
-			exec(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = "dng_graveyard" })
-			exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
-			s.lastSavedAt = T0
-			s.restBonusSeconds = K.restBonusMaxSeconds
-			local events = Game.advance(s, ctx(T0 + 3600, false))
-			for _, e in events do
-				if e.type == "ExpeditionReturned" then
-					expect(e.restBonus).toBe(nil)
-				end
+		it(
+			"D-173 修練の護符・日替わりは重ねて効く（日替わりは経験値補正の上限の外）",
+			function()
+				local s, _, raw = playReturn("dt_exp", true)
+				local adv = s.adventurers[s.parties[1].slots[1]]
+				local mult = Growth.expMultiplier(adv, master, s.equipment)
+				expect(mult).toBeCloseTo(1 + K.expBonusCap)
+				expect(adv.exp).toBe(math.floor(raw * mult * master.dailyTraits.dt_exp.value))
 			end
-		end)
-		it("D-173 トレーニングには掛けない", function()
-			local function train(rest: number): number
+		)
+		it(
+			"D-280 留守にしても休息ボーナスはたまらない（セーブに残りを持たない）",
+			function()
 				local s = newState()
-				local uid = s.parties[1].slots[1]
-				s.gold = 10 ^ 9
-				s.restBonusSeconds = rest
-				exec(s, { type = "Train", adventurerUid = uid, sessions = 1 })
-				local adv = s.adventurers[uid]
-				return adv.level * 1000000 + adv.exp
+				s.lastSavedAt = T0
+				Game.advance(s, ctx(T0 + 2 * 3600, false))
+				expect(s.restBonusSeconds).toBe(nil)
+				expect(K.restBonusExpMult).toBe(nil)
 			end
-			expect(train(K.restBonusMaxSeconds)).toBe(train(0))
-		end)
+		)
 	end)
-
 	describe("セーブの移行 version 6 → 7（M7b-3）", function()
 		it(
-			"D-161 lastSavedAt に lastAdvancedAt を入れ、休息ボーナスは 0。探索はそのまま",
+			"D-161 lastSavedAt に lastAdvancedAt を入れる。探索はそのまま（休息ボーナスは v13 で消える：D-280）",
 			function()
 				local s = newState()
 				exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
@@ -692,17 +666,28 @@ return function(t)
 				Migration.migrate(s, master)
 				expect(s.version).toBe(Migration.CURRENT) -- 6 → 7 → 8（v7 → 8 は Rewards.spec）
 				expect(s.lastSavedAt).toBe(T0 + 77)
-				expect(s.restBonusSeconds).toBe(0)
+				expect(s.restBonusSeconds).toBe(nil)
 				expect(s.expeditions).toEqual(before)
 				local e = onlyExpedition(s)
 				expect(e.offline).toBe(nil)
 				expect(e.dailyTraitId).toBe(nil)
 			end
 		)
-		it("D-161 新しいセーブは lastSavedAt と休息ボーナス 0 を持つ", function()
+		it(
+			"D-161 新しいセーブは lastSavedAt を持つ（休息ボーナスは持たない：D-280）",
+			function()
+				local s = newState()
+				expect(s.lastSavedAt).toBe(T0)
+				expect(s.restBonusSeconds).toBe(nil)
+			end
+		)
+		it("D-280 version 12 → 13 で休息ボーナスの残りを消す", function()
 			local s = newState()
-			expect(s.lastSavedAt).toBe(T0)
-			expect(s.restBonusSeconds).toBe(0)
+			s.version = 12
+			s.restBonusSeconds = 1234
+			Migration.migrate(s, master)
+			expect(s.version).toBe(13)
+			expect(s.restBonusSeconds).toBe(nil)
 		end)
 	end)
 end

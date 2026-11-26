@@ -123,6 +123,8 @@ function CommandText.fromTokens(tokens: { string }): any?
 		return { type = "ChangeAppearanceChoose", which = which(tokens[2]) }
 	elseif c == "expand" then
 		return { type = "BuyExpansion", expansionId = tokens[2] }
+	elseif c == "unlock" then
+		return { type = "UnlockDungeon", dungeonId = tokens[2] } -- D-279
 	elseif c == "train" then
 		local n = if tokens[3] == "max" then CommandText.TRAIN_MAX else tonumber(tokens[3]) or 1
 		return { type = "Train", adventurerUid = tokens[2], sessions = n }

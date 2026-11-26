@@ -30,6 +30,8 @@ local ERRORS = {
 	WAREHOUSE_FULL = "倉庫がいっぱいです",
 	DUNGEON_NOT_FOUND = "そのダンジョンはありません",
 	DUNGEON_LOCKED = "そのダンジョンはまだ解放されていません",
+	DUNGEON_ALREADY_UNLOCKED = "そのダンジョンはもう解放されています",
+	DUNGEON_PREV_LOCKED = "前のダンジョンがまだ解放されていません",
 	PARTY_EMPTY = "パーティに誰もいません",
 	NO_CHEST = "開ける宝箱がありません",
 	PILE_NOT_FOUND = "その宝箱の山はありません",
@@ -268,7 +270,6 @@ function Text.calendar(save: any, master: any): string
 			then ` ／ 次の報酬は {P.nextMinutes}分`
 			else " ／ 今日の報酬はすべて受け取り済み"}`
 	)
-	table.insert(lines, `【休息ボーナス】残り {hms(Game.query.restBonus(s))}`)
 	return table.concat(lines, "\n")
 end
 
@@ -417,11 +418,6 @@ function Text.status(save: any, master: any): string
 	table.insert(
 		lines,
 		`トレーニング場 Lv{s.expansions.trainingLevel}（Lv{fac.levelCap}まで、1回 経験値{fac.expPerSession}）`
-	)
-	-- 休息ボーナスの残り（D-161）
-	table.insert(
-		lines,
-		`休息ボーナス 残り {hms(Game.query.restBonus(s))}（帰還時の経験値×{master.K.restBonusExpMult}）`
 	)
 	return table.concat(lines, "\n")
 end
@@ -649,7 +645,6 @@ function Text.events(events: { any }, save: any, master: any): string
 					.. (if e.offline then " ［留守番］" else "")
 					.. (if e.interrupted then " ［途中で帰還］" else "")
 					.. (if e.dailyTraitId then ` ［日替わり：{traitText(e.dailyTraitId, master)}］` else "")
-					.. (if e.restBonus then " ［休息ボーナス］" else "")
 			)
 		elseif e.type == "EventDispatched" then
 			if e.kind == "merchant" then
@@ -712,7 +707,12 @@ function Text.events(events: { any }, save: any, master: any): string
 		elseif e.type == "FirstClear" then
 			table.insert(lines, t .. `初踏破：{master.dungeons[e.dungeonId].name}`)
 		elseif e.type == "DungeonUnlocked" then
-			table.insert(lines, t .. `新しいダンジョンが解放された：{master.dungeons[e.dungeonId].name}`)
+			table.insert(
+				lines,
+				t
+					.. `新しいダンジョンが解放された：{master.dungeons[e.dungeonId].name}`
+					.. (if e.gold then `（{e.gold}G）` else "")
+			)
 		elseif e.type == "AutoDispatched" then
 			table.insert(
 				lines,

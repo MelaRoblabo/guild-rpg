@@ -90,6 +90,9 @@ return {
 
 	-- 雇用（Q-006）。ステータスの範囲はギルドの成長に関係なく一定（D-081）
 	hireCost = 300,
+	-- 面接の Total（HP を除く4項目の合計：Q-006）の特別な演出の線（見せ方だけ。仮。D-283）
+	hireTotalGreat = 110,
+	hireTotalAmazing = 130,
 	hireStatRange = {
 		str = { min = 1, max = 40 }, -- D-086：引き直しに一喜一憂が出るよう幅を広げる
 		mag = { min = 1, max = 40 },
@@ -180,10 +183,6 @@ return {
 	offlineTimeMult = 10, -- 留守番の探索1回の時間の倍率（効率10%）
 	offlineMaxSeconds = 21600, -- 1回の留守で6時間まで。6時間までに最後の探索を帰還させる（拡張しない）
 
-	-- 休息ボーナス（D-161, D-173。06章 §14）
-	restBonusRate = 0.5, -- 留守にした時間の半分を貯める（仮。M7b-6）
-	restBonusMaxSeconds = 14400, -- 上限4時間
-	restBonusExpMult = 2, -- 帰還時の経験値の倍率（仮。M7b-6）
 	pinchHpRatio = 0.3, -- ピンチの印：探索の今の時点で、メンバーの HP の合計／最大 HP の合計がこれより低い（仮。D-229）
 	-- 能力の演出の線（見せ方だけ。結果は変えない）：上限（雇用は範囲、転生は加算分の上限）に対する割合
 	statGoodRatio = 0.75, -- 良い値の演出（雇用 S-21c：D-220、転生 S-43b：D-224）

@@ -56,6 +56,7 @@ return {
 	},
 	{
 		id = "dng_ruins",
+		unlockGold = 1000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "罠の遺跡",
 		stage = 2,
 		timeTarget = 65,
@@ -80,6 +81,7 @@ return {
 	},
 	{
 		id = "dng_tower",
+		unlockGold = 3000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "封印の塔",
 		stage = 3,
 		timeTarget = 94,
@@ -102,6 +104,7 @@ return {
 	},
 	{
 		id = "dng_castle",
+		unlockGold = 8000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "騎士の古城",
 		stage = 4,
 		timeTarget = 106,
@@ -124,6 +127,7 @@ return {
 	},
 	{
 		id = "dng_sunken_temple",
+		unlockGold = 20000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "水没神殿",
 		stage = 5,
 		timeTarget = 119,
@@ -146,6 +150,7 @@ return {
 	},
 	{
 		id = "dng_mist_forest",
+		unlockGold = 50000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "霧の大森林",
 		stage = 6,
 		timeTarget = 131,
@@ -168,6 +173,7 @@ return {
 	},
 	{
 		id = "dng_labyrinth",
+		unlockGold = 120000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "地下大迷宮",
 		stage = 7,
 		timeTarget = 144,
@@ -192,6 +198,7 @@ return {
 	},
 	{
 		id = "dng_abbey",
+		unlockGold = 300000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "呪われた修道院",
 		stage = 8,
 		timeTarget = 156,
@@ -214,6 +221,7 @@ return {
 	},
 	{
 		id = "dng_iron_fortress",
+		unlockGold = 700000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "鋼鉄の要塞",
 		stage = 9,
 		timeTarget = 165,
@@ -236,6 +244,7 @@ return {
 	},
 	{
 		id = "dng_dragon_nest",
+		unlockGold = 1500000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "竜の巣",
 		stage = 10,
 		timeTarget = 175,
@@ -258,6 +267,7 @@ return {
 	},
 	{
 		id = "dng_demon_gate",
+		unlockGold = 3000000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "魔界の門",
 		stage = 11,
 		timeTarget = 247, -- D-097／D-098：パーティ5つで帰還間隔約30秒。撤退も長くなるよう移動を延ばす
@@ -280,6 +290,7 @@ return {
 	},
 	{
 		id = "dng_sky_throne",
+		unlockGold = 6000000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 		name = "天空の玉座",
 		stage = 12,
 		timeTarget = 265, -- D-097／D-098：同上

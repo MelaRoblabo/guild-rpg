@@ -113,7 +113,6 @@ function Game.newState(master: any, seed: number, now: number): any
 		createdAt = now,
 		lastAdvancedAt = now,
 		lastSavedAt = now, -- 最後に保存した時刻（留守の始まり：D-161）。サーバーが保存のときに書く（M7b-5）
-		restBonusSeconds = 0, -- 休息ボーナスの残り秒（D-161）
 		quests = Quest.newState(), -- D-153。次のオンラインの advance で今日・今週の分を作る
 		login = Login.newState(), -- D-155。次のオンラインの advance で1日目
 		playtime = Playtime.newState(), -- D-154
@@ -236,8 +235,7 @@ local function autoRepeatBlocker(state: any): string?
 end
 
 -- 帰還処理：報酬を状態に反映する
--- restActive：休息ボーナスが効くか（オンライン中の帰還で、帰還時に残りがある：06章 §14）
-local function collect(state: any, e: any, master: any, events: { any }, restActive: boolean)
+local function collect(state: any, e: any, master: any, events: { any })
 	if e.merchant then
 		-- 商人からの帰還（D-274）：買った品はその場で倉庫に入れた。ここでは帰るだけ
 		state.expeditions[e.uid] = nil
@@ -282,12 +280,11 @@ local function collect(state: any, e: any, master: any, events: { any }, restAct
 	end
 
 	-- 経験値（D-041：生存者で等分済み。個人倍率はここで掛ける）。順序を固定するため隊列順に処理
-	-- 休息ボーナス（留守番の探索には使わない）と日替わりの expMult は expBonusCap の外で掛け合わせる（D-161, D-173）
-	local useRest = restActive and not e.offline
-	local outerMult = (if useRest then K.restBonusExpMult else 1) * DailyTrait.expMult(e.dailyTraitId, master)
+	-- 日替わりの expMult は expBonusCap の外で掛ける（D-173）。留守番の探索は経験値を得ない（D-280）
+	local outerMult = DailyTrait.expMult(e.dailyTraitId, master)
 	local levelUps = {}
 	for _, uid in e.memberUids do
-		local amount = r.exp[uid]
+		local amount = if e.offline then nil else r.exp[uid]
 		local adv = state.adventurers[uid]
 		if amount and amount > 0 and adv then
 			local levels = Growth.addExp(adv, amount, rng, master, state.equipment, outerMult)
@@ -330,7 +327,6 @@ local function collect(state: any, e: any, master: any, events: { any }, restAct
 		offline = e.offline,
 		interrupted = e.interrupted, -- 途中ログインで戻った（D-186）
 		dailyTraitId = e.dailyTraitId,
-		restBonus = if useRest then true else nil,
 		eventSlot = e.eventSlot, -- レアダンジョンからの帰還（D-152）
 		pileKey = if e.chestPile then e.chestPile else nil,
 	})
@@ -421,12 +417,11 @@ function Game.offlineStart(state: any): number
 	return math.max(state.lastSavedAt or state.lastAdvancedAt, state.lastAdvancedAt)
 end
 
--- オンライン（ctx.online == true）：帰還 → 自動再派遣を ctx.now に追いつくまで。休息ボーナスはオンラインの経過秒だけ減る
+-- オンライン（ctx.online == true）：帰還 → 自動再派遣を ctx.now に追いつくまで
 -- 帰還・自動再派遣のあとで、日・週の切り替え（クエストの入れ替え・ログインボーナスの前進）とプレイ時間（05章 §3-4）
 local function advanceOnline(state: any, ctx: Ctx, events: { any })
 	local master = ctx.master
 	local t0 = state.lastAdvancedAt
-	local rest = state.restBonusSeconds or 0
 	local take = rngTaker(state)
 	raidArrivals(state, ctx.now, master, events)
 	while true do
@@ -434,9 +429,7 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 		if nextE == nil then
 			break
 		end
-		-- 帰還時刻での休息ボーナスの残り（06章 §14、D-173）
-		local restLeft = rest - math.max(0, nextE.returnAt - t0)
-		collect(state, nextE, master, events, restLeft > 0)
+		collect(state, nextE, master, events)
 		-- クエストの「踏破」はオンライン中の帰還で数える（留守番の探索は数えない：D-153, D-161）
 		-- レアダンジョンの踏破は数え、レイドは数えない（D-191）
 		if nextE.log.result == "clear" and not nextE.offline and not nextE.raidDamage then
@@ -466,7 +459,6 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 			end
 		end
 	end
-	state.restBonusSeconds = math.max(0, rest - math.max(0, ctx.now - t0))
 	Quest.refresh(state, ctx.now, master) -- D-153：日・週が変わったら入れ替える（引き直しなし）
 	Login.advance(state, ctx.now, master, take, events) -- D-155：その日の最初のオンラインの advance で1日分
 	-- プレイ時間：前回の advance からのオンラインの経過秒を足す（D-154。留守番の時間は数えない）
@@ -479,10 +471,6 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 	local K = master.K
 	local start = Game.offlineStart(state)
 	local finish = start + K.offlineMaxSeconds -- 6時間までに最後の探索を帰還させる
-	-- 休息ボーナスを貯める：留守にした時間 × restBonusRate（上限 restBonusMaxSeconds）
-	local away = math.max(0, ctx.now - start)
-	local gained = math.floor(away * K.restBonusRate)
-	state.restBonusSeconds = math.min((state.restBonusSeconds or 0) + gained, K.restBonusMaxSeconds)
 	-- ログアウトの前に出発したレイドのダメージは入れる（結果は出発時に決まる：D-152）。留守中は新しく参加しない（D-161）
 	raidArrivals(state, ctx.now, master, events)
 	-- 商人のところのパーティは、ログアウトの時刻（まだ着いていなければ着いた時刻）に帰り始める（D-274）
@@ -497,7 +485,7 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 		if nextE == nil then
 			break
 		end
-		collect(state, nextE, master, events, false)
+		collect(state, nextE, master, events)
 		-- 自動再派遣のパーティは留守番の探索を続ける。倉庫がいっぱいでも止めない（D-172）
 		local party = state.parties[nextE.partyIndex]
 		if party and party.autoRepeat and state.unlockedDungeons[party.autoRepeat.dungeonId] then
@@ -541,9 +529,9 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 		e.log = log
 		e.returnAt = ctx.now
 		e.interrupted = if part.interrupted then true else nil
-		collect(state, e, master, events, false)
+		collect(state, e, master, events)
 	end
-	state.stats.offlineSecondsTotal = (state.stats.offlineSecondsTotal or 0) + away
+	state.stats.offlineSecondsTotal = (state.stats.offlineSecondsTotal or 0) + math.max(0, ctx.now - start)
 end
 
 function Game.advance(state: any, ctx: Ctx): { any }
@@ -1367,6 +1355,30 @@ handlers.BuyExpansion = function(state, cmd, ctx)
 	}
 end
 
+-- ゴールドでダンジョンを先に解放する（D-279）。前のダンジョンが解放済みのときだけ。踏破の無料解放は collect のまま
+handlers.UnlockDungeon = function(state, cmd, ctx)
+	local d = ctx.master.dungeons[cmd.dungeonId]
+	if not d then
+		return fail("DUNGEON_NOT_FOUND")
+	end
+	if state.unlockedDungeons[d.id] then
+		return fail("DUNGEON_ALREADY_UNLOCKED")
+	end
+	if d.unlockAfterClear == nil or d.unlockGold == nil or not state.unlockedDungeons[d.unlockAfterClear] then
+		return fail("DUNGEON_PREV_LOCKED")
+	end
+	if state.gold < d.unlockGold then
+		return fail("NOT_ENOUGH_GOLD")
+	end
+	state.gold -= d.unlockGold
+	state.unlockedDungeons[d.id] = true
+	bump(state, "goldSpentOnDungeonUnlocks", d.unlockGold)
+	return {
+		ok = true,
+		events = { { type = "DungeonUnlocked", at = ctx.now, dungeonId = d.id, gold = d.unlockGold } },
+	}
+end
+
 handlers.SetAutoSell = function(state, cmd, ctx)
 	local r = tonumber(cmd.maxRarity) or state.settings.autoSell.maxRarity
 	if r < 1 or r > ctx.master.rarityCount then
@@ -1953,10 +1965,6 @@ end
 -- 一覧の並べ方と一括売却の上限（保存がなければ StarterSet.listPrefs の初期値。D-117・D-231 ⑮）
 function Game.query.listPrefs(state: any, master: any): any
 	return ListPrefs.get(state, master)
-end
-
-function Game.query.restBonus(state: any): number
-	return state.restBonusSeconds or 0
 end
 
 -- 今と次のマップイベント（D-152、06章 §12）。全員共通。next は予告の時間に入るまで nil

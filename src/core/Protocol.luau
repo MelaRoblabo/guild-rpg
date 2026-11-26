@@ -62,6 +62,7 @@ Protocol.CLIENT_COMMANDS = {
 	ChangeAppearance = { adventurerUid = str(ID) },
 	ChangeAppearanceChoose = { which = WHICH },
 	BuyExpansion = { expansionId = str(ID) },
+	UnlockDungeon = { dungeonId = str(ID) }, -- D-279。ゴールドでダンジョンを先に解放する
 	SetAutoSell = { enabled = bool(), maxRarity = int(1, 100, true), keepModified = bool(true) },
 	AutoEquip = { partyIndex = int(1, 20), adventurerUid = str(ID, true) }, -- D-120・D-231 ⑨・D-235 ③・D-266
 	-- 設定（D-117・D-237 ③）。送った項目だけ変わる

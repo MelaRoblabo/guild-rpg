@@ -59,6 +59,7 @@ return {
 		jobPotionTargets = { "job_thief", "job_ninja" },
 		modifierPool = { "mod_trapward", "mod_swift" },
 		unlockAfterClear = "dng_graveyard",
+		unlockGold = 1000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_tower",
@@ -86,6 +87,7 @@ return {
 		jobPotionTargets = { "job_mage", "job_sage" },
 		modifierPool = { "mod_healing", "mod_swift" },
 		unlockAfterClear = "dng_ruins",
+		unlockGold = 3000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_castle",
@@ -113,6 +115,7 @@ return {
 		jobPotionTargets = { "job_warrior", "job_knight" },
 		modifierPool = { "mod_exorcism", "mod_trapward" },
 		unlockAfterClear = "dng_tower",
+		unlockGold = 8000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_sunken_temple",
@@ -140,6 +143,7 @@ return {
 		jobPotionTargets = { "job_mage", "job_sage" },
 		modifierPool = { "mod_healing", "mod_exorcism" },
 		unlockAfterClear = "dng_castle",
+		unlockGold = 20000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_mist_forest",
@@ -167,6 +171,7 @@ return {
 		jobPotionTargets = { "job_thief", "job_ninja" },
 		modifierPool = { "mod_swift", "mod_trapward" },
 		unlockAfterClear = "dng_sunken_temple",
+		unlockGold = 50000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_labyrinth",
@@ -195,6 +200,7 @@ return {
 		jobPotionTargets = { "job_warrior", "job_knight" },
 		modifierPool = { "mod_trapward", "mod_swift" },
 		unlockAfterClear = "dng_mist_forest",
+		unlockGold = 120000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_abbey",
@@ -222,6 +228,7 @@ return {
 		jobPotionTargets = { "job_priest", "job_bishop" },
 		modifierPool = { "mod_exorcism", "mod_healing" },
 		unlockAfterClear = "dng_labyrinth",
+		unlockGold = 300000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_iron_fortress",
@@ -249,6 +256,7 @@ return {
 		jobPotionTargets = { "job_warrior", "job_knight" },
 		modifierPool = { "mod_trapward", "mod_swift" },
 		unlockAfterClear = "dng_abbey",
+		unlockGold = 700000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_dragon_nest",
@@ -276,6 +284,7 @@ return {
 		jobPotionTargets = { "job_mage", "job_sage" },
 		modifierPool = { "mod_swift", "mod_healing" },
 		unlockAfterClear = "dng_iron_fortress",
+		unlockGold = 1500000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_demon_gate",
@@ -303,6 +312,7 @@ return {
 		jobPotionTargets = { "job_thief", "job_ninja" },
 		modifierPool = { "mod_healing", "mod_trapward" },
 		unlockAfterClear = "dng_dragon_nest",
+		unlockGold = 3000000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 	{
 		id = "dng_sky_throne",
@@ -330,5 +340,6 @@ return {
 		jobPotionTargets = { "job_priest", "job_bishop" },
 		modifierPool = { "mod_exorcism", "mod_swift" },
 		unlockAfterClear = "dng_demon_gate",
+		unlockGold = 6000000, -- 踏破の前にゴールドで解放する金額（仮。D-279）
 	},
 }

@@ -85,9 +85,9 @@
 勝利時の経験値 = 戦闘報酬の経験値を勝利時点の生存者で等分（端数切り捨て）            -- D-041
   個人倍率 = (1 + rebirthExpBonusPerCount × 転生回数) × (1 + min(経験値補正, expBonusCap))
   経験値補正 = 大食らい 0.25 ＋ 装備の経験値補正の合計                                     -- D-082
-  休息ボーナス：帰還時に残りがあれば、さらに × restBonusExpMult（修練の護符と重ねて効く。expBonusCap の外）   -- §14、D-161, D-173
-  日替わりの特性 expMult：出発時に当たっていれば × value（休息ボーナスと掛け合わせる。expBonusCap の外）       -- §16、D-156, D-173
-  個人倍率（全体）= (1 + rebirthExpBonusPerCount × 転生回数) × (1 + min(経験値補正, expBonusCap)) × 休息ボーナス × 日替わり
+  日替わりの特性 expMult：出発時に当たっていれば × value（修練の護符と重ねて効く。expBonusCap の外）            -- §16、D-156, D-173
+  個人倍率（全体）= (1 + rebirthExpBonusPerCount × 転生回数) × (1 + min(経験値補正, expBonusCap)) × 日替わり
+  留守番の探索（offline）は冒険者の経験値を得ない（ゴールド・宝箱・ギルド経験値は入る）                         -- §13、D-280
   装備の経験値補正 = expPct × equipRarityMult[rarity] × (1 + equipGradeCoef × grade)       -- アイテムレベルでは伸びない
 必要経験値(Lv→Lv+1) = floor(100 × Lv^1.5 × expCycleMult[転生回数+1])   -- D-071
 レベルアップ時の成長(各項目) = max(0, 職業の基準値 + rng:int(−growthVariance, +growthVariance))   -- D-043
@@ -99,7 +99,7 @@
 
 ```
 1回の費用   = floor(trainGoldCoef × Lv ^ trainGoldExponent)          -- Lv は行う時点のレベル
-1回の経験値 = trainingFacility[トレーニング場のレベル].expPerSession -- 倍率（転生・ギフト・装備・休息ボーナス：D-173）は掛けない
+1回の経験値 = trainingFacility[トレーニング場のレベル].expPerSession -- 倍率（転生・ギフト・装備：D-173）は掛けない
 上げられる上限 = min(本人の levelCap, trainingFacility[...].levelCap)
 上限に達したら余った経験値は捨てる。ゴールドが1回の費用に足りなくなったら止める
 ```
@@ -195,7 +195,7 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
 ```
 
 - サーバーが落ちたとき、最後の定期保存から落ちるまでのオンラインの進み具合は失われ、その時間は次のログインで留守として計算される（二重にはならない）。これを仕様として受け入れる（D-193）。
-- 留守番の探索には `offline = true` の印を付け、クエストに数えない・休息ボーナスを使わない。
+- 留守番の探索には `offline = true` の印を付け、クエストに数えない。冒険者の経験値は得ない（ゴールド・宝箱・ギルド経験値は入る。D-280）。オンラインで出発して留守中に帰った探索は普通に経験値を得る。
 - 6時間より前にログインしたら、帰っていない留守番の探索はログインの時点で帰還させる。留守中は倉庫がいっぱいでも止めない（D-172）。
 - 途中ログインで持ち帰るもの（D-186）：
 
@@ -210,19 +210,9 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
 - 日替わりの特性は出発した日（出発時刻の dayIndex）の特性を当てる（§16）。
 - ログイン時の計算量の目安：5パーティで約70回分。
 
-## 14. 休息ボーナス（D-161, D-173, D-193）
+## 14. 休息ボーナス（廃止）
 
-```
-たまる量 = floor((ログイン時刻 − 留守の始まり) × restBonusRate)          -- 留守にした時間の半分。留守の始まりは §13（max(lastSavedAt, lastAdvancedAt)：D-193）
-restBonusSeconds = min(restBonusSeconds + たまる量, restBonusMaxSeconds)   -- 上限4時間
-消費     = オンラインの advance で、経過秒だけ restBonusSeconds を減らす（0 未満にしない。探索しているかは問わない）
-効き方   = オンライン中に帰還した探索（offline でない）の経験値に、帰還時に残りが 0 より大きければ × restBonusExpMult
-重ね方   = 修練の護符（装備の経験値補正、D-082）・日替わりの expMult と掛け合わせる。expBonusCap（+100%）の外で掛ける
-           (1 + min(経験値補正, expBonusCap)) × restBonusExpMult × (日替わりの expMult)
-トレーニングの経験値には掛けない（§8b）
-```
-
-倍率・たまる速さは D-161 の「留守の半分・上限4時間・2倍」のまま（M7b-6 の自動プレイで暦日数の目標に届いたので変えていない）。
+D-280 で廃止した（留守番の探索は経験値を得ない。セーブの `restBonusSeconds` とマスターデータの `restBonus*` を消した）。節の番号は他の章から参照されているので残す。
 
 ## 15. クエストの量（D-153）
 

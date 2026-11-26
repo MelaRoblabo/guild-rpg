@@ -59,7 +59,7 @@ export type Expedition = {
 	returnAt: number,
 	log: ExpeditionLog,               -- 07章。出発時に確定し変更しない
 	collected: boolean,
-	offline: boolean?,                -- 留守番の探索（D-161）。クエストに数えない・休息ボーナスを使わない。M7b-3（version 7）で追加
+	offline: boolean?,                -- 留守番の探索（D-161）。クエストに数えない・冒険者の経験値を得ない（D-280）。M7b-3（version 7）で追加
 	dailyTraitId: string?,            -- 出発時に当たっていた日替わりの特性（D-156）。留守番も出発した日の特性。M7b-3（version 7）で追加
 	eventSlot: number?,               -- マップイベントへの派遣なら、そのイベントの時間帯の番号（D-152、06章 §12）
 	raidDamage: number?,              -- レイドへの派遣なら、出発時に計算したダメージ（到着時刻に入れる。D-152）
@@ -155,7 +155,6 @@ export type PlayerState = {
 	-- ここから M7b-3 以降の段階で追加（D-152〜D-168。段階ごとに version を上げる：下の「セーブの移行」）
 	lastSavedAt: number,              -- 最後に保存した時刻（ふつうはログアウト時刻）。サーバーが保存のときに ctx.now を書く（11章）。version 7
 	                                  -- 留守の始まりは max(lastSavedAt, lastAdvancedAt)（D-161, D-193、06章 §13）
-	restBonusSeconds: number,         -- 休息ボーナスの残り秒（D-161。上限 restBonusMaxSeconds）。version 7
 	quests: {                         -- D-153。version 8
 		daily: { dayIndex: number, entries: { QuestEntry }, bonusDone: boolean },
 		weekly: { weekIndex: number, entries: { QuestEntry }, bonusDone: boolean },
@@ -229,7 +228,7 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 | `restBonusSeconds` | 0 | D-161 |
 | `expeditions[*]` | `offline`・`dailyTraitId` は nil のまま（旧版の探索は普通の探索で、日替わりの特性なし） | D-161, D-156 |
 
-新規のセーブは `lastSavedAt = 作成時刻`、`restBonusSeconds = 0` を持つ。
+新規のセーブは `lastSavedAt = 作成時刻`、`restBonusSeconds = 0` を持つ（`restBonusSeconds` は version 13 で消した：D-280）。
 
 ### version 7 → 8（M7b-4 前半）　`Migration.CURRENT = 8`
 
@@ -280,7 +279,15 @@ D-152〜D-168 で足す状態は、まとめて1つの版にせず、**M7b の�
 
 新規のセーブは nil（最初の派遣で書く）。
 
-### version 12 → 13 以降
+### version 12 → 13（D-280）　`Migration.CURRENT = 13`
+
+| 項目 | 旧版からの変換 | 根拠 |
+| --- | --- | --- |
+| `restBonusSeconds` | 消す（休息ボーナスの廃止） | D-280 |
+
+新規のセーブは `restBonusSeconds` を持たない。
+
+### version 13 → 14 以降
 
 まだ足していない項目は今はない。次の段階で状態を足すときは、ここに表（項目・旧版からの変換・根拠・足す段階）を作ってから version を上げ、足した段階でこの表を「version n → n+1」の節に移す。
 

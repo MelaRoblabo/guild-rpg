@@ -8,7 +8,7 @@ local ExclusiveGift = require("./ExclusiveGift")
 
 local Migration = {}
 
-Migration.CURRENT = 12
+Migration.CURRENT = 13
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -173,6 +173,11 @@ local STEPS: { [number]: (any, any) -> () } = {
 			end
 		end
 		state.version = 12
+	end,
+	-- v12 → v13（D-280）：休息ボーナスを廃止。restBonusSeconds を消す
+	[12] = function(state)
+		state.restBonusSeconds = nil
+		state.version = 13
 	end,
 }
 

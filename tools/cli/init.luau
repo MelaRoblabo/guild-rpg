@@ -142,11 +142,7 @@ local function handle(tokens: { string }): (boolean, any)
 			for _, e in Game.advance(save.state, ctx(false)) do
 				table.insert(events, e)
 			end
-			say(
-				`ログインしました（{Text.clock(save)}）。休息ボーナス 残り {Game.query.restBonus(
-					save.state
-				)} 秒`
-			)
+			say(`ログインしました（{Text.clock(save)}）`)
 			return true, events
 		elseif not (c == "status" or c == "daily" or c == "event" or c == "help" or c == nil) then
 			-- 表示（status・daily・event・help）だけは許す。留守中はイベントに参加できない（D-161）

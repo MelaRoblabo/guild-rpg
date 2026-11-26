@@ -71,6 +71,7 @@ for i, t in Templates do
 		jobPotionTargets = t.jobPotionTargets,
 		modifierPool = t.modifierPool,
 		unlockAfterClear = if i > 1 then Templates[i - 1].id else nil,
+		unlockGold = t.unlockGold, -- D-279
 	}
 end
 
@@ -273,6 +274,10 @@ for _, r in lines do
 	table.insert(out, `\t\tmodifierPool = {list(r.modifierPool)},`)
 	if r.unlockAfterClear then
 		table.insert(out, `\t\tunlockAfterClear = "{r.unlockAfterClear}",`)
+		table.insert(
+			out,
+			`\t\tunlockGold = {r.unlockGold}, -- 踏破の前にゴールドで解放する金額（仮。D-279）`
+		)
 	end
 	table.insert(out, "\t},")
 end

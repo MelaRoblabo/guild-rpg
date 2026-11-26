@@ -288,6 +288,8 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 
 	-- 雇用
 	c:integer(p .. ".hireCost", k.hireCost, 0)
+	c:integer(p .. ".hireTotalGreat", k.hireTotalGreat, 1) -- D-283
+	c:integer(p .. ".hireTotalAmazing", k.hireTotalAmazing, k.hireTotalGreat or 1)
 	for _, s in Types.STAT_KEYS do
 		local r = if type(k.hireStatRange) == "table" then k.hireStatRange[s] else nil
 		c:range(`{p}.hireStatRange.{s}`, r) -- D-081：ギルドレベルでは変わらない
@@ -341,12 +343,9 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	c:number(p .. ".equipGradeCoef", k.equipGradeCoef, 0)
 	c:number(p .. ".equipTierMult", k.equipTierMult, 1)
 
-	-- 留守番・休息ボーナス（D-161）
+	-- 留守番（D-161。休息ボーナスは D-280 で廃止）
 	c:number(p .. ".offlineTimeMult", k.offlineTimeMult, 1)
 	c:integer(p .. ".offlineMaxSeconds", k.offlineMaxSeconds, 1)
-	c:number(p .. ".restBonusRate", k.restBonusRate, 0)
-	c:integer(p .. ".restBonusMaxSeconds", k.restBonusMaxSeconds, 0)
-	c:number(p .. ".restBonusExpMult", k.restBonusExpMult, 1)
 	c:number(p .. ".cutInSeconds", k.cutInSeconds, 0) -- D-238 ③
 	c:number(p .. ".returnToastSeconds", k.returnToastSeconds, 0)
 	c:number(p .. ".returnToastGroupSeconds", k.returnToastGroupSeconds, 0)
@@ -791,6 +790,7 @@ local function validateContent(c: Checker, d: any)
 			end
 			if g.unlockAfterClear ~= nil then
 				c:ref(p .. ".unlockAfterClear", g.unlockAfterClear, dungeonIds)
+				c:integer(p .. ".unlockGold", g.unlockGold, 1) -- D-279：ゴールドで先に解放する金額
 			end
 		end
 	end

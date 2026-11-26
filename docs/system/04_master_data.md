@@ -82,6 +82,7 @@
 | `trainGoldCoef` / `trainGoldExponent` | 10 / 2（1回 = 10 × Lv²、仮） | D-076 |
 | `trainingFacility` | Lv1〜5：上限 Lv10/20/30/40/50、1回の経験値 430/820/1200/1630/2060（仮） | D-077 |
 | `hireCost` | 300G（仮） | Q-006 |
+| `hireTotalGreat` / `hireTotalAmazing` | 110 / 130（面接の Total＝HP を除く4項目の合計の特別な演出の線。見せ方だけ。仮） | D-283 |
 | `hireStatRange` | 4項目 1〜40、HP 20〜80。ギルドの成長に関係なく一定（仮） | Q-006, D-081, D-086 |
 | `hireFreeRerolls` | 3（初回を含まない、仮） | Q-006 |
 | `specialVisitorChance` | 0.005（仮） | 02章 |
@@ -102,8 +103,7 @@
 | `chestEffectRate` | 0.10〜0.15（開封演出が入る割合の基準。普通のダンジョンだけ） | D-090, D-166 |
 | `offlineTimeMult` | 10（留守番の探索1回の時間の倍率） | D-161 |
 | `offlineMaxSeconds` | 21600（1回の留守で6時間まで。拡張しない） | D-161 |
-| `restBonusRate` / `restBonusMaxSeconds` | 0.5（留守の半分）/ 14400（4時間）（D-161。M7b-6 の自動プレイで変えていない） | D-161 |
-| `restBonusExpMult` | 2（D-161。M7b-6 の自動プレイで変えていない） | D-161 |
+| （休息ボーナス） | なし（旧 `restBonusRate`・`restBonusMaxSeconds`・`restBonusExpMult` は廃止） | D-280 |
 | `pinchHpRatio` | 0.3（ピンチの印：探索の今の時点で、メンバーの HP の合計／最大 HP の合計がこれより低い。見るための印で結果は変えない。仮） | D-212, D-229 |
 | `statGoodRatio` | 0.75（能力の「良い値」の演出の線。雇用は範囲、転生は加算分の上限に対する割合。見せ方だけ） | D-220, D-224 |
 | `rebirthGreatRatio` | 0.9（転生の加算分の特別な演出の線。上限に対する割合） | D-224, 07章 |
@@ -147,6 +147,7 @@
 - 数値を変えたいときは、テンプレートの目標値か段階の想定を変えて `lune run tools/sim/calibrate` を再実行する。
 - 宝箱のレアリティの出現率 `chestRarityWeights`（D-085）もテンプレートに書き、calibrate がそのまま写す（%、[1]=コモン…）。2本の演出ライン `chestEffectMinRarity`・`rareChestEffectMinRarity` も同じ（D-188）。
 - 報酬のゴールドの基準額 `rewardGoldBase`（整数。全ダンジョン必須）もテンプレートに書き、calibrate がそのまま写す（D-198。以前は `Constants.rewardGoldBase` の辞書。Constants に残すと検証で止める）。報酬のゴールド = floor(踏破した一番深いダンジョンの rewardGoldBase × 報酬ごとの係数)（06章 §22、D-190, D-187）。仮（M7b-6）：各ダンジョンの `battleReward.gold` に比例させ古い墓地 100 〜 天空の玉座 5960。
+- ゴールドで先に解放する金額 `unlockGold`（整数。`unlockAfterClear` のあるダンジョン＝2番目以降は必須）もテンプレートに書き、calibrate がそのまま写す（D-279。金額は仮）。
 
 | ダンジョン | コモン | アンコモン | レア | エピック | レジェンド | ミシック | 演出ライン | 演出率 | レアダンジョンの演出ライン | 演出率 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

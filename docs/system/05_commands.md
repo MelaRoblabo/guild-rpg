@@ -41,6 +41,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M4 | `ChangeAppearance` | adventurerUid | 見た目変更ポーションで抽選 | NO_POTION, UNIQUE_CANNOT_CHANGE | 07章 |
 | M4 | `ChangeAppearanceChoose` | "previous" / "current" | 見た目を選ぶ（どちらでも1個消費） | — | 07章 |
 | M5 | `BuyExpansion` | expansionId | 拡張を購入（パーティ枠・雇用候補枠・所属枠・倉庫・トレーニング場） | NOT_ENOUGH_GOLD, GUILD_LEVEL_TOO_LOW, DUNGEON_NOT_CLEARED | 08章, D-075, D-077 |
+| M8 | `UnlockDungeon` | dungeonId | ゴールドでダンジョンを先に解放する（前のダンジョンが解放済みのとき。金額は unlockGold）。踏破での無料解放はそのまま | DUNGEON_NOT_FOUND, DUNGEON_ALREADY_UNLOCKED, DUNGEON_PREV_LOCKED, NOT_ENOUGH_GOLD | D-279 |
 | M5 | `SetAutoSell` | enabled, maxRarity, keepModified? | 自動売却の設定（初期値はオン：D-167） | — | 06章, D-167 |
 | M8 | `AutoEquip` | partyIndex, adventurerUid? | adventurerUid を渡すとそのパーティのその人の分だけ（パーティに入れた瞬間：D-266）。自動装備（06章 §24）：隊列1番から順に、倉庫の品と本人の今の装備から、武器は攻撃力補正、防具は最後の行き先の攻撃の種類の割合で重み付けした防御が一番高いものに付け替える。補助・修飾語は見ない。他の冒険者が付けている品は使わない。前の装備は倉庫へ。提案は `Game.query.autoEquipPlan`（同じ計算）。結果は `AutoEquipped`（partyIndex・changes） | PARTY_NOT_FOUND, PARTY_BUSY, ADVENTURER_NOT_IN_PARTY, NOTHING_TO_CHANGE | D-120, D-231 ⑨, D-235 ③, D-266 |
 | M8 | `SetSettings` | musicVolume?, soundVolume?（0〜volumeSteps）, chestAnimation?, lessFlashing?, returnToast?, cutIns?, otherCarts? | 設定（S-61）を `settings.prefs` に保存する。送った項目だけ変わる。保存がなければ `StarterSet.preferences` の初期値。`Game.query.preferences` で読む。イベントなし | INVALID_VOLUME | D-117, D-145, D-237 ③ |
@@ -72,10 +73,9 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
    - 留守の始まり＝`max(state.lastSavedAt, state.lastAdvancedAt)`（`Game.offlineStart`。D-193）。ログアウト時に出ていた探索はふつうに帰還させる。サーバーが落ちて失われたオンラインの進み具合（最後の定期保存から落ちるまで）は、次のログインで留守として計算される（二重にはならない。D-193）。
    - 自動再派遣のパーティは、帰還時刻から留守番の探索（時間 × `offlineTimeMult`、`offline = true`）を続ける。帰還時刻が `留守の始まり + offlineMaxSeconds` を超える探索は出さない（6時間までに全員帰還して終わる）。留守中は倉庫がいっぱいでも止めない（D-172）。
    - 6時間より前にログインしたときは、まだ帰っていない留守番の探索をログインの時点（`ctx.now`）で帰還させる。持ち帰るのは、探索ログの時間の流れに沿ってその時点までに終わったフロアの分の経験値・ゴールド・宝箱・アイテムだけ（その時点で撤退したのと同じ。踏破していなければ確定宝箱など踏破の報酬は出さない。全フロアを終えて帰りの移動中ならログのとおり全部）。戻ったときは全員ギルドで待機（D-172, D-186）。
-   - 休息ボーナスを貯める（06章 §14）。
    - 留守中にしないこと：マップイベント・商人・雇用・転生・トレーニング・プレイ時間報酬・クエストの数え上げ（D-161）。
    - 同じ留守を二重に計算しない（留守の始まりを最後に時間を進めた時刻より前にしない）。`lastSavedAt` の書き込みとセッションロックはサーバー側（11章、M7b-5）。
-4. `ctx.online == true` のときは、1〜2 のあとで、日・週の切り替え（06章 §11）を見て、クエストの入れ替え・ログインボーナスの前進（その日の最初のオンラインの advance で1日分）・プレイ時間のリセットを行う（D-153〜D-155, D-168）。プレイ時間は前回のオンラインの advance からの経過秒を足し（ログイン直後の最初の advance は足さない）、段階に届いたら報酬を受け取り箱へ（D-154）。休息ボーナスの残りはオンラインの経過秒だけ減らす（探索しているかは問わない。06章 §14、D-173）。
+4. `ctx.online == true` のときは、1〜2 のあとで、日・週の切り替え（06章 §11）を見て、クエストの入れ替え・ログインボーナスの前進（その日の最初のオンラインの advance で1日分）・プレイ時間のリセットを行う（D-153〜D-155, D-168）。プレイ時間は前回のオンラインの advance からの経過秒を足し（ログイン直後の最初の advance は足さない）、段階に届いたら報酬を受け取り箱へ（D-154）。
 
 ## 3a. 届け物（サーバーの呼び口：D-180）
 
