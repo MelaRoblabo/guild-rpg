@@ -11,6 +11,7 @@ local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local Art = require("../ui/Art")
 local HubState = require("../hub/HubState")
+local Motion = require("../ui/Motion")
 local Portrait = require("../ui/Portrait")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
@@ -46,6 +47,7 @@ local rows: { [number]: { button: TextButton, glyph: TextLabel, pinch: Frame, ri
 local markers: { [string]: TextButton } = {}
 local goldText: TextLabel
 local chestCount: TextLabel
+local lastChestTotal: number? = nil -- 前に見た宝箱の数（増えたら馬車から宝箱が飛ぶ：D-268 ①）
 local chestNotice: Frame
 local chestButton: Frame
 local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 ②）
@@ -628,7 +630,25 @@ local function refreshStatic(view: any)
 	for _, c in view.chests or {} do
 		total += c.count
 	end
-	chestCount.Text = tostring(total)
+	-- 宝箱が増えたら（帰還など）、ギルドから宝箱が1つずつ宝箱ボタンへ飛び、数字が弾んで増える（D-268 ①・D-214 ⑨）
+	if lastChestTotal ~= nil and total > lastChestTotal and Nav.depth() == 0 and HubState.guildNode then
+		local from = lastChestTotal
+		local n = math.min(total - from, 6)
+		for k = 1, n do
+			Motion.fly({
+				from = HubState.guildNode :: GuiObject,
+				to = chestButton,
+				icon = "@chest",
+				size = 56,
+				endSize = 36,
+				delay = (k - 1) * 0.12,
+			})
+		end
+		Motion.countUp(chestCount, from, total, { duration = 0.55 + (n - 1) * 0.12, float = false })
+	else
+		chestCount.Text = tostring(total)
+	end
+	lastChestTotal = total
 	-- 宝箱が0個のときは茶、あるときだけ金（D-250 ②。押せるのは同じ）
 	local kind = if total > 0 then "gold" else "brown"
 	if chestButton:GetAttribute("Kind") ~= kind then
@@ -779,6 +799,7 @@ function Hub.mount()
 	ReturnToast.mount() -- 帰還のトースト（11章 §5、M8-6）
 	LoginSequence.mount() -- ログイン時のまとめ・カットイン・カレンダー（D-132・D-208、M8-6）
 	Guide.mount() -- 初回の誘導（D-244 ①）
+	Art.preloadChests() -- 開封の演出の箱の絵を先に読み込む（D-267）
 	Session.changed:connect(function(view)
 		refreshStatic(view)
 		refreshMoving(view)
@@ -803,6 +824,7 @@ require("./hire/HireReroll")
 require("./hire/HireDone")
 require("./chest/ChestList")
 require("./chest/ChestOpening")
+require("./chest/ChestFeature")
 require("./chest/ChestReveal")
 require("./chest/ChestResults")
 require("./rebirth/RebirthRitual")

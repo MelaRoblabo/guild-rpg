@@ -145,6 +145,7 @@ export type Batch = {
 	stoppedBy: string?, -- "WAREHOUSE_FULL"
 	plan: { Upgrades.Upgrade }, -- 開けた直後に計算した「誰が強くなるか」（装備する前の比べる値で見せる）
 	upgradeItems: number, -- 誰かが強くなる品の数
+	first: boolean?, -- 初めての開封（演出はフル：D-267 ④）
 }
 
 -- 山ごとに OpenChests を送り、1つの束にまとめる。1つも開けられなければ nil

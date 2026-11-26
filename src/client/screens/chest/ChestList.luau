@@ -104,13 +104,48 @@ local function pileRow(
 	open.AnchorPoint = Vector2.new(1, 0.5)
 	open.Position = UDim2.new(1, -6, 0.5, 0)
 	open.Parent = row
-	local pill = countPill(I.chest, count)
-	pill.AnchorPoint = Vector2.new(1, 0.5)
-	pill.Position = UDim2.new(1, -(6 + OPEN_W + 12), 0.5, 0)
-	pill.Parent = row
+	-- 閉じた箱の絵を積んだ形（数に応じて1〜3個）と、上に数の札（D-268 ②）。
+	-- 箱はレアリティを表さないふつうの宝箱のアイコン（開けるまでレアリティは見せない：D-087）
+	local stack: Frame = new("Frame", {
+		Name = "Stack",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -(6 + OPEN_W + 12), 0.5, 0),
+		Size = UDim2.fromOffset(100, 70),
+		BackgroundTransparency = 1,
+		Parent = row,
+	})
+	local boxes = if count >= 10 then 3 elseif count >= 2 then 2 else 1
+	for k = 1, boxes do
+		local b = Components.text({ text = I.chest, size = 34, color = C.bronzeHi, font = Tokens.font.number })
+		b.Name = "Box" .. k
+		b.AutomaticSize = Enum.AutomaticSize.None
+		b.AnchorPoint = Vector2.new(0.5, 1)
+		b.Size = UDim2.fromOffset(38, 38)
+		b.Position = UDim2.new(1, -19 - (k - 1) * 20, 1, -4) -- 右寄せ（名前と重ならないように）
+		b.ZIndex = 3 + k
+		b.Parent = stack
+	end
+	local badge = Components.text({
+		text = "×" .. HubState.formatNumber(count),
+		size = 21,
+		color = C.inkLight,
+		font = Tokens.font.number,
+		stroke = true,
+	})
+	badge.Name = "Count"
+	badge.AnchorPoint = Vector2.new(1, 0)
+	badge.Position = UDim2.new(1, 0, 0, -2)
+	badge.ZIndex = 8
+	badge.Parent = stack
+	-- 特別な宝箱はアイコン＋語（「@login」の記号を文字のまま出していたのを直す）
+	local word = info.name
+	if info.special and word == "" then
+		local key = string.match(info.pileKey, "^special:(%w+)") or ""
+		word = ChestCommon.sourceWord[key] or ""
+	end
 	local name = Components.text({
-		text = (if info.special then info.icon .. "  " else "") .. info.name,
-		size = if info.special then 21 else 25,
+		text = "",
+		size = if info.special then 23 else 25,
 		color = C.inkLight,
 		font = Tokens.font.display,
 		xAlign = Enum.TextXAlignment.Left,
@@ -120,6 +155,11 @@ local function pileRow(
 	name.Position = UDim2.new(0, 16, 0.5, 0)
 	name.Size = UDim2.new(1, -(16 + 6 + OPEN_W + 12 + 110), 0, 40)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
+	if info.special then
+		Components.setParts(name, { info.icon, word })
+	else
+		name.Text = word
+	end
 	name.Parent = row
 	return row
 end
@@ -147,11 +187,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if busy or #piles == 0 then
 			return
 		end
+		-- 初めての開封か（誘導の Open All の段がまだ済んでいない）。初回は設定にかかわらず演出をフルで見せる（D-267 ④）
+		local first = Guide.is("chests") or Guide.is("openAll")
 		Guide.done("openAll") -- 初回の誘導：開けた（Open All でも山ごとでも）
 		busy = true
 		local batch = ChestCommon.open(piles, all)
 		busy = false
 		if batch then
+			batch.first = first
 			api.open("ChestOpening", { batch = batch })
 		else
 			render()

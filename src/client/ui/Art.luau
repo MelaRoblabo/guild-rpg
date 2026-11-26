@@ -77,6 +77,20 @@ function Art.chest(rank: number?, open: boolean?): string?
 	return if open then c.open else c.closed
 end
 
+-- 開封の演出で使う宝箱の絵（閉じた・開いた）を先に読み込む（初めて使うときに間に合わず、何も映らないため：D-267）
+function Art.preloadChests()
+	local list = {}
+	for _, c in (images.chests or {}) :: { any } do
+		table.insert(list, c.closed)
+		table.insert(list, c.open)
+	end
+	task.spawn(function()
+		pcall(function()
+			game:GetService("ContentProvider"):PreloadAsync(list)
+		end)
+	end)
+end
+
 export type PutOptions = {
 	inset: number?, -- 枠の内側の余白（px）
 	scaleType: Enum.ScaleType?, -- 既定は Fit（背景は Crop）

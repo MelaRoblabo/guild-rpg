@@ -4,6 +4,9 @@
 --   - 演出つきの宝箱は右の取り置きの列へ（開けるまでレアリティは見せない：D-087）。
 --   - 終わったら、演出つきがあれば明かす画面（S-31c・d）へ、なければ結果（S-31b+e）へ。
 --   - 本番の演出（先読み・保留変化など）は M8-FX（D-140〜D-147）。ここは仮の短い動き。
+--   - 開けた品は受け皿の行き先へ飛ぶ：装備は To Warehouse、自動売却はコインになって Auto-sold、ゴールドは Gold（D-268 ③）。
+--     受け皿の数には語を付ける（D-264 ②）。自動売却が起きたら、この接続で一度だけ「Auto Sell is ON」の吹き出し。
+--   - 終わったら、演出つきがあれば明かす画面（S-31c・d）、なければ一番良い箱の演出（ChestFeature：D-267）を通って結果へ。
 
 local UserInputService = game:GetService("UserInputService")
 
@@ -12,6 +15,7 @@ local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Art = require("../../ui/Art")
 local HubState = require("../../hub/HubState")
+local Motion = require("../../ui/Motion")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Screen = require("../Screen")
@@ -27,23 +31,32 @@ local PER_CHEST = 0.05 -- 1箱あたりの秒
 local MAX_TOTAL = 2.5 -- 全部を開ける秒の上限
 local HOLD_SKIP = 0.6 -- 長押しで飛ばすまでの秒
 local CELLS = 40 -- 箱の列に並べる数
+local MAX_FLIES = 14 -- 受け皿へ飛ばす数の上限（多いときは間引く）
+
+local autoSellHinted = false -- 「Auto Sell is ON」はこの接続で一度だけ
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local batch: ChestCommon.Batch = (params :: any).batch
 	local band = Root.bandBottom()
 	local frame = Screen.scene("ChestOpening")
 
+	local finished = false
 	local function finish()
+		if finished then
+			return
+		end
+		finished = true
 		if #batch.special > 0 then
 			api.replace("ChestReveal", { batch = batch, index = 1 })
 		else
-			api.replace("ChestResults", { batch = batch })
+			-- 演出つきがなくても、一番良い箱を必ず1つ演出する（D-267 ①）
+			api.replace("ChestFeature", { batch = batch })
 		end
 	end
 
 	-- 進んでいる間の × は薄く（介入しない。押すと最後まで飛ばす）
 	local close = Screen.closeTopRight(frame, function()
-		api.replace("ChestResults", { batch = batch })
+		finish() -- 残りを飛ばしても、演出の1箱は見せる（D-267 ①）
 	end)
 	close.BackgroundTransparency = 0.5
 
@@ -187,10 +200,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		end
 		return label :: TextLabel
 	end
-	local itemsText = trayChip(I.sword, C.bronzeHi, 1)
+	local itemsText = trayChip(I.warehouse, C.bronzeHi, 1)
 	local soldText = trayChip(I.recycle, C.bronzeHi, 2)
 	local goldText = trayChip(I.gold, C.coinGold, 3)
 	goldText.TextColor3 = C.numHi
+	itemsText.Text = "To Warehouse 0"
+	soldText.Text = "Auto-sold 0"
+	goldText.Text = "Gold +0"
+	local itemsChip = itemsText.Parent :: GuiObject
+	local soldChip = soldText.Parent :: GuiObject
+	local goldChip = goldText.Parent :: GuiObject
 
 	-- 触ると速まる・長押しで飛ばす（D-218 ④）
 	local speed = 1
@@ -230,6 +249,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	task.spawn(function()
 		local step = math.min(PER_CHEST, MAX_TOTAL / math.max(1, #all))
 		local items, sold, gold = 0, 0, 0
+		local flyEvery = math.max(1, math.ceil(#all / MAX_FLIES))
 		for k, r in all do
 			if not alive then
 				return
@@ -258,15 +278,29 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					end
 				end
 			end
-			itemsText.Text = HubState.formatNumber(items)
-			soldText.Text = HubState.formatNumber(sold)
-			goldText.Text = "+" .. HubState.formatNumber(gold)
+			itemsText.Text = "To Warehouse " .. HubState.formatNumber(items)
+			soldText.Text = "Auto-sold " .. HubState.formatNumber(sold)
+			goldText.Text = "Gold +" .. HubState.formatNumber(gold)
+			-- 開けた品が行き先へ飛ぶ（D-268 ③）。演出つきは右の取り置きへ行くので飛ばさない
+			if cell and not skip and not r.effect and (k - 1) % flyEvery == 0 then
+				local target, icon = goldChip, I.gold
+				if #(r.equipmentUids or {}) > 0 then
+					target, icon = itemsChip, I.sword
+				elseif r.autoSold and #r.autoSold > 0 then
+					target, icon = soldChip, I.gold -- 自動売却はコインになる
+				end
+				Motion.fly({ from = cell, to = target, icon = icon, size = 44, endSize = 28, duration = 0.35 })
+			end
 			progressFill.Size = UDim2.new(k / #all, -4, 1, -4)
 			if not skip then
 				task.wait(step / speed)
 			end
 		end
-		task.wait(if skip then 0.1 else 0.4 / speed)
+		if sold > 0 and not autoSellHinted and alive then
+			autoSellHinted = true
+			Motion.reason(soldChip, "Auto Sell is ON") -- 自動売却の意味を一度だけ（D-268 ③）
+		end
+		task.wait(if skip then 0.1 else 0.6 / speed)
 		if alive then
 			finish()
 		end
