@@ -697,6 +697,81 @@ function Components.button(p: ButtonProps): Frame
 	return holder
 end
 
+export type SwitchProps = {
+	on: boolean,
+	width: number,
+	label: string,
+	name: string?,
+	onClick: (() -> ())?,
+}
+
+-- オン／オフのスイッチ（形で分かる：D-269 ②）。茶のボタンの中に語と、つまみが左右に動く溝。
+-- オンは溝が緑でつまみが右、オフは暗い溝でつまみが左
+function Components.switchButton(p: SwitchProps): Frame
+	local h = Tokens.size.tapMin
+	local holder: Frame = new("Frame", {
+		Name = p.name or "Switch",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(p.width, h + Tokens.spacing.lipSecondary),
+	})
+	new("Frame", {
+		Name = "Lip",
+		Position = UDim2.fromOffset(0, Tokens.spacing.lipSecondary),
+		Size = UDim2.fromOffset(p.width, h),
+		BackgroundColor3 = C.ch13,
+		[CHILDREN] = { Components.corner(h / 2) },
+		Parent = holder,
+	})
+	local face: TextButton = new("TextButton", {
+		Name = "Face",
+		Text = "",
+		AutoButtonColor = false,
+		Size = UDim2.fromOffset(p.width, h),
+		BackgroundColor3 = C.ch28,
+		ZIndex = 2,
+		[CHILDREN] = { Components.corner(h / 2), Components.stroke(C.bronze, Tokens.spacing.rim) },
+		Parent = holder,
+	})
+	local word =
+		Components.text({ text = p.label, size = Tokens.text.caption, color = C.inkLight, font = Tokens.font.display })
+	word.AnchorPoint = Vector2.new(0, 0.5)
+	word.Position = UDim2.new(0, 20, 0.5, 0)
+	word.ZIndex = 3
+	word.Parent = face
+	local track: Frame = new("Frame", {
+		Name = "Track",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -16, 0.5, 0),
+		Size = UDim2.fromOffset(56, 30),
+		BackgroundColor3 = if p.on then C.okGreen else C.ch13,
+		ZIndex = 3,
+		[CHILDREN] = { Components.corner(15), Components.stroke(C.ch16, 2) },
+		Parent = face,
+	})
+	new("Frame", {
+		Name = "Knob",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(if p.on then 1 else 0, if p.on then -15 else 15, 0.5, 0),
+		Size = UDim2.fromOffset(24, 24),
+		BackgroundColor3 = C.inkWhite,
+		ZIndex = 4,
+		[CHILDREN] = { Components.corner(12) },
+		Parent = track,
+	})
+	face.MouseButton1Down:Connect(function()
+		face.Position = UDim2.fromOffset(0, Tokens.spacing.lipSecondary - 1)
+	end)
+	local function up()
+		face.Position = UDim2.fromOffset(0, 0)
+	end
+	face.MouseButton1Up:Connect(up)
+	face.MouseLeave:Connect(up)
+	if p.onClick then
+		face.Activated:Connect(p.onClick)
+	end
+	return holder
+end
+
 -- 閉じる ×（右上。重ねた面なら面の右上の角、画面いっぱいなら帯のすぐ下：D-222）
 function Components.closeButton(onClick: () -> ()): TextButton
 	local size = Tokens.size.closeSize

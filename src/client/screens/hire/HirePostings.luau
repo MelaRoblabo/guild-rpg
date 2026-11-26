@@ -90,6 +90,34 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 		if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
 		if job then job.nameEn else "",
 	})
+	-- 黄色い票（特別な訪問者）には「Unique」の帯（D-269 ④。色だけでは分からなかった）
+	if unique then
+		local band: Frame = new("Frame", {
+			Name = "UniqueBand",
+			LayoutOrder = 0,
+			Size = UDim2.new(1, 0, 0, 30),
+			BackgroundColor3 = C.ctaGoldRim,
+			[CHILDREN] = { Components.corner(6) },
+			Parent = body,
+		})
+		local w =
+			Components.text({ text = "", size = 21, color = C.inkWhite, font = Tokens.font.display, stroke = true })
+		w.AnchorPoint = Vector2.new(0.5, 0.5)
+		w.Position = UDim2.fromScale(0.5, 0.5)
+		w.Parent = band
+		Components.setParts(w, { "@special", "Unique" })
+	end
+	-- ▲の意味の語（D-269 ④）
+	local growth = Components.text({
+		text = "▲ Growth",
+		size = 21,
+		color = C.inkMid,
+		font = Tokens.font.number,
+		xAlign = Enum.TextXAlignment.Left,
+	})
+	growth.Name = "GrowthHeader"
+	growth.LayoutOrder = 5
+	growth.Parent = body
 	-- 能力の行（表記と伸びやすさの ▲。値はまだ決まっていない＝サイコロ。ユニークは決まった値）
 	local marks = HireCommon.growthMarks(candidate.jobId)
 	local fixed = if unique and master.uniques[candidate.uniqueId]
@@ -97,7 +125,7 @@ local function sheet(candidate: any, index: number): (TextButton, UIStroke)
 		else nil
 	for i, s in HireCommon.STATS do
 		local row: Frame = new("Frame", {
-			LayoutOrder = 1 + i,
+			LayoutOrder = 10 + i,
 			Size = UDim2.new(1, 0, 0, 40),
 			BackgroundColor3 = C.ch75,
 			[CHILDREN] = { Components.corner(6), Components.padding(0, 10, 0, 10) },

@@ -241,13 +241,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						)
 					end
 				end
-				label(r3, 8, "⚠", 23)
+				-- 罠のよけやすさ：語と %（D-269 ①④）
+				label(r3, 8, "Dodge", 21)
 				local evade = Hint.forParty(view, pick, d, master, deps)
-				local eb = bar(r3, 9, 110, 22)
+				local eb = bar(r3, 9, 90, 22)
 				new(
 					"Frame",
 					{ Size = UDim2.fromScale(math.clamp(evade, 0, 1), 1), BackgroundColor3 = C.barFill, Parent = eb }
 				)
+				label(r3, 10, string.format("%d%%", math.floor(math.clamp(evade, 0, 1) * 100 + 0.5)), 21)
 			end
 		elseif raidInfo then
 			-- ボスの HP の棒と、選んだパーティのダメージの見込み（数字なし：D-231 ⑬）
@@ -332,6 +334,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			width = 240,
 			icon = "▶",
 			label = Words.go,
+			reason = Words.reason.allOut, -- 出かけ中で出発できない理由（D-269 ④）
 			name = "Go",
 			glyph = "A",
 			onClick = function()

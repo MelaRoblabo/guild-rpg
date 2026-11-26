@@ -27,7 +27,6 @@ local Words = require("../ui/Words")
 local master = require("../Master")
 
 local C = Tokens.color
-local I = Components.icon
 local new = Create.new
 local CHILDREN = Create.Children
 
@@ -365,16 +364,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			go.Parent = actions
 			Guide.mark(go, Guide.is("go") and dest ~= nil, 18) -- 初回の誘導：Go
 		else
-			-- 自動再派遣のスイッチ（D-125・D-214 ⑥）
+			-- 自動再派遣のスイッチ（D-125・D-214 ⑥）。オン／オフが形で分かるスイッチの形と「Auto Repeat」（D-269 ②）
 			local on = party.autoRepeat ~= nil
-			local toggle = Components.button({
-				kind = if on then "gold" else "brown",
-				width = 170,
-				height = 66,
-				icon = I.reroll,
-				label = Words.repeatOn,
+			local toggle = Components.switchButton({
+				on = on,
+				width = 214,
+				label = Words.autoRepeat,
 				name = "Repeat",
-				glyph = "X",
 				onClick = function()
 					Session.send({
 						type = "SetAutoRepeat",
@@ -388,7 +384,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			-- 冒険中は編成できない。灰色の Edit Party を押すと理由を出す（D-265 ②）
 			local menu = Components.button({
 				kind = "disabled",
-				width = 180,
+				width = 160,
 				height = 66,
 				icon = "@party",
 				label = Words.editParty,
@@ -485,20 +481,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			p.Position = UDim2.new(1, -6, 0, 6)
 			p.Parent = scene
 		end
-		-- 帰るまでの残り（左の一覧の行と同じ時計：D-249 ①）。帰り道は真ん中の時計が同じなので出さない
-		if st.phase ~= "inbound" then
-			local c = Components.chip("@time", clock(st.remaining), C.inkLight)
+		-- 帰るまでの残り（左の一覧の行と同じ時計：D-249 ①）。時間は「Back in」の1つだけ（D-269 ①）。
+		-- 移動中・帰り道は真ん中に大きく出すので、左上の札はフロアにいる間だけ
+		if st.phase == "floor" then
+			local c = Components.chip("@time", "Back in " .. clock(st.remaining), C.inkLight)
 			c.Name = "ReturnClock"
 			c.Position = UDim2.fromOffset(6, 6)
 			c.Parent = scene
 		end
 		if st.phase ~= "floor" then
-			-- 移動中・帰り道：馬車と残り時間（帰り道は持ち帰る宝箱も：D-236 ④）
-			local toGo = if st.phase == "outbound"
-				then e.departAt + e.log.travelSeconds - Session.now()
-				else st.remaining
+			-- 移動中・帰り道：馬車と、帰るまでの残り（Back in の1つ：D-269 ①。帰り道は持ち帰る宝箱も：D-236 ④）
 			center(if st.phase == "outbound" then "▶" else "◀", 40, C.inkLight, 0.4)
-			center(clock(toGo), 30, C.inkLight, 0.72)
+			center("Back in " .. clock(st.remaining), 30, C.inkLight, 0.72)
 			if st.phase ~= "outbound" then
 				chestPill()
 			end
@@ -532,19 +526,23 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			-- 絵があるときは名前と HP の棒を左へ寄せる（絵と重ねない）
 			local cx = if monImage then 0.36 else 0.5
 			center(if mon then mon.nameEn else "?", 25, C.inkLight, 0.45, cx)
-			-- 敵の HP の棒は名前のすぐ下（数字なし：D-236 ①・D-249 ③）
+			-- 敵の HP の棒は名前のすぐ下（数字なし：D-236 ①・D-249 ③）。地は暗く残りは明るい赤、左に「HP」（D-269 ④）
 			local track: Frame = new("Frame", {
 				Name = "MonsterHp",
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromScale(cx, 0.58),
 				Size = UDim2.new(if monImage then 0.5 else 0.6, 0, 0, 18),
-				BackgroundColor3 = C.barTrack,
+				BackgroundColor3 = C.ch05,
 				[CHILDREN] = { Components.corner(6) },
 				Parent = scene,
 			})
+			local hpWord = Components.text({ text = "HP", size = 21, color = C.inkLight, font = Tokens.font.number })
+			hpWord.AnchorPoint = Vector2.new(1, 0.5)
+			hpWord.Position = UDim2.new(0, -6, 0.5, 0)
+			hpWord.Parent = track
 			new("Frame", {
 				Size = UDim2.fromScale(st.monsterRatio or 1, 1),
-				BackgroundColor3 = C.warnDark,
+				BackgroundColor3 = C.warn,
 				[CHILDREN] = { Components.corner(6) },
 				Parent = track,
 			})

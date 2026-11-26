@@ -20,6 +20,7 @@ local Create = require("../../ui/Create")
 local Art = require("../../ui/Art")
 local HireCommon = require("../hire/HireCommon")
 local HubState = require("../../hub/HubState")
+local Motion = require("../../ui/Motion")
 local Nav = require("../../ui/Nav")
 local RebirthCommon = require("../rebirth/RebirthCommon")
 local Root = require("../../ui/Root")
@@ -91,6 +92,15 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local busy = false
 	local holding = false
 	local held = false
+	-- トレーニングの前の能力（次に描くとき、上がった数字をカウントアップして「+4」を浮かべる：D-269 ③）
+	local trainedFrom: { [string]: number }? = nil
+	local function markTrain()
+		local v = Session.view
+		local a = v and v.adventurers[uid]
+		if trainedFrom == nil and a then
+			trainedFrom = table.clone(a.baseStats)
+		end
+	end
 	local render: () -> ()
 
 	local function send(cmd: any): any?
@@ -308,7 +318,19 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			r.LayoutOrder = 1 + i
 			r.Size = UDim2.new(1, 0, 0, 50)
 			r.Parent = leftCol
+			-- トレーニングで上がった数字はカウントアップ（D-269 ③）
+			local from = trainedFrom and trainedFrom[s.key]
+			local to = adv.baseStats[s.key]
+			if from and from ~= to then
+				for _, d in r:GetDescendants() do
+					if d:IsA("TextLabel") and d.Text == tostring(to) and d.ZIndex == 4 then
+						Motion.countUp(d, from, to)
+						break
+					end
+				end
+			end
 		end
+		trainedFrom = nil
 		-- 攻撃力・物理防御・魔法防御（実効）
 		local wells: Frame = new("Frame", {
 			Name = "Wells",
@@ -560,6 +582,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						return
 					end
 					if not busy then
+						markTrain()
 						send({ type = "Train", adventurerUid = uid, sessions = 1 })
 						render()
 					end
@@ -582,6 +605,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						end
 						held = true
 						while holding do
+							markTrain()
 							local r = send({ type = "Train", adventurerUid = uid, sessions = 1 })
 							if not (r and r.ok) then
 								holding = false

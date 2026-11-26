@@ -308,7 +308,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 	})
 	call.LayoutOrder = 2
 	call.Parent = actions
-	-- ベルの角の雇用の印（D-232 ①）：新しいパーティ枠（空のパーティ）があれば光る。なければ無料の引き直しの数
+	-- ベルの角の雇用の印（D-232 ①）：新しいパーティ枠（空のパーティ）があるときだけ光る
 	local emptyParty = false
 	for _, p in (view and view.parties) or {} do
 		if Party.isEmpty(p) then
@@ -328,12 +328,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		[CHILDREN] = { Components.corner(16), Components.stroke(C.bronze, 2) },
 		Parent = call,
 	})
-	Components.setParts(
-		mark,
-		if emptyParty
-			then { Components.icon.party, "✚" }
-			else { Components.icon.reroll, tostring(master.K.hireFreeRerolls) }
-	)
+	-- 無料の引き直しの数は受付では出さず、引き直しの画面（Reroll のボタン）で出す（D-269 ①）
+	mark.Visible = emptyParty
+	Components.setParts(mark, { Components.icon.party, "✚" })
 	return { frame = frame, scrim = 1 }
 end
 

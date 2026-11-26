@@ -12,6 +12,7 @@ local Words = {
 	undo = "Undo", -- 入れ替えと自動装備を戻す（D-266 ③）
 	skip = "Skip", -- 開封の演出を飛ばす（D-267 ②）
 	repeatOn = "Repeat",
+	autoRepeat = "Auto Repeat", -- 自動再派遣のスイッチ（D-269 ②）
 	form = "Form",
 	destination = "Destination",
 	autoEquip = "Auto Equip",
