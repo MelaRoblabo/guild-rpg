@@ -1,6 +1,7 @@
 --!strict
 -- 3D マップのカメラ（D-270 ④⑤）。
---   1本指／左ドラッグ＝注目点の周りを回る、2本指／右ドラッグ＝地図の上を滑らせる、ピンチ／ホイール＝寄る。地図の外へは出ない。
+--   1本指／右ドラッグ＝注目点の周りを回る、2本指／左ドラッグ＝地図の上を滑らせる、ピンチ／ホイール＝寄る。地図の外へは出ない。
+--   右ドラッグで向きを変えるのは Shift+P のフリーカメラに合わせた（D-270 ④）。
 --   MapCamera.focus(pos) でその物へ移り、移ったあとは俯瞰でゆっくり旋回する。自分で動かしたら旋回をやめる。
 --   タップ（動かさずに離した）は onTap に画面の位置を渡す（3D の物を選ぶのは World3D）。
 --   キーボード（PC。Shift+P のフリーカメラと同じ感じ）：W・A・S・D＝地図の上を前後左右に動く、E・Q＝上げる・下げる、
@@ -104,6 +105,11 @@ function MapCamera.focus(pos: Vector3, getPos: (() -> Vector3?)?)
 	follow = getPos
 end
 
+-- 今の注目点とカメラまでの距離（被写界深度のピント合わせに使う）
+function MapCamera.state(): (Vector3, number)
+	return focus, dist
+end
+
 function MapCamera.enable()
 	enabled = true
 end
@@ -130,6 +136,16 @@ local mouseMode: string? = nil
 local downAt: Vector2? = nil
 local downTime = 0
 local moved = 0
+local lastPos: Vector2? = nil
+
+-- ドラッグの間はマウスをその場に固定する（Roblox のカメラの右ドラッグと同じ）。
+-- 固定しないと動いた量（Delta）が 0 のまま届くことがあり、ドラッグしてもカメラが動かなかった
+local function endDrag()
+	mouseMode = nil
+	downAt = nil
+	lastPos = nil
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+end
 
 UserInputService.InputBegan:Connect(function(input, gp)
 	if not enabled or gp then
@@ -137,10 +153,12 @@ UserInputService.InputBegan:Connect(function(input, gp)
 	end
 	local t = input.UserInputType
 	if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.MouseButton2 then
-		mouseMode = if t == Enum.UserInputType.MouseButton1 then "rotate" else "pan"
+		mouseMode = if t == Enum.UserInputType.MouseButton2 then "rotate" else "pan"
 		downAt = Vector2.new(input.Position.X, input.Position.Y)
 		downTime = os.clock()
 		moved = 0
+		lastPos = downAt
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
 	end
 end)
 
@@ -154,6 +172,11 @@ UserInputService.InputChanged:Connect(function(input, gp)
 		zoom(if input.Position.Z > 0 then 0.88 else 1.14)
 	elseif t == Enum.UserInputType.MouseMovement and mouseMode then
 		local d = Vector2.new(input.Delta.X, input.Delta.Y)
+		local pos = Vector2.new(input.Position.X, input.Position.Y)
+		if d.Magnitude == 0 and lastPos then
+			d = pos - lastPos -- 固定できなかったときは位置の差で動かす
+		end
+		lastPos = pos
 		moved += d.Magnitude
 		if moved > TAP_MOVE then
 			stopAuto()
@@ -171,11 +194,17 @@ UserInputService.InputEnded:Connect(function(input)
 	if (t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.MouseButton2) and mouseMode then
 		local wasTap = t == Enum.UserInputType.MouseButton1 and moved <= TAP_MOVE and os.clock() - downTime <= TAP_TIME
 		local at = downAt
-		mouseMode = nil
-		downAt = nil
+		endDrag()
 		if wasTap and at and MapCamera.onTap then
 			MapCamera.onTap(at)
 		end
+	end
+end)
+
+-- ウィンドウの外でボタンを離したとき
+UserInputService.WindowFocusReleased:Connect(function()
+	if mouseMode then
+		endDrag()
 	end
 end)
 
