@@ -288,18 +288,24 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if s.state == "waiting" then
 			local menu = Components.button({
 				kind = "brown",
-				width = 150,
+				width = 180,
 				height = 66,
 				icon = "@party",
-				label = Words.menu,
+				label = Words.editParty, -- D-265 ⑥（Menu をやめた）
 				name = "Menu",
 				glyph = "X",
 				onClick = function()
-					api.open("PartyMenu", { partyIndex = partyIndex }) -- S-12（M8-6）
+					-- 全員が冒険中に雇った人がいれば、その人を控えの先頭で光らせて開く（D-265 ②の帰還後の誘導）
+					local pending = HubState.pendingNewcomers(Session.view)
+					for _, u in pending do
+						HubState.newcomers[u] = nil -- 誘導は一度だけ
+					end
+					api.open("PartyMenu", { partyIndex = partyIndex, newcomer = pending[1] }) -- S-12
 				end,
 			})
 			menu.LayoutOrder = 1
 			menu.Parent = actions
+			Guide.mark(menu, #HubState.pendingNewcomers(view) > 0, 18) -- 帰還後の誘導：Edit Party（D-265 ②）
 			-- 最後の行き先（D-228）。まだ一度も出ていなければ、解放済みで一番浅いダンジョン（D-244 ②）
 			local dest = party.lastDungeonId or HubState.firstUnlocked(view)
 			-- Go の行き先の札（D-250 ④）：Go のすぐ上に「ローマ数字＋名前」。押すとマップで行き先を選ぶ
@@ -339,7 +345,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 			local go = Components.button({
 				kind = if dest then "gold" else "disabled",
-				width = 200,
+				width = 190,
 				icon = "▶",
 				label = Words.go,
 				name = "Go",
@@ -377,8 +383,20 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					})
 				end,
 			})
-			toggle.LayoutOrder = 1
+			toggle.LayoutOrder = 2
 			toggle.Parent = actions
+			-- 冒険中は編成できない。灰色の Edit Party を押すと理由を出す（D-265 ②）
+			local menu = Components.button({
+				kind = "disabled",
+				width = 180,
+				height = 66,
+				icon = "@party",
+				label = Words.editParty,
+				name = "Menu",
+				reason = Words.reason.partyOut,
+			})
+			menu.LayoutOrder = 1
+			menu.Parent = actions
 		end
 	end
 

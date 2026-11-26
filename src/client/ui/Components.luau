@@ -141,6 +141,9 @@ local ICON_FALLBACK: { [string]: string } = {
 	pinch = "♥",
 	vanish = "✕",
 	unknown = "?",
+	-- D-258 で足すアイコン（絵がアップされるまでの記号）
+	back = "⬅",
+	auto_equip = "🛡★",
 }
 
 local function iconKey(s: string?): string?
@@ -523,6 +526,7 @@ export type ButtonProps = {
 	name: string?, -- インスタンスの名前（確かめ用）
 	glyph: string?, -- ゲームパッドの印
 	onClick: (() -> ())?,
+	reason: string?, -- 押せない色のときに押すと出す理由（1行の吹き出し2秒：D-264 ②）
 }
 
 local KIND = {
@@ -590,7 +594,7 @@ function Components.button(p: ButtonProps): Frame
 		Name = "Face",
 		Text = "",
 		AutoButtonColor = false,
-		Active = enabled,
+		Active = enabled or p.reason ~= nil,
 		Size = UDim2.fromOffset(w, h),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 		ZIndex = 2,
@@ -679,6 +683,13 @@ function Components.button(p: ButtonProps): Frame
 		if p.onClick then
 			face.Activated:Connect(p.onClick)
 		end
+	elseif p.reason then
+		-- 灰色のボタンも押せて、押すと理由を出す（D-264 ②）。Motion は Components を使うので、ここで読み込む
+		local reason = p.reason
+		face.Activated:Connect(function()
+			local Motion = require("./Motion") :: any
+			Motion.reason(face, reason)
+		end)
 	end
 	if p.glyph then
 		Components.padGlyph(p.glyph, face)

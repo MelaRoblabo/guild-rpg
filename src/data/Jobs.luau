@@ -4,6 +4,7 @@
 -- attackType: physical=腕力で攻撃し物理防御を引く / magic=魔力で攻撃し魔法防御を引く
 -- growth: レベルアップ1回あたりの基準値（±growthVariance の振れ幅を乗せる）
 -- レア職の成長値は仮（D-044）
+-- hireEquipment: 雇ったとき（HireChoose）に付けて来る装備。コモン+0・アイテムレベル1（D-266。最初の4人と同じ品）
 
 return {
 	{
@@ -18,6 +19,7 @@ return {
 		outfitClass = "phy",
 		growth = { str = 4, mag = 0, agi = 1, dex = 0, hp = 5 },
 		equipKinds = { "sword", "heavy_armor", "shield", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_sword", armor = "eq_arm_chainmail", sub = "eq_sub_buckler" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_thief",
@@ -31,6 +33,7 @@ return {
 		outfitClass = "phy",
 		growth = { str = 2, mag = 0, agi = 3, dex = 4, hp = 3 },
 		equipKinds = { "dagger", "light_armor", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_dagger", armor = "eq_arm_leather", sub = "eq_sub_ring_wind" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_mage",
@@ -44,6 +47,7 @@ return {
 		outfitClass = "mag",
 		growth = { str = 0, mag = 5, agi = 2, dex = 1, hp = 2 },
 		equipKinds = { "staff", "robe", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_staff", armor = "eq_arm_robe", sub = "eq_sub_ring_wisdom" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_priest",
@@ -57,6 +61,7 @@ return {
 		outfitClass = "mag",
 		growth = { str = 1, mag = 4, agi = 1, dex = 1, hp = 3 },
 		equipKinds = { "mace", "vestment", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_mace", armor = "eq_arm_vestment", sub = "eq_sub_ring_wisdom" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_knight",
@@ -70,6 +75,7 @@ return {
 		outfitClass = "phy",
 		growth = { str = 5, mag = 0, agi = 1, dex = 0, hp = 6 },
 		equipKinds = { "sword", "heavy_armor", "shield", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_sword", armor = "eq_arm_chainmail", sub = "eq_sub_buckler" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_ninja",
@@ -83,6 +89,7 @@ return {
 		outfitClass = "phy",
 		growth = { str = 2, mag = 0, agi = 4, dex = 5, hp = 3 },
 		equipKinds = { "dagger", "light_armor", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_dagger", armor = "eq_arm_leather", sub = "eq_sub_ring_wind" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_sage",
@@ -96,6 +103,7 @@ return {
 		outfitClass = "mag",
 		growth = { str = 0, mag = 6, agi = 2, dex = 2, hp = 2 },
 		equipKinds = { "staff", "robe", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_staff", armor = "eq_arm_robe", sub = "eq_sub_ring_wisdom" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 	{
 		id = "job_bishop",
@@ -109,5 +117,6 @@ return {
 		outfitClass = "mag",
 		growth = { str = 1, mag = 5, agi = 1, dex = 1, hp = 4 },
 		equipKinds = { "mace", "vestment", "accessory" },
+		hireEquipment = { weapon = "eq_wpn_mace", armor = "eq_arm_vestment", sub = "eq_sub_ring_wisdom" }, -- 雇ったときに付けて来るコモンの装備（D-266）
 	},
 }

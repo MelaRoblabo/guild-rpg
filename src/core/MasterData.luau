@@ -517,6 +517,27 @@ local function validateContent(c: Checker, d: any)
 				c:integer(`{p}.growth.{s}`, if type(j.growth) == "table" then j.growth[s] else nil, 0)
 			end
 			c:array(p .. ".equipKinds", j.equipKinds)
+			-- 雇ったときの装備（D-266）：武器・防具・補助の3つ。その枠の品で、この職業が付けられるもの
+			if type(j.hireEquipment) ~= "table" then
+				c:error(p .. ".hireEquipment", "テーブルが必要")
+			else
+				for _, slot in { "weapon", "armor", "sub" } do
+					local baseId = j.hireEquipment[slot]
+					local base = nil
+					for _, b in (if type(d.EquipmentBases) == "table" then d.EquipmentBases else {}) do
+						if b.id == baseId then
+							base = b
+						end
+					end
+					if base == nil then
+						c:error(`{p}.hireEquipment.{slot}`, `装備の土台がない：{baseId}`)
+					elseif base.slot ~= slot then
+						c:error(`{p}.hireEquipment.{slot}`, `枠が違う：{base.slot}`)
+					elseif type(j.equipKinds) == "table" and table.find(j.equipKinds, base.kind) == nil then
+						c:error(`{p}.hireEquipment.{slot}`, `この職業が付けられない種類：{base.kind}`)
+					end
+				end
+			end
 		end
 	end
 

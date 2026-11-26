@@ -175,7 +175,7 @@
 
 ## 5. 職業（Jobs.luau）
 
-ゲーム仕様書03章の成長表どおり。各行：`id, name, line（warrior/scout/mage/support）, attackType（physical/magic）, isRare, growth{str,mag,agi,dex,hp}, equipKinds{...}, heals（boolean）, outfitClass（phy/mag）`。
+ゲーム仕様書03章の成長表どおり。各行：`id, name, line（warrior/scout/mage/support）, attackType（physical/magic）, isRare, growth{str,mag,agi,dex,hp}, equipKinds{...}, heals（boolean）, outfitClass（phy/mag）, hireEquipment{weapon,armor,sub}`。hireEquipment は雇ったときに付けて来るコモン+0・アイテムレベル1の装備（D-266）。
 
 ## 6. 初期状態（StarterSet.luau、Q-020 仮）
 

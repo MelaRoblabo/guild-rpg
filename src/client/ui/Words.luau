@@ -7,12 +7,14 @@ local Words = {
 	-- 出発・パーティ
 	go = "Go",
 	goAll = "Go All",
-	menu = "Menu",
+	editParty = "Edit Party", -- 編成の面・その入口（D-265 ⑥。Menu・Party をそろえた）
+	addToParty = "Add to Party", -- 採用の後・控えの人（D-265）
+	undo = "Undo", -- 入れ替えと自動装備を戻す（D-266 ③）
+	skip = "Skip", -- 開封の演出を飛ばす（D-267 ②）
 	repeatOn = "Repeat",
 	form = "Form",
 	destination = "Destination",
 	autoEquip = "Auto Equip",
-	party = "Party",
 	-- 出発の面の攻略ヒントの行の見出し（ボタンではないが、同じ語をそろえるためここに置く：D-250 ③）
 	foes = "Foes",
 	traps = "Traps",
@@ -62,6 +64,23 @@ local Words = {
 	items = "Items",
 	inbox = "Inbox",
 	autoSell = "Auto Sell",
+}
+
+-- 押せない理由・アラート（1行・12語まで：D-264 ②③）
+Words.reason = {
+	partyOut = "Can't add to a party on an adventure", -- D-265 ②
+	noBetterGear = "No better gear in Warehouse", -- D-266 ④
+	allOut = "All parties are out", -- D-269 ④
+}
+
+-- 画面のタイトル（1〜3語：D-264 ②）
+Words.title = {
+	editParty = "Edit Party",
+}
+
+-- 初回の誘導の指に添える1行（D-264 ④）
+Words.hint = {
+	dragReserve = "Drag a reserve onto a member",
 }
 
 -- 装備の枠・倉庫のタブの語（D-245）と、語が入るタブの幅

@@ -42,7 +42,8 @@ function AutoEquip.score(item: any, slot: string, wPhys: number, wMag: number, m
 end
 
 -- 付け替えの提案。補助と修飾語は見ない。他の冒険者が付けている品は使わない（倉庫の品と本人の今の装備だけ）
-function AutoEquip.plan(state: any, partyIndex: number, master: any): { Change }
+-- onlyUid を渡すと、その人の分だけ提案する（パーティに入れた瞬間の自動装備：D-266）
+function AutoEquip.plan(state: any, partyIndex: number, master: any, onlyUid: string?): { Change }
 	local party = state.parties[partyIndex]
 	if party == nil then
 		return {}
@@ -58,7 +59,7 @@ function AutoEquip.plan(state: any, partyIndex: number, master: any): { Change }
 	local changes: { Change } = {}
 	for _, advUid in party.slots do
 		local adv = state.adventurers[advUid] -- 空き枠（Party.EMPTY）は冒険者がいない
-		if adv then
+		if adv and (onlyUid == nil or advUid == onlyUid) then
 			for _, slot in { "weapon", "armor" } do
 				local cur = adv.equipment[slot]
 				local best, bestScore =

@@ -28,7 +28,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M3 | `HireStart` | — | 雇用費を払い候補を抽選 | NOT_ENOUGH_GOLD, ROSTER_FULL, SESSION_EXISTS | 02章 |
 | M3 | `HirePick` | candidateIndex | 面接する候補を選び初回抽選 | — | 02章 |
 | M3 | `HireReroll` | — | 引き直し（無料回数→チケット）。今回の結果が「前回」になり、それより前の結果は消える | NO_TICKET | 02章, D-086 |
-| M3 | `HireChoose` | "previous" / "current" | 採用する結果を選んで雇用確定 | — | 02章 |
+| M3 | `HireChoose` | "previous" / "current" | 採用する結果を選んで雇用確定。職業の hireEquipment（コモン+0・アイテムレベル1の3点）を付けて来る（D-266） | — | 02章, D-266 |
 | M3 | `HireCancel` | — | 雇用を中止（雇用費は戻らない） | — | 02章 |
 | M3 | `Rename` | adventurerUid, name | 名前変更（ユニーク不可） | UNIQUE_CANNOT_RENAME | 02章 |
 | M3 | `Dismiss` | adventurerUid | 冒険者を解雇（保護中・探索中は不可） | ADVENTURER_LOCKED | Q-020 |
@@ -41,7 +41,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M4 | `ChangeAppearanceChoose` | "previous" / "current" | 見た目を選ぶ（どちらでも1個消費） | — | 07章 |
 | M5 | `BuyExpansion` | expansionId | 拡張を購入（パーティ枠・雇用候補枠・所属枠・倉庫・トレーニング場） | NOT_ENOUGH_GOLD, GUILD_LEVEL_TOO_LOW, DUNGEON_NOT_CLEARED | 08章, D-075, D-077 |
 | M5 | `SetAutoSell` | enabled, maxRarity, keepModified? | 自動売却の設定（初期値はオン：D-167） | — | 06章, D-167 |
-| M8 | `AutoEquip` | partyIndex | 自動装備（06章 §24）：隊列1番から順に、倉庫の品と本人の今の装備から、武器は攻撃力補正、防具は最後の行き先の攻撃の種類の割合で重み付けした防御が一番高いものに付け替える。補助・修飾語は見ない。他の冒険者が付けている品は使わない。前の装備は倉庫へ。提案は `Game.query.autoEquipPlan`（同じ計算）。結果は `AutoEquipped`（partyIndex・changes） | PARTY_NOT_FOUND, PARTY_BUSY, NOTHING_TO_CHANGE | D-120, D-231 ⑨, D-235 ③ |
+| M8 | `AutoEquip` | partyIndex, adventurerUid? | adventurerUid を渡すとそのパーティのその人の分だけ（パーティに入れた瞬間：D-266）。自動装備（06章 §24）：隊列1番から順に、倉庫の品と本人の今の装備から、武器は攻撃力補正、防具は最後の行き先の攻撃の種類の割合で重み付けした防御が一番高いものに付け替える。補助・修飾語は見ない。他の冒険者が付けている品は使わない。前の装備は倉庫へ。提案は `Game.query.autoEquipPlan`（同じ計算）。結果は `AutoEquipped`（partyIndex・changes） | PARTY_NOT_FOUND, PARTY_BUSY, ADVENTURER_NOT_IN_PARTY, NOTHING_TO_CHANGE | D-120, D-231 ⑨, D-235 ③, D-266 |
 | M8 | `SetSettings` | musicVolume?, soundVolume?（0〜volumeSteps）, chestAnimation?, lessFlashing?, returnToast?, cutIns?, otherCarts? | 設定（S-61）を `settings.prefs` に保存する。送った項目だけ変わる。保存がなければ `StarterSet.preferences` の初期値。`Game.query.preferences` で読む。イベントなし | INVALID_VOLUME | D-117, D-145, D-237 ③ |
 | M8 | `SetGuideStep` | step（1〜99） | 初回の誘導（D-244 ①）の済んだ段の数を `settings.guideStep` に保存する（設定と一緒にサーバーへ：D-117）。小さい数は無視（戻らない）。段の中身（馬車→Go→宝箱ボタン→Open All→Equip→Quests：D-246 ②）は画面が持つ。`Game.query.guideStep` で読み、要約の `guideStep` にも入れて送る（保存がなく一度でも帰還したセーブは全部済んだ扱い＝`Game.GUIDE_DONE`）。イベントなし | — | D-244 ①, D-246 ②, D-117 |
 | M8 | `Inspect`（読み取り専用） | userId, partyIndex | 他のプレイヤーのパーティの詳細（S-14）。`Game.execute` を通さず、サーバーが同じサーバーにいる相手の状態から `World.inspect` で答える（メンバーの name・jobId・level・appearanceId、ギルドLv、行き先と出発時刻・時間）。状態は変えない。回数制限の対象。形の表は `Protocol.READ_COMMANDS` | NOT_FOUND（相手がいない・探索中でない） | D-108, D-121, 11章（システム）§6.2 |

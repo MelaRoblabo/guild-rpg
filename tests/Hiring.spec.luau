@@ -2,6 +2,7 @@
 local Appearance = require("../src/core/Appearance")
 local Game = require("../src/core/Game")
 local Hiring = require("../src/core/Hiring")
+local Inventory = require("../src/core/Inventory")
 local Rng = require("../src/core/Rng")
 local Fixtures = require("./helpers/Fixtures")
 
@@ -139,6 +140,32 @@ return function(t)
 			expect(adv.level).toBe(1)
 			expect(adv.levelCap).toBe(K.levelCapInitial)
 			expect(s.hireSession).toBe(nil)
+		end)
+		it(
+			"D-266 雇った人は職業に合ったコモンの装備3点を付けて来る（倉庫の数は増えない）",
+			function()
+				local s = started()
+				local usedBefore = Inventory.warehouseUsage(s)
+				local r = exec(s, { type = "HireChoose", which = "current" })
+				local adv = s.adventurers[(r.events :: any)[1].uid]
+				local set = master.jobs[adv.jobId].hireEquipment
+				for _, slot in { "weapon", "armor", "sub" } do
+					local e = s.equipment[adv.equipment[slot]]
+					expect(e.baseId).toBe(set[slot])
+					expect(e.rarity).toBe(1)
+					expect(e.grade).toBe(0)
+					expect(e.itemLevel).toBe(1)
+					expect(e.equippedBy).toBe(adv.uid)
+				end
+				expect(Inventory.warehouseUsage(s)).toBe(usedBefore)
+			end
+		)
+		it("D-266 どの職業の初期装備も、その職業が付けられる品", function()
+			for id, job in master.jobs do
+				for _, baseId in job.hireEquipment do
+					expect(Inventory.canEquip(id, baseId, master)).toBe(true)
+				end
+			end
 		end)
 		it("引き直す前は prev を選べない", function()
 			local s = started()

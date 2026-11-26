@@ -1,6 +1,10 @@
 --!strict
--- S-21e 採用（D-220・D-226 ③）。採用を表すスタンプを押す演出のあと、決まった能力と
--- パーティ編成（金。S-12 は M8-6）・メイン画面（茶）へのボタンを出す。「もう一度呼ぶ」は出さない。
+-- S-21e 採用（D-220・D-265 ①②）。HIRED のハンコのあと、決まった能力と金の「Add to Party」を出す。
+--   - 待機中のパーティがあれば：雇った人のカードが画面の下（控えの列）へ飛び、そのまま編成の面（Edit Party）が開く。
+--     控えの列では雇った人が先頭で NEW・脈打つ。
+--   - 全員が冒険中なら：「Can't add to a party on an adventure」のアラートを出し、カードはマップのギルドの建物へ
+--     飛び込む（建物に NEW の顔）。パーティが帰ったら、馬車 → Edit Party を一度だけ光らせる（HubState.newcomers）。
+--   - 閉じる × はメイン画面へ。「もう一度呼ぶ」は出さない（D-226 ③ の Home・Party の2つは D-265 で置き換え）。
 
 local TweenService = game:GetService("TweenService")
 
@@ -8,7 +12,10 @@ local Party = require("@game/ReplicatedStorage/Core/Party")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local HireCommon = require("./HireCommon")
+local HubState = require("../../hub/HubState")
+local Motion = require("../../ui/Motion")
 local Nav = require("../../ui/Nav")
+local Portrait = require("../../ui/Portrait")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
 local Words = require("../../ui/Words")
@@ -17,6 +24,31 @@ local C = Tokens.color
 local I = Components.icon
 local new = Create.new
 local CHILDREN = Create.Children
+
+-- 控えの列が出る所（編成の面の左下。PartyMenu の Reserve と同じ辺り。基準の単位）
+local RESERVE_AT = Vector2.new(260, 650)
+
+-- 飛ばす顔のカード
+local function faceCard(appearanceId: string?): Frame
+	local card: Frame = new("Frame", {
+		Name = "FlyingCard",
+		BackgroundColor3 = C.ch13,
+		[CHILDREN] = { Components.corner(14), Components.stroke(C.selAmber, 4) },
+	})
+	Portrait.fill(card, appearanceId)
+	return card
+end
+
+-- 最初の待機中のパーティ
+local function waitingParty(): number?
+	local v = Session.view
+	for _, p in (v and v.parties) or {} do
+		if not Party.isBusy(v, p.index) then
+			return p.index
+		end
+	end
+	return nil
+end
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local view = Session.view
@@ -38,71 +70,59 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local panel = HireCommon.statPanel(frame, candidate, adv.baseStats, nil)
 	panel.frame.Visible = false
 
-	-- 1拍目：スタンプ（仮の短い動き。本番の演出は M8-FX）
-	local stamp: Frame = new("Frame", {
-		Name = "Stamp",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(320, 320),
-		Rotation = -12,
-		BackgroundTransparency = 1,
-		ZIndex = 30,
-		[CHILDREN] = {
-			Components.corner(160),
-			Components.stroke(C.warn, 10),
-		},
-		Parent = portrait,
-	})
-	local word = Components.text({ text = "HIRED", size = 40, color = C.warn, font = Tokens.font.display })
-	word.AutomaticSize = Enum.AutomaticSize.None
-	word.Size = UDim2.fromScale(1, 1)
-	word.ZIndex = 31
-	word.Parent = stamp
-	local scale = new("UIScale", { Scale = 2.2, Parent = stamp })
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-		:Play()
+	-- 1拍目：ハンコ（共通の動きの部品：D-269 ⑤）
+	local stamp = Motion.stamp(portrait, "HIRED", C.warn, 320)
 
-	-- 2拍目：決まった能力と行き先のボタン
+	-- 2拍目：決まった能力と Add to Party
 	local actions = HireCommon.actionRow(frame)
 	actions.Visible = false
-	local home = Components.button({
-		kind = "brown",
-		width = 160,
-		height = 66,
-		icon = "@map", -- メイン画面（マップ）へ戻る
-		label = Words.home,
-		name = "Home",
-		glyph = "X",
-		onClick = api.home,
-	})
-	home.LayoutOrder = 1
-	home.Parent = actions
-	local party = Components.button({
+	local sent = false
+	local add = Components.button({
 		kind = "gold",
-		width = 200,
+		width = 300,
 		icon = I.party,
-		label = Words.party,
-		name = "Party",
+		label = Words.addToParty,
+		name = "AddToParty",
 		glyph = "A",
 		onClick = function()
-			-- パーティ編成（S-12）を開き、控えの列で雇った人を光らせる（D-226 ③・D-246 ③）。
-			-- 待機のパーティがなければメイン画面へ
-			local v = Session.view
-			local target: number? = nil
-			for _, p in (v and v.parties) or {} do
-				if not Party.isBusy(v, p.index) then
-					target = p.index
-					break
-				end
+			if sent then
+				return
 			end
-			api.home()
+			sent = true
+			local target = waitingParty()
+			local card = faceCard(adv.appearanceId)
 			if target then
-				Nav.open("PartyMenu", { partyIndex = target, newcomer = uid })
+				-- カードが控えの列へ飛び、着いたら編成の面を開く（画面が切り替わらず、つながって見える）
+				Motion.fly({
+					from = portrait,
+					to = RESERVE_AT,
+					visual = card,
+					size = 220,
+					endSize = 80,
+					onArrive = function()
+						api.home()
+						Nav.open("PartyMenu", { partyIndex = target, newcomer = uid })
+					end,
+				})
+			else
+				-- 全員が冒険中：アラート → カードはギルドの建物へ（D-265 ②）
+				HubState.newcomers[uid] = true
+				Motion.alert(Words.reason.partyOut)
+				local from = Motion.center(portrait)
+				api.home()
+				local guild = HubState.guildNode
+				Motion.fly({
+					from = from,
+					to = if guild then guild else Vector2.new(640, 360),
+					visual = card,
+					size = 200,
+					endSize = 60,
+					delay = 0.6,
+				})
 			end
 		end,
 	})
-	party.LayoutOrder = 2
-	party.Parent = actions
+	add.Parent = actions
 	task.delay(0.9, function()
 		if frame.Parent then
 			TweenService:Create(stamp, TweenInfo.new(0.3), { Size = UDim2.fromOffset(110, 110) }):Play()

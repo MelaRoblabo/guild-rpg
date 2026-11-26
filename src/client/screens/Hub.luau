@@ -11,6 +11,7 @@ local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local Art = require("../ui/Art")
 local HubState = require("../hub/HubState")
+local Portrait = require("../ui/Portrait")
 local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
 local EventMarker = require("../hub/EventMarker")
@@ -125,6 +126,33 @@ local function buildMap(parent: Frame)
 		Parent = mapContent,
 	})
 	placeAt(guild, MapLayout.guild())
+	HubState.guildNode = guild -- 全員が冒険中に雇った人のカードが飛び込む先（D-265 ②）
+	-- 雇った人の NEW の顔（全員が冒険中に雇った人がいる間だけ。refreshStatic で出し入れする）
+	local newFace: Frame = new("Frame", {
+		Name = "NewFace",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 0, 4),
+		Size = UDim2.fromOffset(64, 64),
+		BackgroundColor3 = C.ch13,
+		Visible = false,
+		ZIndex = 6,
+		[CHILDREN] = { Components.corner(32), Components.stroke(C.okGreen, 3) },
+		Parent = guild,
+	})
+	new("TextLabel", {
+		Name = "New",
+		Text = "NEW",
+		TextSize = 18,
+		FontFace = Tokens.font.number,
+		TextColor3 = C.inkDark,
+		BackgroundColor3 = C.okGreen,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 1),
+		Size = UDim2.fromOffset(52, 24),
+		ZIndex = 8,
+		[CHILDREN] = { Components.corner(12) },
+		Parent = newFace,
+	})
 	local guildArt = Art.put(guild, Art.mapGuild(), { zIndex = 4 })
 	if guildArt then
 		-- 建物の絵があれば枠と記号を消す
@@ -633,8 +661,18 @@ local function refreshGuide(view: any)
 	if first and (Guide.is("wagon") or Guide.is("go")) and Nav.depth() == 0 then
 		wagonOn = HubState.status(view, first.index).state == "waiting"
 	end
-	if first then
-		Guide.mark(wagons[first.index], wagonOn, 10)
+	-- 全員が冒険中に雇った人がいて、パーティが帰ってきたら、その馬車を一度だけ光らせる（D-265 ②）
+	local newcomerParty: number? = nil
+	if not wagonOn and Nav.depth() == 0 and #HubState.pendingNewcomers(view) > 0 then
+		for _, p in view.parties or {} do
+			if HubState.status(view, p.index).state == "waiting" then
+				newcomerParty = p.index
+				break
+			end
+		end
+	end
+	for i, w in wagons do
+		Guide.mark(w, (wagonOn and first ~= nil and i == first.index) or i == newcomerParty, 10)
 	end
 	local total = 0
 	for _, c in view.chests or {} do
@@ -652,6 +690,18 @@ local function refreshMoving(view: any)
 		return
 	end
 	refreshGuide(view)
+	-- ギルドの建物の NEW の顔（全員が冒険中に雇った人：D-265 ②。雇った直後にも出すので 0.1 秒ごとに見る）
+	local guildNode = HubState.guildNode
+	local newFace = guildNode and guildNode:FindFirstChild("NewFace") :: Frame?
+	if newFace then
+		local pending = HubState.pendingNewcomers(view)
+		local first = pending[1] and view.adventurers[pending[1]]
+		newFace.Visible = first ~= nil
+		if first and newFace:GetAttribute("Uid") ~= pending[1] then
+			newFace:SetAttribute("Uid", pending[1])
+			Portrait.fill(newFace, first.appearanceId)
+		end
+	end
 	local exploring: { [string]: number } = {} -- ダンジョンごとの探索の進み（D-249 ②）
 	for _, party in view.parties or {} do
 		local i = party.index

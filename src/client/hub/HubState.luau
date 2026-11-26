@@ -13,6 +13,32 @@ local HubState = {}
 HubState.selected = nil :: number?
 HubState.following = false
 
+-- 全員が冒険中に雇った人（D-265 ②）。パーティに入れるか、帰還後の誘導で Edit Party を開くまで残す。
+-- マップのギルドの建物に NEW の顔を付け、帰ってきたパーティの馬車 → Edit Party を一度だけ光らせる。
+-- 保存はしない（この接続の間だけ）
+HubState.newcomers = {} :: { [string]: boolean }
+HubState.guildNode = nil :: GuiObject? -- マップのギルドの建物（雇った人のカードが飛び込む先）
+
+-- まだどのパーティにも入っていない、全員が冒険中に雇った人
+function HubState.pendingNewcomers(view: any): { string }
+	local out = {}
+	for uid in HubState.newcomers do
+		local inParty = false
+		for _, p in (view and view.parties) or {} do
+			if table.find(p.slots, uid) then
+				inParty = true
+			end
+		end
+		if view == nil or view.adventurers[uid] == nil or inParty then
+			HubState.newcomers[uid] = nil
+		else
+			table.insert(out, uid)
+		end
+	end
+	table.sort(out)
+	return out
+end
+
 function HubState.dungeonIndex(id: string?): number?
 	if id == nil then
 		return nil

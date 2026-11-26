@@ -482,6 +482,34 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			why.LayoutOrder = 1
 			why.Parent = actions
 		end
+		-- 控えの人（どのパーティにもいない）には Add to Party（D-265 ⑤）。編成の面がその人を控えの先頭で光らせて開く。
+		-- 全員が冒険中なら灰色で、押すと理由を出す（D-265 ②）
+		if Party.find(view, uid) == nil then
+			local target: number? = nil
+			for _, pt in view.parties do
+				if not Party.isBusy(view, pt.index) then
+					target = pt.index
+					break
+				end
+			end
+			local addBtn = Components.button({
+				kind = if target then "brown" else "disabled",
+				width = 240,
+				height = 66,
+				icon = I.party,
+				label = Words.addToParty,
+				name = "AddToParty",
+				glyph = "X",
+				reason = Words.reason.partyOut,
+				onClick = function()
+					if target then
+						api.open("PartyMenu", { partyIndex = target, newcomer = uid })
+					end
+				end,
+			})
+			addBtn.LayoutOrder = 1
+			addBtn.Parent = actions
+		end
 		local atCap = adv.level >= adv.levelCap
 		if atCap then
 			local cost = RebirthCommon.cost(adv)

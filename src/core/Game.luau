@@ -935,6 +935,12 @@ handlers.HireChoose = function(state, cmd, ctx)
 	local uid = newUid(state, "adv")
 	local adv = Hiring.newAdventurer(uid, h.candidates[h.pickedIndex], stats, ctx.now, ctx.master)
 	state.adventurers[uid] = adv
+	-- 職業に合ったコモンの装備3点を付けて来る（D-266）。装備中の品は倉庫の数に入らない（Q-020）
+	for _, slot in Inventory.SLOTS do
+		local baseId = ctx.master.jobs[adv.jobId].hireEquipment[slot]
+		local e = Inventory.newEquipment(state, { baseId = baseId, rarity = 1, grade = 0, itemLevel = 1 })
+		Inventory.equip(state, adv, e, ctx.master)
+	end
 	state.hireSession = nil
 	bump(state, "hired")
 	local events: { any } = { { type = "Hired", at = ctx.now, uid = uid } }
@@ -1341,6 +1347,7 @@ handlers.SetAutoSell = function(state, cmd, ctx)
 end
 
 -- 自動装備（05章 AutoEquip、D-120・D-231 ⑨・D-235 ③）。提案（Game.query.autoEquipPlan）と同じ計算で付け替える
+-- adventurerUid を渡すと、そのパーティにいるその人の分だけ付け替える（パーティに入れた瞬間：D-266）
 handlers.AutoEquip = function(state, cmd, ctx)
 	local party = state.parties[cmd.partyIndex]
 	if party == nil then
@@ -1349,7 +1356,10 @@ handlers.AutoEquip = function(state, cmd, ctx)
 	if Party.isBusy(state, cmd.partyIndex) then
 		return fail("PARTY_BUSY")
 	end
-	local changes = AutoEquip.plan(state, cmd.partyIndex, ctx.master)
+	if cmd.adventurerUid ~= nil and table.find(party.slots, cmd.adventurerUid) == nil then
+		return fail("ADVENTURER_NOT_IN_PARTY")
+	end
+	local changes = AutoEquip.plan(state, cmd.partyIndex, ctx.master, cmd.adventurerUid)
 	if #changes == 0 then
 		return fail("NOTHING_TO_CHANGE")
 	end
