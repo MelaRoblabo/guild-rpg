@@ -22,7 +22,9 @@ local Portrait = require("../ui/Portrait")
 local Hint = require("../party/Hint")
 local HubState = require("../hub/HubState")
 local Nav = require("../ui/Nav")
+local PartyIcon = require("../ui/PartyIcon")
 local PickMode = require("../hub/PickMode")
+local World3D = require("../hub/World3D")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -179,9 +181,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		BackgroundTransparency = 1,
 		Parent = frame,
 	})
-	local pickParty: number? = nil -- マップから：編成先の待機のパーティ
 	local busy = false
+	local chooser: { action: string }? = nil -- Go／Form の後に出す待機のパーティの一覧（D-272）
 	local render: () -> ()
+	-- ダンジョンを選んだときは、カメラがそのダンジョンへ寄って旋回する（メニューから開いたときも：D-270 ⑤）
+	World3D.focusDungeon(dungeonId)
 
 	render = function()
 		body:ClearAllChildren()
@@ -328,8 +332,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					if r and r.ok then
 						PickMode.stop()
 						HubState.selected = p
-						HubState.following = true
 						api.close()
+						task.delay(0.3, function()
+							World3D.focusParty(p) -- 出た馬車へカメラを寄せる
+						end)
 					else
 						render()
 					end
@@ -337,22 +343,24 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			go.Parent = actions
 		elseif mode == "map" then
-			-- ② マップから：適性の4人＋待機のパーティの札＋この4人で編成
+			-- ② マップから：適性の4人＋ Form（この4人で編成）＋ Go。どちらも押すと待機のパーティの一覧を出す（D-272）
 			local waiting = {}
 			for _, party in view.parties or {} do
 				if HubState.status(view, party.index).state == "waiting" then
-					table.insert(waiting, party.index)
+					local members = 0
+					for _, uid in party.slots do
+						if view.adventurers[uid] then
+							members += 1
+						end
+					end
+					table.insert(waiting, { index = party.index, members = members })
 				end
 			end
-			if pickParty == nil or table.find(waiting, pickParty) == nil then
-				pickParty = waiting[1]
-			end
-			-- 入れられる人：探索中でなく、どのパーティにもいないか、選んだパーティにいる（D-235 ①・SetPartySlot）
+			-- 入れられる人：探索中でない人（どのパーティに入れるかは一覧で選ぶ）
 			local sub = table.clone(view)
 			local advs = {}
 			for uid, a in view.adventurers do
-				local inParty = Party.find(view, uid)
-				if not Party.isAdventurerBusy(view, uid) and (inParty == nil or inParty == pickParty) then
+				if not Party.isAdventurerBusy(view, uid) then
 					advs[uid] = a
 				end
 			end
@@ -377,115 +385,139 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				local inParty = Party.find(view, uid)
 				face(faces, i, view.adventurers[uid], fav, false, if inParty then "♟" .. inParty else nil)
 			end
-			-- 待機のパーティの札（番号＋状態。D-231 ⑰と同じ形）
-			local picks: Frame = new("Frame", {
-				Name = "Parties",
-				LayoutOrder = 3,
-				Size = UDim2.new(1, 0, 0, 66),
-				BackgroundTransparency = 1,
-				[CHILDREN] = {
-					new("UIListLayout", {
-						FillDirection = Enum.FillDirection.Horizontal,
-						HorizontalAlignment = Enum.HorizontalAlignment.Center,
-						Padding = UDim.new(0, 12),
-						SortOrder = Enum.SortOrder.LayoutOrder,
-					}),
-				},
-				Parent = content,
-			})
-			for _, party in view.parties or {} do
-				local st = HubState.status(view, party.index).state
-				local ok = st == "waiting"
-				local sel = ok and pickParty == party.index
-				local b: TextButton = new("TextButton", {
-					Name = "Party" .. party.index,
-					LayoutOrder = party.index,
-					Text = party.index .. "  " .. (if ok then "⌂" else "●"),
-					TextSize = 25,
-					FontFace = Tokens.font.display,
-					TextColor3 = C.inkLight,
-					TextTransparency = if ok then 0 else 0.5,
-					AutoButtonColor = false,
-					Active = ok,
-					Size = UDim2.fromOffset(109, 66),
-					BackgroundColor3 = if ok then C.ch28 else C.ch16,
-					[CHILDREN] = {
-						Components.corner(14),
-						Components.stroke(if sel then C.selAmber elseif ok then C.bronze else C.ch28, 3),
-					},
-					Parent = picks,
-				})
-				if ok then
-					b.Activated:Connect(function()
-						pickParty = party.index
-						render()
-					end)
-				end
-			end
 			actions.Parent = content
+			local anyWaiting = #waiting > 0
 			local form = Components.button({
-				kind = if pickParty and #suited > 0 then "brown" else "disabled",
+				kind = if anyWaiting and #suited > 0 then "brown" else "disabled",
 				width = 150,
 				height = 66,
 				icon = "♟✚",
 				label = Words.form,
 				name = "Form",
 				glyph = "X",
+				reason = Words.reason.allOut,
 				onClick = function()
-					if busy or pickParty == nil then
-						return
+					if anyWaiting and #suited > 0 then
+						chooser = { action = "form" }
+						render()
 					end
-					busy = true
-					for slot, uid in suited do
-						Session.sendAndWait({
-							type = "SetPartySlot",
-							partyIndex = pickParty,
-							slot = slot,
-							adventurerUid = uid,
-						})
-					end
-					busy = false
-					HubState.selected = pickParty
-					api.close()
 				end,
 			})
 			form.LayoutOrder = 1
 			form.Parent = actions
-			-- 金＝選んだパーティでこのダンジョンへ Go（D-244 ③）。メンバーがいなければ押せない色
-			local members = 0
-			if pickParty then
-				for _, uid in view.parties[pickParty].slots do
-					if view.adventurers[uid] then
-						members += 1
-					end
-				end
-			end
-			local canGo = pickParty ~= nil and members > 0
 			local go = Components.button({
-				kind = if canGo then "gold" else "disabled",
-				width = 220, -- Form（150）と並べて面の幅に収める
+				kind = if anyWaiting then "gold" else "disabled",
+				width = 220,
 				icon = "▶",
 				label = Words.go,
 				name = "Go",
 				glyph = "A",
+				reason = Words.reason.allOut, -- 待機中のパーティがいない（D-272 ②）
 				onClick = function()
-					if busy or not canGo then
-						return
-					end
-					busy = true
-					local r = Session.sendAndWait({ type = "Dispatch", partyIndex = pickParty, dungeonId = dungeonId })
-					busy = false
-					if r and r.ok then
-						HubState.selected = pickParty
-						HubState.following = true
-						api.close()
-					else
+					if anyWaiting then
+						chooser = { action = "go" }
 						render()
 					end
 				end,
 			})
 			go.LayoutOrder = 2
 			go.Parent = actions
+			-- 待機中のパーティの一覧（リーダーのアイコンと名前：D-272 ①・D-271 ③）
+			local ch = chooser
+			if ch and anyWaiting then
+				local scrim: TextButton = new("TextButton", {
+					Name = "PartyChooser",
+					Text = "",
+					AutoButtonColor = false,
+					Size = UDim2.fromScale(1, 1),
+					BackgroundColor3 = C.scrim,
+					BackgroundTransparency = 0.45,
+					ZIndex = 40,
+					Parent = body,
+				})
+				scrim.Activated:Connect(function()
+					chooser = nil
+					render()
+				end)
+				local sheet, sc = Components.panel({
+					size = UDim2.fromOffset(420, 120 + #waiting * 84),
+					position = UDim2.fromScale(0.5, 0.5),
+					anchor = Vector2.new(0.5, 0.5),
+					title = if ch.action == "go" then Words.go else Words.form,
+				})
+				sheet.ZIndex = 41
+				sheet.Parent = scrim
+				new("UIListLayout", {
+					Padding = UDim.new(0, 10),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Parent = sc,
+				})
+				for k, w in waiting do
+					local rowB: TextButton = new("TextButton", {
+						Name = "Party" .. w.index,
+						LayoutOrder = k,
+						Text = "",
+						AutoButtonColor = false,
+						Size = UDim2.new(1, 0, 0, 74),
+						BackgroundColor3 = C.ch28,
+						ZIndex = 42,
+						[CHILDREN] = { Components.corner(12), Components.stroke(C.bronze, 3) },
+						Parent = sc,
+					})
+					local icon = PartyIcon.make(56)
+					icon.Position = UDim2.fromOffset(10, 9)
+					icon.Parent = rowB
+					PartyIcon.set(icon, view, w.index, "waiting")
+					local nm = Components.text({
+						text = PartyIcon.name(view, w.index),
+						size = 25,
+						color = C.inkLight,
+						font = Tokens.font.display,
+						xAlign = Enum.TextXAlignment.Left,
+					})
+					nm.AnchorPoint = Vector2.new(0, 0.5)
+					nm.Position = UDim2.new(0, 80, 0.5, 0)
+					nm.Parent = rowB
+					local cnt = WarehouseCommon.pill("@roster", tostring(w.members), 21)
+					cnt.AnchorPoint = Vector2.new(1, 0.5)
+					cnt.Position = UDim2.new(1, -12, 0.5, 0)
+					cnt.Parent = rowB
+					rowB.Activated:Connect(function()
+						if busy then
+							return
+						end
+						busy = true
+						if ch.action == "form" then
+							for slot, uid in suited do
+								Session.sendAndWait({
+									type = "SetPartySlot",
+									partyIndex = w.index,
+									slot = slot,
+									adventurerUid = uid,
+								})
+							end
+							busy = false
+							chooser = nil
+							HubState.selected = w.index
+							api.close()
+							return
+						end
+						local r =
+							Session.sendAndWait({ type = "Dispatch", partyIndex = w.index, dungeonId = dungeonId })
+						busy = false
+						chooser = nil
+						if r and r.ok then
+							HubState.selected = w.index
+							api.close()
+							task.delay(0.3, function()
+								World3D.focusParty(w.index) -- 出た馬車へカメラを寄せる
+							end)
+						else
+							render()
+						end
+					end)
+				end
+			end
 		else
 			-- ③ 未解放：鍵 → 前のダンジョン（踏破の印）
 			local prev = if d.unlockAfterClear then master.dungeons[d.unlockAfterClear] else nil

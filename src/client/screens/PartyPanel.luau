@@ -13,7 +13,9 @@ local TweenService = game:GetService("TweenService")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local Art = require("../ui/Art")
+local PartyIcon = require("../ui/PartyIcon")
 local Portrait = require("../ui/Portrait")
+local World3D = require("../hub/World3D")
 local HubState = require("../hub/HubState")
 local LevelUpMarks = require("../hub/LevelUpMarks")
 local Nav = require("../ui/Nav")
@@ -42,7 +44,14 @@ local function clock(seconds: number): string
 	return string.format("%d:%02d", s // 60, s % 60)
 end
 
-local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, compact: boolean?): Frame
+local function memberRow(
+	adv: any,
+	hp: number?,
+	maxHp: number?,
+	delta: number?,
+	compact: boolean?,
+	isLeader: boolean?
+): Frame
 	local row: Frame = new("Frame", {
 		Name = "Member",
 		Size = UDim2.new(1, 0, 0, if compact then 46 else 56), -- 探索中は一枚絵の枠のぶん低く
@@ -69,6 +78,15 @@ local function memberRow(adv: any, hp: number?, maxHp: number?, delta: number?, 
 		Parent = row,
 	})
 	Portrait.fill(face, adv.appearanceId, down)
+	-- リーダーの印（王冠：D-271）
+	if isLeader then
+		local crown = Components.text({ text = "👑", size = 21, color = C.inkDark, font = Tokens.font.number })
+		crown.Name = "Leader"
+		crown.AnchorPoint = Vector2.new(0.5, 0.5)
+		crown.Position = UDim2.new(1, -2, 0, 2)
+		crown.ZIndex = 5
+		crown.Parent = face
+	end
 	local name = Components.text({ text = adv.name, size = 23, color = C.inkDark, font = Tokens.font.bodyStrong })
 	name.LayoutOrder = 2
 	name.TextTransparency = if down then 0.5 else 0
@@ -131,9 +149,70 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local panel, content = Components.panel({
 		size = UDim2.fromOffset(PANEL_W, PANEL_H),
 		position = UDim2.fromOffset(196, band + 40),
-		title = "Party " .. partyIndex,
+		title = PartyIcon.name(Session.view, partyIndex), -- 「リーダー名's Party」（D-271 ③）
 	})
 	panel.Parent = frame
+	-- 題の札の左にリーダーのアイコン（D-271 ③）
+	local titleIcon = PartyIcon.make(48)
+	titleIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	titleIcon.Position = UDim2.fromOffset(196 + 6, band + 40 - 2)
+	titleIcon.ZIndex = 12
+	for _, d in titleIcon:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 13
+		end
+	end
+	titleIcon.Parent = frame
+	-- パーティを選んだときは、カメラがそのパーティへ寄って旋回する（メニューから開いたときも：D-270 ⑤）
+	World3D.focusParty(partyIndex)
+	-- リーダーを選ぶ小さな面（メンバーの行を押すと開く：D-271 ①）
+	local leaderSheet: Frame? = nil
+	local function closeLeaderSheet()
+		if leaderSheet then
+			leaderSheet:Destroy()
+			leaderSheet = nil
+		end
+	end
+	local function openLeaderSheet(adv: any)
+		closeLeaderSheet()
+		local scrim: TextButton = new("TextButton", {
+			Name = "LeaderSheet",
+			Text = "",
+			AutoButtonColor = false,
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = C.scrim,
+			BackgroundTransparency = 0.5,
+			ZIndex = 40,
+			Parent = frame,
+		})
+		scrim.Activated:Connect(closeLeaderSheet)
+		local sheet, sc = Components.panel({
+			size = UDim2.fromOffset(380, 190),
+			position = UDim2.fromOffset(196 + PANEL_W / 2, band + 240),
+			anchor = Vector2.new(0.5, 0.5),
+		})
+		sheet.ZIndex = 41
+		sheet.Parent = scrim
+		local t = Components.text({ text = adv.name, size = 25, color = C.inkDark, font = Tokens.font.display })
+		t.Position = UDim2.fromOffset(0, 4)
+		t.Parent = sc
+		local b = Components.button({
+			kind = "gold",
+			width = 300,
+			height = 66,
+			icon = "👑",
+			label = Words.makeLeader,
+			name = "MakeLeader",
+			onClick = function()
+				Session.send({ type = "SetPartyLeader", partyIndex = partyIndex, adventurerUid = adv.uid })
+				closeLeaderSheet()
+			end,
+		})
+		b.AnchorPoint = Vector2.new(0.5, 1)
+		b.Position = UDim2.new(0.5, 0, 1, -4)
+		b.Parent = sc
+		leaderSheet = scrim
+	end
 	local close = Components.closeButton(api.close)
 	close.AnchorPoint = Vector2.new(0.5, 0.5)
 	close.Position = UDim2.fromOffset(196 + PANEL_W - 12, band + 40 + 12)
@@ -199,6 +278,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			.. tostring(party.autoRepeat and party.autoRepeat.dungeonId)
 			.. ":"
 			.. tostring(party.lastDungeonId)
+			.. ":"
+			.. tostring(Party.leader(view, partyIndex))
+		-- 題の札とアイコン（リーダーが変わったら）
+		PartyIcon.set(titleIcon, view, partyIndex, s.state)
+		local plaque = panel:FindFirstChild("TitlePlaque", true)
+		if plaque then
+			for _, d in plaque:GetDescendants() do
+				if d:IsA("TextLabel") and d.Text ~= "" then
+					d.Text = PartyIcon.name(view, partyIndex)
+				end
+			end
+		end
 		if s.hp then
 			key ..= ":" .. table.concat(s.hp, ",")
 		end
@@ -278,10 +369,34 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						end
 					end
 				end
-				local row = memberRow(view.adventurers[uid], hp, maxHp[memberIdx], delta, exploring)
+				local adv = view.adventurers[uid]
+				local isLeader = Party.leader(view, partyIndex) == uid
+				local row = memberRow(adv, hp, maxHp[memberIdx], delta, exploring, isLeader)
+				-- 行と、押す面を重ねる入れ物（押す面を行の並び（UIListLayout）に入れないため）
+				local holder: Frame = new("Frame", {
+					Name = "Member_" .. uid,
+					Size = row.Size,
+					BackgroundTransparency = 1,
+					Parent = body,
+				})
 				order += 1
-				row.LayoutOrder = order
-				row.Parent = body
+				holder.LayoutOrder = order
+				row.Size = UDim2.fromScale(1, 1)
+				row.Parent = holder
+				-- 行を押すと「リーダーにする」の面（今のリーダーの行は何もしない：D-271 ①）
+				if not isLeader then
+					local tap: TextButton = new("TextButton", {
+						Name = "Tap",
+						Text = "",
+						BackgroundTransparency = 1,
+						Size = UDim2.fromScale(1, 1),
+						ZIndex = 6,
+						Parent = holder,
+					})
+					tap.Activated:Connect(function()
+						openLeaderSheet(adv)
+					end)
+				end
 			end
 		end
 		if s.state == "waiting" then

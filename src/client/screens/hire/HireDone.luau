@@ -110,10 +110,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				Motion.alert(Words.reason.partyOut)
 				local from = Motion.center(portrait)
 				api.home()
-				local guild = HubState.guildNode
+				local guild = HubState.guildPoint and HubState.guildPoint()
 				Motion.fly({
 					from = from,
-					to = if guild then guild else Vector2.new(640, 360),
+					to = guild or Vector2.new(640, 360),
 					visual = card,
 					size = 200,
 					endSize = 60,

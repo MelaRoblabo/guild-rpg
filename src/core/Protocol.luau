@@ -38,6 +38,7 @@ local WHICH = enum({ "previous", "current" })
 -- クライアントから受け付けるコマンドと引数（05章 M2〜M5b、M7b）。GrantPurchase・GrantReferral（サーバー専用）は含めない
 Protocol.CLIENT_COMMANDS = {
 	SetPartySlot = { partyIndex = int(1, 20), slot = int(1, 4), adventurerUid = str(ID, true) },
+	SetPartyLeader = { partyIndex = int(1, 20), adventurerUid = str(ID) }, -- D-271
 	Equip = { adventurerUid = str(ID), equipmentUid = str(ID) },
 	Unequip = { adventurerUid = str(ID), slot = enum({ "weapon", "armor", "sub" }) },
 	Dispatch = { partyIndex = int(1, 20), dungeonId = str(ID) },

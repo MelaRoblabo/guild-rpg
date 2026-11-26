@@ -3,6 +3,9 @@
 
 local Players = game:GetService("Players")
 
+-- 3D マップの画面だけを見るゲームなので、アバターは出さない（D-270。カメラは MapCamera が動かす）
+Players.CharacterAutoLoads = false
+
 local Data = require("@game/ReplicatedStorage/Data")
 local MasterData = require("@game/ReplicatedStorage/Core/MasterData")
 local Config = require("./Config")

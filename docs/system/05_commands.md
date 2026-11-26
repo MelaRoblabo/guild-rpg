@@ -17,7 +17,8 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 
 | フェイズ | type | 引数 | 内容 | 主なエラー | 根拠 |
 | --- | --- | --- | --- | --- | --- |
-| M2 | `SetPartySlot` | partyIndex, slot(1-4), adventurerUid? | 隊列に配置／外す | PARTY_BUSY, ADVENTURER_IN_OTHER_PARTY | D-035 |
+| M2 | `SetPartySlot` | partyIndex, slot(1-4), adventurerUid? | 隊列に配置／外す。リーダーが外れたらリーダーの記録を消す（次はいちばん前の人） | PARTY_BUSY, ADVENTURER_IN_OTHER_PARTY | D-035, D-271 |
+| M8 | `SetPartyLeader` | partyIndex, adventurerUid | パーティのリーダーを決める（アイコンと名前だけ。探索中も可）。リーダーは `Party.leader`（leaderUid がいなければいちばん前の人） | PARTY_NOT_FOUND, ADVENTURER_NOT_IN_PARTY | D-271 |
 | M2 | `Equip` | adventurerUid, equipmentUid | 装備する（職業制限を確認） | JOB_CANNOT_EQUIP, ADVENTURER_ON_EXPEDITION | 06章 |
 | M2 | `Unequip` | adventurerUid, slot | 外す | WAREHOUSE_FULL | 06章 |
 | M2 | `Dispatch` | partyIndex, dungeonId | 派遣。探索ログを確定（出発時の日替わりの特性を当てる：D-156）。派遣費は廃止（D-163） | PARTY_BUSY, PARTY_EMPTY, DUNGEON_LOCKED | D-026, D-071, D-156, D-163 |

@@ -9,6 +9,7 @@ local Words = {
 	goAll = "Go All",
 	editParty = "Edit Party", -- 編成の面・その入口（D-265 ⑥。Menu・Party をそろえた）
 	addToParty = "Add to Party", -- 採用の後・控えの人（D-265）
+	makeLeader = "Make Leader", -- パーティのリーダーにする（D-271 ①）
 	undo = "Undo", -- 入れ替えと自動装備を戻す（D-266 ③）
 	skip = "Skip", -- 開封の演出を飛ばす（D-267 ②）
 	repeatOn = "Repeat",

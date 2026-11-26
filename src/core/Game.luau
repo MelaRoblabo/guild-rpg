@@ -557,6 +557,7 @@ handlers.SetPartySlot = function(state, cmd, ctx)
 	local uid = cmd.adventurerUid
 	if uid == nil or uid == Party.EMPTY then
 		p.slots[cmd.slot] = Party.EMPTY
+		Party.fixLeader(state, cmd.partyIndex)
 		return { ok = true, events = {} }
 	end
 	if not state.adventurers[uid] then
@@ -571,7 +572,21 @@ handlers.SetPartySlot = function(state, cmd, ctx)
 		p.slots[otherSlot] = p.slots[cmd.slot]
 	end
 	p.slots[cmd.slot] = uid
+	Party.fixLeader(state, cmd.partyIndex)
 	local _ = ctx
+	return { ok = true, events = {} }
+end
+
+-- パーティのリーダーを決める（D-271 ①）。役割はアイコンと名前だけなので、探索中でも変えられる
+handlers.SetPartyLeader = function(state, cmd, _ctx)
+	local p = state.parties[cmd.partyIndex]
+	if not p then
+		return fail("PARTY_NOT_FOUND")
+	end
+	if table.find(p.slots, cmd.adventurerUid) == nil or state.adventurers[cmd.adventurerUid] == nil then
+		return fail("ADVENTURER_NOT_IN_PARTY")
+	end
+	p.leaderUid = cmd.adventurerUid
 	return { ok = true, events = {} }
 end
 
@@ -1004,6 +1019,7 @@ handlers.Dismiss = function(state, cmd, ctx)
 	local partyIndex, slot = Party.find(state, adv.uid)
 	if partyIndex and slot then
 		state.parties[partyIndex].slots[slot] = Party.EMPTY
+		Party.fixLeader(state, partyIndex)
 	end
 	state.adventurers[adv.uid] = nil
 	return { ok = true, events = { { type = "Dismissed", at = ctx.now, uid = adv.uid, name = adv.name } } }

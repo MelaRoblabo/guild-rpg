@@ -17,7 +17,7 @@ HubState.following = false
 -- マップのギルドの建物に NEW の顔を付け、帰ってきたパーティの馬車 → Edit Party を一度だけ光らせる。
 -- 保存はしない（この接続の間だけ）
 HubState.newcomers = {} :: { [string]: boolean }
-HubState.guildNode = nil :: GuiObject? -- マップのギルドの建物（雇った人のカードが飛び込む先）
+HubState.guildPoint = nil :: (() -> Vector2?)? -- 画面の上のギルドの位置（雇った人のカード・宝箱が飛ぶ：3D マップ D-270）
 
 -- まだどのパーティにも入っていない、全員が冒険中に雇った人
 function HubState.pendingNewcomers(view: any): { string }

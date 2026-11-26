@@ -1,9 +1,9 @@
 --!strict
 -- メイン画面 S-10（T0 ハブ。D-211〜D-216・D-225）。ほかの画面はこの上に Nav で重ねる。
---   - マップが主役：画面より広く、ドラッグでスクロールする。一覧の行を触るとカメラがその馬車に寄って追う（D-212）。
---   - 常に出すもの：左のパーティ一覧、右下の宝箱ボタン（唯一の金）、右上のゴールドとその下のフレンド（D-213 ⑯・D-225）。
+--   - マップが主役：テーブルの上の 3D の地図（World3D・MapCamera：D-270）。カメラは自由に動かせ、
+--     パーティ・ダンジョン・ギルドを選ぶとその物へ寄ってゆっくり旋回する。
+--   - 常に出すもの：左のパーティ一覧（リーダーのアイコン：D-271）、右下の宝箱ボタン（唯一の金）、右上のゴールドとその下のフレンド（D-213 ⑯・D-225）。
 --   - 部品はすべて Roblox の帯より下に置く（D-219・D-225 ①）。
--- マップの絵とダンジョンの位置は仮（MapLayout。D-214 ⑪）。
 
 local RunService = game:GetService("RunService")
 
@@ -13,7 +13,8 @@ local Art = require("../ui/Art")
 local HubState = require("../hub/HubState")
 local Motion = require("../ui/Motion")
 local Portrait = require("../ui/Portrait")
-local MapLayout = require("../hub/MapLayout")
+local PartyIcon = require("../ui/PartyIcon")
+local World3D = require("../hub/World3D")
 local Nav = require("../ui/Nav")
 local EventMarker = require("../hub/EventMarker")
 local Guide = require("../hub/Guide")
@@ -21,12 +22,10 @@ local LevelUpMarks = require("../hub/LevelUpMarks")
 local PickMode = require("../hub/PickMode")
 local LoginSequence = require("../hub/LoginSequence")
 local ReturnToast = require("../hub/ReturnToast")
-local WorldCarts = require("../hub/WorldCarts")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
 local Words = require("../ui/Words")
-local master = require("../Master")
 
 local C = Tokens.color
 local I = Components.icon
@@ -35,17 +34,11 @@ local CHILDREN = Create.Children
 
 local Hub = {}
 
-local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV" }
-local STATE_GLYPH =
-	{ moving = "@cart_moving", exploring = "@cart_exploring", returning = "@cart_returning", waiting = "@cart_waiting" }
-
 local layer: Frame
-local map: ScrollingFrame
-local mapContent: Frame
 local listFrame: Frame
-local wagons: { [number]: Frame } = {}
-local rows: { [number]: { button: TextButton, glyph: TextLabel, pinch: Frame, ring: UIStroke, timer: TextLabel } } = {}
-local markers: { [string]: TextButton } = {}
+-- 左の一覧の行：リーダーのアイコン（右上に動く状態の印）と名前（D-271）
+local rows: { [number]: { button: TextButton, icon: Frame, name: TextLabel, pinch: Frame, ring: UIStroke } } = {}
+local newFaceBoard: BillboardGui? = nil -- ギルドの上の、全員が冒険中に雇った人の NEW の顔（D-265 ②）
 local goldText: TextLabel
 local chestCount: TextLabel
 local levelUpBadge: TextLabel? = nil -- Adventurers のボタンの ▲（D-269 ③）
@@ -55,378 +48,70 @@ local chestButton: Frame
 local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 ②）
 
 ---------------------------------------------------------------------------
--- マップ
+-- 3D マップ（D-270）
 
-local PROGRESS_DOTS = 12 -- 進みの輪の点の数（D-249 ②。見た目の分け方でゲームの数値ではない）
-
-local function placeAt(inst: GuiObject, p: MapLayout.Point)
-	inst.AnchorPoint = Vector2.new(0.5, 0.5)
-	inst.Position = UDim2.fromOffset(p.x, p.y)
+-- パーティを選ぶ：パーティの面を開く（面がカメラをそのパーティへ寄せて旋回させる：D-270 ⑤）
+local function openParty(partyIndex: number)
+	HubState.selected = partyIndex
+	PickMode.stop() -- 行き先を選ぶのをやめる
+	Nav.open("PartyPanel", { partyIndex = partyIndex })
 end
 
-local function buildMap(parent: Frame)
-	local n = #master.dungeonList
-	-- マップの絵（1024×720 を左からつなぐ：15章 §9）。スクロールは最後のダンジョンの少し先まで（絵の右の続きは今は使わない）
-	local tiles = Art.mapTiles()
-	local width = MapLayout.width(n)
-	map = new("ScrollingFrame", {
-		Name = "Map",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = C.ch13,
-		BorderSizePixel = 0,
-		ScrollingDirection = Enum.ScrollingDirection.X,
-		ScrollBarThickness = 0,
-		CanvasSize = UDim2.fromOffset(width, 0),
-		ElasticBehavior = Enum.ElasticBehavior.Never,
-		Parent = parent,
+local function mount3D()
+	World3D.mount({
+		onDungeon = function(id: string)
+			Nav.open("DungeonPanel", { dungeonId = id }) -- 面がカメラをそのダンジョンへ寄せる
+		end,
+		onGuild = function()
+			World3D.focusGuild()
+			Nav.open("HireDesk") -- ギルド（S-20＝受付の広間：D-122・D-231 ③）
+		end,
+		onParty = openParty,
 	})
-	-- 仮の地面（暖かい暗い茶の濃淡）
-	new("Frame", {
-		Name = "Ground",
-		Size = UDim2.new(0, width, 1, 0),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BorderSizePixel = 0,
-		[CHILDREN] = { Components.gradient(C.ch16, C.ch13) },
-		Parent = map,
-	})
-	for i, img in tiles do
-		new("ImageLabel", {
-			Name = "MapTile" .. i,
-			Image = img,
-			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(1024 * (i - 1), 0),
-			Size = UDim2.new(0, 1024, 1, 0),
-			ScaleType = Enum.ScaleType.Stretch,
-			ZIndex = 1,
-			Parent = map,
-		})
+	-- 雇った人のカードが飛び込む先（画面の上のギルドの位置：D-265 ②）
+	HubState.guildPoint = function(): Vector2?
+		return World3D.screenPoint(World3D.guild())
 	end
-	mapContent = new("Frame", {
-		Name = "Content",
-		Size = UDim2.new(0, width, 1, 0),
-		BackgroundTransparency = 1,
-		ZIndex = 2,
-		Parent = map,
-	})
-	-- ギルド（街）
-	local guild: TextButton = new("TextButton", {
-		Name = "Guild",
-		Text = "",
-		AutoButtonColor = false,
-		Size = UDim2.fromOffset(110, 110),
-		BackgroundColor3 = C.ch28,
-		ZIndex = 3,
-		[CHILDREN] = {
-			Components.corner(18),
-			Components.stroke(C.bronze, 3),
-			(function()
-				local t = Components.text({ text = I.home, size = 54, color = C.inkLight, font = Tokens.font.number })
-				t.AutomaticSize = Enum.AutomaticSize.None
-				t.Size = UDim2.fromScale(1, 1)
-				t.ZIndex = 4
-				return t
-			end)(),
-		},
-		Parent = mapContent,
-	})
-	placeAt(guild, MapLayout.guild())
-	HubState.guildNode = guild -- 全員が冒険中に雇った人のカードが飛び込む先（D-265 ②）
-	-- 雇った人の NEW の顔（全員が冒険中に雇った人がいる間だけ。refreshStatic で出し入れする）
-	local newFace: Frame = new("Frame", {
-		Name = "NewFace",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, 4),
-		Size = UDim2.fromOffset(64, 64),
-		BackgroundColor3 = C.ch13,
-		Visible = false,
-		ZIndex = 6,
-		[CHILDREN] = { Components.corner(32), Components.stroke(C.okGreen, 3) },
-		Parent = guild,
-	})
-	new("TextLabel", {
-		Name = "New",
-		Text = "NEW",
-		TextSize = 18,
-		FontFace = Tokens.font.number,
-		TextColor3 = C.inkDark,
-		BackgroundColor3 = C.okGreen,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 1),
-		Size = UDim2.fromOffset(52, 24),
-		ZIndex = 8,
-		[CHILDREN] = { Components.corner(12) },
-		Parent = newFace,
-	})
-	local guildArt = Art.put(guild, Art.mapGuild(), { zIndex = 4 })
-	if guildArt then
-		-- 建物の絵があれば枠と記号を消す
-		guild.BackgroundTransparency = 1
-		for _, c in guild:GetChildren() do
-			if c:IsA("TextLabel") then
-				c.Visible = false
-			elseif c:IsA("UIStroke") then
-				c.Enabled = false
-			end
-		end
-	end
-	-- ダンジョン
-	for i, d in master.dungeonList do
-		local m: TextButton = new("TextButton", {
-			Name = d.id,
-			Text = "",
-			AutoButtonColor = false,
-			Size = UDim2.fromOffset(84, 84),
-			BackgroundColor3 = C.ch16,
-			ZIndex = 3,
-			[CHILDREN] = {
-				Components.corner(42),
-				Components.stroke(C.bronze, 3),
-				(function()
-					local t = Components.text({
-						text = ROMAN[i] or tostring(i),
-						size = 30,
-						color = C.inkLight,
-						font = Tokens.font.display,
-					})
-					t.AutomaticSize = Enum.AutomaticSize.None
-					t.Size = UDim2.fromScale(1, 1)
-					t.ZIndex = 4
-					t.Name = "Numeral"
-					return t
-				end)(),
-			},
-			Parent = mapContent,
+	local pg = (game:GetService("Players").LocalPlayer :: Player):WaitForChild("PlayerGui")
+	local boards = pg -- 板は PlayerGui の直下
+	EventMarker.mount(World3D.eventPlace, boards) -- マップイベントの印（D-270 ⑦）
+	-- ギルドの上の NEW の顔（全員が冒険中に雇った人：D-265 ②）
+	local guild = World3D.guild()
+	if guild then
+		local b: BillboardGui = new("BillboardGui", {
+			Name = "NewcomerBoard",
+			Adornee = guild,
+			AlwaysOnTop = true,
+			Enabled = false,
+			Size = UDim2.fromOffset(80, 92),
+			StudsOffsetWorldSpace = Vector3.new(0, guild.Size.Y / 2 + 12, 0),
+			Parent = boards,
 		})
-		placeAt(m, MapLayout.dungeon(i))
-		m.Activated:Connect(function()
-			Nav.open("DungeonPanel", { dungeonId = d.id })
-		end)
-		markers[d.id] = m
-		-- 探索の進みの輪（D-249 ②）：丸の周りに点を並べ、進みに合わせて明るくする。探索中のときだけ見せる
-		local ring: Frame = new("Frame", {
-			Name = "Progress",
+		local face: Frame = new("Frame", {
+			Name = "NewFace",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.fromScale(0.5, 0),
+			Size = UDim2.fromOffset(64, 64),
+			BackgroundColor3 = C.ch13,
+			[CHILDREN] = { Components.corner(32), Components.stroke(C.okGreen, 3) },
+			Parent = b,
+		})
+		new("TextLabel", {
+			Name = "New",
+			Text = "NEW",
+			TextSize = 18,
+			FontFace = Tokens.font.number,
+			TextColor3 = C.inkDark,
+			BackgroundColor3 = C.okGreen,
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			Visible = false,
-			Parent = m,
+			Position = UDim2.fromScale(0.5, 1),
+			Size = UDim2.fromOffset(52, 24),
+			ZIndex = 3,
+			[CHILDREN] = { Components.corner(12) },
+			Parent = face,
 		})
-		for k = 1, PROGRESS_DOTS do
-			local a = math.rad(-90 + (k - 1) * 360 / PROGRESS_DOTS)
-			new("Frame", {
-				Name = "Dot" .. k,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(0.5, math.cos(a) * 54, 0.5, math.sin(a) * 54),
-				Size = UDim2.fromOffset(10, 10),
-				BackgroundColor3 = C.ch45,
-				ZIndex = 4,
-				[CHILDREN] = { Components.corner(5) },
-				Parent = ring,
-			})
-		end
+		newFaceBoard = b
 	end
-	-- 行き先を選ぶ形（D-231 ⑦）：選べるダンジョンは琥珀の輪。
-	-- 入ったときは選べる丸が順に跳ね、ギルドから今の行き先へ点線の道が伸びる（D-269 ②）
-	local pickDots: Frame? = nil
-	local function clearPickDots()
-		if pickDots then
-			pickDots:Destroy()
-			pickDots = nil
-		end
-	end
-	local function showPickMode()
-		local view = Session.view
-		local picking = PickMode.partyIndex ~= nil
-		local k = 0
-		for _, d in master.dungeonList do
-			local mk = markers[d.id]
-			local open = view ~= nil and view.unlockedDungeons ~= nil and view.unlockedDungeons[d.id] == true
-			local stroke = mk and mk:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				stroke.Color = if picking and open then C.selAmber else C.bronze
-				stroke.Thickness = if picking and open then 5 else 3
-			end
-			if picking and open and mk then
-				k += 1
-				task.delay(0.08 * k, function()
-					Motion.bump(mk, 0.25)
-				end)
-			end
-		end
-		clearPickDots()
-		if picking and view then
-			local party = view.parties[PickMode.partyIndex :: number]
-			local dest = (party and party.lastDungeonId) or HubState.firstUnlocked(view)
-			local di = HubState.dungeonIndex(dest)
-			if di then
-				local g, t = MapLayout.guild(), MapLayout.dungeon(di)
-				local holder: Frame = new("Frame", {
-					Name = "PickPath",
-					Size = UDim2.fromScale(1, 1),
-					BackgroundTransparency = 1,
-					ZIndex = 2,
-					Parent = mapContent,
-				})
-				pickDots = holder
-				local dx, dy = t.x - g.x, t.y - g.y
-				local len = math.sqrt(dx * dx + dy * dy)
-				local steps = math.max(1, math.floor(len / 26))
-				for j = 1, steps - 1 do
-					local dot: Frame = new("Frame", {
-						Name = "Dot" .. j,
-						AnchorPoint = Vector2.new(0.5, 0.5),
-						Position = UDim2.fromOffset(g.x + dx * j / steps, g.y + dy * j / steps),
-						Size = UDim2.fromOffset(9, 9),
-						BackgroundColor3 = C.selAmber,
-						Visible = false,
-						ZIndex = 3,
-						[CHILDREN] = { Components.corner(5), Components.stroke(C.ch05, 1) },
-						Parent = holder,
-					})
-					task.delay(0.5 * j / steps, function()
-						dot.Visible = true
-					end)
-				end
-			end
-		end
-	end
-	PickMode.changed:connect(showPickMode)
-	EventMarker.mount(mapContent) -- マップイベントの印（M8-6）
-	WorldCarts.mount(mapContent) -- 他のプレイヤーの馬車（M8-7、D-108・D-151）
-	-- 自分でスクロールしたら追うのをやめる（D-214 ⑧）
-	map.InputBegan:Connect(function(io: InputObject)
-		if io.UserInputType == Enum.UserInputType.Touch or io.UserInputType == Enum.UserInputType.MouseButton1 then
-			HubState.following = false
-		end
-	end)
-	map.InputChanged:Connect(function(io: InputObject)
-		if io.UserInputType == Enum.UserInputType.MouseWheel then
-			HubState.following = false
-		end
-	end)
-end
-
-local function wagonFor(partyIndex: number): Frame
-	local w = wagons[partyIndex]
-	if w then
-		return w
-	end
-	w = new("Frame", {
-		Name = "Wagon" .. partyIndex,
-		Size = UDim2.fromOffset(84, 64),
-		BackgroundColor3 = C.ch28,
-		ZIndex = 6,
-		[CHILDREN] = {
-			Components.corner(10),
-			Components.stroke(C.ch05, 2),
-		},
-		Parent = mapContent,
-	})
-	-- 馬車の絵（ui_cart）。番号は旗にする（D-269 ②。「1」と書いた四角では馬車と分からなかった）
-	if Art.put(w, Art.ui("cart"), { zIndex = 7 }) then
-		w.BackgroundTransparency = 1
-		local stroke = w:FindFirstChildOfClass("UIStroke")
-		if stroke then
-			stroke.Enabled = false
-		end
-	end
-	local flag: Frame = new("Frame", {
-		Name = "Flag",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromOffset(-6, 14),
-		Size = UDim2.fromOffset(34, 28),
-		BackgroundColor3 = C.ctaGoldRim,
-		ZIndex = 8,
-		[CHILDREN] = { Components.corner(4), Components.stroke(C.ch05, 2) },
-		Parent = w,
-	})
-	new("Frame", {
-		Name = "Pole",
-		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.new(0, -2, 1, 0),
-		Size = UDim2.fromOffset(3, 16),
-		BackgroundColor3 = C.ch05,
-		BorderSizePixel = 0,
-		ZIndex = 8,
-		Parent = flag,
-	})
-	local num = Components.text({
-		text = tostring(partyIndex),
-		size = 21,
-		color = C.inkWhite,
-		font = Tokens.font.display,
-		stroke = true,
-	})
-	num.AutomaticSize = Enum.AutomaticSize.None
-	num.Size = UDim2.fromScale(1, 1)
-	num.ZIndex = 9
-	num.Parent = flag
-	-- 指示待ちの吹き出しの「！」（D-215 ⑦）
-	new("TextLabel", {
-		Name = "Waiting",
-		Text = "!",
-		TextSize = 25,
-		FontFace = Tokens.font.number,
-		TextColor3 = C.inkWhite,
-		BackgroundColor3 = C.notice,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, -4),
-		Size = UDim2.fromOffset(34, 34),
-		ZIndex = 8,
-		Visible = false,
-		[CHILDREN] = { Components.corner(17), Components.stroke(C.ch75, 2) },
-		Parent = w,
-	})
-	-- ピンチの印（ひびの入ったハートの仮。D-214 ③）
-	new("TextLabel", {
-		Name = "Pinch",
-		Text = "♥",
-		TextSize = 21,
-		FontFace = Tokens.font.number,
-		TextColor3 = C.warnDark,
-		BackgroundColor3 = C.ch10,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 10, 0, -10),
-		Size = UDim2.fromOffset(30, 30),
-		ZIndex = 8,
-		Visible = false,
-		[CHILDREN] = { Components.corner(15), Components.stroke(C.warnDark, 2) },
-		Parent = w,
-	})
-	-- 戦いの間の吹き出し（D-249 ②）
-	new("TextLabel", {
-		Name = "Battle",
-		Text = "⚔",
-		TextSize = 25,
-		FontFace = Tokens.font.number,
-		TextColor3 = C.inkLight,
-		BackgroundColor3 = C.ch10,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, -4),
-		Size = UDim2.fromOffset(38, 34),
-		ZIndex = 8,
-		Visible = false,
-		[CHILDREN] = { Components.corner(17), Components.stroke(C.bronze, 2) },
-		Parent = w,
-	})
-	-- 馬車を触ってもパーティの面を開く（D-212。一覧の行と同じ）
-	local tap: TextButton = new("TextButton", {
-		Name = "Tap",
-		Text = "",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 9,
-		Parent = w,
-	})
-	tap.Activated:Connect(function()
-		HubState.selected = partyIndex
-		HubState.following = true
-		PickMode.stop()
-		Nav.open("PartyPanel", { partyIndex = partyIndex })
-	end)
-	wagons[partyIndex] = w
-	return w
 end
 
 ---------------------------------------------------------------------------
@@ -468,24 +153,29 @@ local function rowFor(partyIndex: number)
 		[CHILDREN] = { Components.corner(8), ring },
 		Parent = listFrame,
 	})
-	local num =
-		Components.text({ text = tostring(partyIndex), size = 30, color = C.inkLight, font = Tokens.font.display })
-	num.Position = UDim2.fromOffset(12, 18)
-	num.ZIndex = 22
-	num.Parent = button
-	local glyph = Components.text({ text = "", size = 30, color = C.ch75, font = Tokens.font.number })
-	glyph.AnchorPoint = Vector2.new(0.5, 0.5)
-	glyph.Position = UDim2.fromOffset(76, 33)
-	glyph.ZIndex = 22
-	glyph.Parent = button
-	-- 帰るまでの残り（出ている間だけ。状態の印は上へ寄せる：D-249 ①）
-	local timer = Components.text({ text = "", size = 21, color = C.inkLight, font = Tokens.font.number })
-	timer.Name = "Timer"
-	timer.AnchorPoint = Vector2.new(0.5, 0.5)
-	timer.Position = UDim2.fromOffset(76, 48)
-	timer.ZIndex = 22
-	timer.Visible = false
-	timer.Parent = button
+	-- リーダーのアイコン（番号の代わり：D-271 ③）。右上に動く状態の印（D-271 ④）。帰るまでの時間は出さない（D-271 ⑤）
+	local icon = PartyIcon.make(50)
+	icon.Position = UDim2.fromOffset(8, 8)
+	icon.ZIndex = 22
+	for _, d in icon:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 23
+		end
+	end
+	icon.Parent = button
+	local name = Components.text({
+		text = "",
+		size = 21,
+		color = C.inkLight,
+		font = Tokens.font.display,
+		xAlign = Enum.TextXAlignment.Left,
+	})
+	name.AutomaticSize = Enum.AutomaticSize.None
+	name.Position = UDim2.fromOffset(68, 20)
+	name.Size = UDim2.fromOffset(72, 26)
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.ZIndex = 22
+	name.Parent = button
 	local pinch: Frame = new("TextLabel", {
 		Name = "Pinch",
 		Text = "♥",
@@ -493,22 +183,19 @@ local function rowFor(partyIndex: number)
 		FontFace = Tokens.font.number,
 		TextColor3 = C.warnDark,
 		BackgroundColor3 = C.ch10,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -8, 0.5, 0),
-		Size = UDim2.fromOffset(32, 32),
-		ZIndex = 22,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -4, 1, -4),
+		Size = UDim2.fromOffset(28, 28),
+		ZIndex = 24,
 		Visible = false,
-		[CHILDREN] = { Components.corner(16), Components.stroke(C.warnDark, 2) },
+		[CHILDREN] = { Components.corner(14), Components.stroke(C.warnDark, 2) },
 		Parent = button,
 	})
 	button.Activated:Connect(function()
-		-- 触るとカメラが寄って追い、パーティの面を開く（D-212）
-		HubState.selected = partyIndex
-		HubState.following = true
-		PickMode.stop() -- 行き先を選ぶのをやめる
-		Nav.open("PartyPanel", { partyIndex = partyIndex })
+		-- 触るとカメラがそのパーティへ寄って旋回し、パーティの面を開く（D-270 ⑤）
+		openParty(partyIndex)
 	end)
-	r = { button = button, glyph = glyph, pinch = pinch, ring = ring, timer = timer }
+	r = { button = button, icon = icon, name = name, pinch = pinch, ring = ring }
 	rows[partyIndex] = r
 	return r
 end
@@ -731,12 +418,13 @@ local function refreshStatic(view: any)
 		total += c.count
 	end
 	-- 宝箱が増えたら（帰還など）、ギルドから宝箱が1つずつ宝箱ボタンへ飛び、数字が弾んで増える（D-268 ①・D-214 ⑨）
-	if lastChestTotal ~= nil and total > lastChestTotal and Nav.depth() == 0 and HubState.guildNode then
+	local guildAt = HubState.guildPoint and HubState.guildPoint()
+	if lastChestTotal ~= nil and total > lastChestTotal and Nav.depth() == 0 and guildAt then
 		local from = lastChestTotal
 		local n = math.min(total - from, 6)
 		for k = 1, n do
 			Motion.fly({
-				from = HubState.guildNode :: GuiObject,
+				from = guildAt,
 				to = chestButton,
 				icon = "@chest",
 				size = 56,
@@ -761,15 +449,6 @@ local function refreshStatic(view: any)
 		break
 	end
 	chestNotice.Visible = hasInbox
-	-- 未解放のダンジョンは暗くする
-	for id, m in markers do
-		local unlocked = view.unlockedDungeons and view.unlockedDungeons[id] == true
-		m.BackgroundColor3 = if unlocked then C.ch16 else C.ch10
-		local numeral = m:FindFirstChild("Numeral") :: TextLabel?
-		if numeral then
-			numeral.TextTransparency = if unlocked then 0 else 0.6
-		end
-	end
 end
 
 -- 初回の誘導（D-244 ①）：馬車（待機の最初のパーティ）→ 帰還のあとの宝箱ボタン
@@ -791,8 +470,9 @@ local function refreshGuide(view: any)
 			end
 		end
 	end
-	for i, w in wagons do
-		Guide.mark(w, (wagonOn and first ~= nil and i == first.index) or i == newcomerParty, 10)
+	-- 3D の馬車は GUI ではないので、誘導の輪は左の一覧の行に付ける（D-270）
+	for i, r in rows do
+		Guide.mark(r.button, (wagonOn and first ~= nil and i == first.index) or i == newcomerParty, 8)
 	end
 	local total = 0
 	for _, c in view.chests or {} do
@@ -805,86 +485,35 @@ end
 
 local function refreshMoving(view: any)
 	EventMarker.refresh(view)
-	WorldCarts.refresh(view)
 	if view == nil then
 		return
 	end
+	World3D.refresh(view)
 	refreshGuide(view)
 	if levelUpBadge then
 		levelUpBadge.Visible = LevelUpMarks.anyUnseen()
 	end
-	-- ギルドの建物の NEW の顔（全員が冒険中に雇った人：D-265 ②。雇った直後にも出すので 0.1 秒ごとに見る）
-	local guildNode = HubState.guildNode
-	local newFace = guildNode and guildNode:FindFirstChild("NewFace") :: Frame?
-	if newFace then
+	-- ギルドの上の NEW の顔（全員が冒険中に雇った人：D-265 ②。雇った直後にも出すので 0.1 秒ごとに見る）
+	local b = newFaceBoard
+	if b then
 		local pending = HubState.pendingNewcomers(view)
 		local first = pending[1] and view.adventurers[pending[1]]
-		newFace.Visible = first ~= nil
-		if first and newFace:GetAttribute("Uid") ~= pending[1] then
-			newFace:SetAttribute("Uid", pending[1])
-			Portrait.fill(newFace, first.appearanceId)
+		b.Enabled = first ~= nil
+		local face = b:FindFirstChild("NewFace") :: Frame
+		if first and face:GetAttribute("Uid") ~= pending[1] then
+			face:SetAttribute("Uid", pending[1])
+			Portrait.fill(face, first.appearanceId)
 		end
 	end
-	local exploring: { [string]: number } = {} -- ダンジョンごとの探索の進み（D-249 ②）
 	for _, party in view.parties or {} do
 		local i = party.index
 		local s = HubState.status(view, i)
 		local r = rowFor(i)
-		Components.setText(r.glyph, STATE_GLYPH[s.state])
-		-- 帰るまでの残り（D-249 ①）：出ている間は印を上に、時計を下に
-		local out = s.remaining ~= nil and s.state ~= "waiting"
-		r.timer.Visible = out
-		r.glyph.Position = UDim2.fromOffset(76, if out then 20 else 33)
-		if out then
-			r.timer.Text = "🕒" .. HubState.clock(s.remaining :: number)
-		end
+		PartyIcon.set(r.icon, view, i, s.state)
+		local leaderName = PartyIcon.name(view, i)
+		r.name.Text = (string.gsub(leaderName, "'s Party$", ""))
 		r.pinch.Visible = s.pinch
 		r.ring.Transparency = if HubState.selected == i then 0 else 1
-		local w = wagonFor(i)
-		if s.state == "waiting" then
-			-- 待機はギルドの横に並べる（D-214）
-			local g = MapLayout.guild()
-			placeAt(w, { x = g.x + 100, y = g.y - 110 + (i - 1) * 62 })
-		else
-			placeAt(w, MapLayout.wagon(HubState.dungeonIndex(s.dungeonId), s.along))
-		end
-		local waiting = w:FindFirstChild("Waiting") :: GuiObject
-		waiting.Visible = s.state == "waiting"
-		-- 戦いの間は馬車が小さく揺れ、⚔ の吹き出し（D-249 ②）
-		local battle = w:FindFirstChild("Battle") :: GuiObject
-		battle.Visible = s.inBattle
-		if s.inBattle then
-			w.Rotation = math.sin(os.clock() * 18) * 4
-		else
-			w.Rotation = 0
-		end
-		if s.state == "exploring" and s.dungeonId and s.exploreRatio then
-			exploring[s.dungeonId] = math.max(exploring[s.dungeonId] or 0, s.exploreRatio)
-		end
-		local pinch = w:FindFirstChild("Pinch") :: GuiObject
-		pinch.Visible = s.pinch
-		if HubState.following and HubState.selected == i then
-			local viewW = map.AbsoluteSize.X / math.max(Root.frame.scale, 0.01)
-			local target = MapLayout.cameraX(w.Position.X.Offset, viewW, map.CanvasSize.X.Offset) -- 絵の幅まで広げたマップ
-			map.CanvasPosition = Vector2.new(target, 0)
-		end
-	end
-	-- 探索の進みの輪（D-249 ②）
-	for id, m in markers do
-		local ring = m:FindFirstChild("Progress") :: Frame?
-		if ring then
-			local ratio = exploring[id]
-			ring.Visible = ratio ~= nil
-			if ratio then
-				local lit = math.floor(ratio * PROGRESS_DOTS + 0.5)
-				for k = 1, PROGRESS_DOTS do
-					local dot = ring:FindFirstChild("Dot" .. k) :: Frame?
-					if dot then
-						dot.BackgroundColor3 = if k <= lit then C.numHi else C.ch45
-					end
-				end
-			end
-		end
 	end
 end
 
@@ -896,7 +525,7 @@ function Hub.mount()
 		ZIndex = 1,
 		Parent = Root.canvas,
 	})
-	buildMap(layer)
+	mount3D()
 	buildList(layer)
 	buildEdges(layer)
 	ReturnToast.mount() -- 帰還のトースト（11章 §5、M8-6）

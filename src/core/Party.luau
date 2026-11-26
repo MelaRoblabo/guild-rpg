@@ -22,6 +22,31 @@ function Party.isEmpty(p: any): boolean
 end
 
 -- 探索中か
+-- パーティのリーダー（D-271）。leaderUid がパーティにいればその人、いなければいちばん前にいる人。誰もいなければ nil
+function Party.leader(state: any, partyIndex: number): string?
+	local p = state.parties[partyIndex]
+	if p == nil then
+		return nil
+	end
+	if p.leaderUid and table.find(p.slots, p.leaderUid) and state.adventurers[p.leaderUid] then
+		return p.leaderUid
+	end
+	for _, uid in p.slots do
+		if uid ~= Party.EMPTY and state.adventurers[uid] then
+			return uid
+		end
+	end
+	return nil
+end
+
+-- リーダーがパーティから外れていたら、記録を消す（次はいちばん前の人。外れた人が戻っても勝手にリーダーに戻らない：D-271 ①）
+function Party.fixLeader(state: any, partyIndex: number)
+	local p = state.parties[partyIndex]
+	if p and p.leaderUid and table.find(p.slots, p.leaderUid) == nil then
+		p.leaderUid = nil
+	end
+end
+
 function Party.isBusy(state: any, partyIndex: number): boolean
 	for _, e in state.expeditions do
 		if e.partyIndex == partyIndex then

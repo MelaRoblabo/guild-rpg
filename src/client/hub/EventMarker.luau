@@ -6,13 +6,13 @@
 --   ④ 出発済み：輪の下にパーティの番号（レア・レイド）か、買った印（商人）。
 --   種類のアイコン：レアダンジョン＝宝石（門はパーティの「探索中」：D-234 ②）、レイド＝稲妻、商人＝カート。
 --   ⑤ 締め切り間近は印が小さく揺れ、締め切ったら「Closed」のハンコを押して消える（D-269 ③。黙って消えていた）。
+--   3D マップ（D-270 ⑦）：印は地図の上の場所（Studio の EventPlace01〜）に BillboardGui で出す。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local Guide = require("./Guide")
 local Motion = require("../ui/Motion")
-local MapLayout = require("./MapLayout")
 local Nav = require("../ui/Nav")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -29,8 +29,9 @@ local EventMarker = {}
 
 local marker: TextButton? = nil
 local current: any = nil
-local content: Frame? = nil -- マップの中身（Closed のハンコを置く）
-local lastOpen: { slot: number, x: number, y: number }? = nil -- 最後に出ていたイベント
+local board: BillboardGui? = nil -- 印を載せる板（場所の Part に付ける）
+local placeFor: ((number) -> BasePart?)? = nil
+local lastOpen: { slot: number, place: BasePart }? = nil -- 最後に出ていたイベント
 
 local function clock(s: number): string
 	s = math.max(0, math.floor(s))
@@ -47,39 +48,54 @@ local function placeIndex(placeId: string): number
 end
 
 -- 締め切ったイベントの場所に「Closed」のハンコを押して消す
-local function stampClosed(at: { x: number, y: number })
-	local parent = content
-	if parent == nil then
+local function stampClosed(place: BasePart)
+	local parentGui = board and board.Parent
+	if parentGui == nil then
 		return
 	end
-	local holder: Frame = new("Frame", {
+	local b: BillboardGui = new("BillboardGui", {
 		Name = "ClosedStamp",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(at.x, at.y),
-		Size = UDim2.fromOffset(120, 120),
+		Adornee = place,
+		AlwaysOnTop = true,
+		Size = UDim2.fromOffset(140, 140),
+		StudsOffsetWorldSpace = Vector3.new(0, 4, 0),
+		Parent = parentGui,
+	})
+	local holder: Frame = new("Frame", {
+		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		ZIndex = 8,
-		Parent = parent,
+		Parent = b,
 	})
 	Motion.stamp(holder, "Closed", C.warnDark, 120)
 	task.delay(1.4, function()
-		holder:Destroy()
+		b:Destroy()
 	end)
 end
 
-function EventMarker.mount(mapContent: Frame)
-	content = mapContent
+-- getPlace：イベントの場所の番号 → 地図の上の Part（World3D.eventPlace）。parentGui：板を置く所（PlayerGui の中）
+function EventMarker.mount(getPlace: (number) -> BasePart?, parentGui: Instance)
+	placeFor = getPlace
+	board = new("BillboardGui", {
+		Name = "MapEventBoard",
+		AlwaysOnTop = true,
+		Active = true,
+		Enabled = false,
+		Size = UDim2.fromOffset(150, 150),
+		StudsOffsetWorldSpace = Vector3.new(0, 4, 0),
+		Parent = parentGui,
+	})
 	local m: TextButton = new("TextButton", {
 		Name = "MapEvent",
 		Text = "",
 		AutoButtonColor = false,
 		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.6),
 		Size = UDim2.fromOffset(96, 96),
 		BackgroundColor3 = C.ch16,
 		Visible = false,
 		ZIndex = 6,
 		[CHILDREN] = { Components.corner(48), Components.stroke(C.barFill, 6) },
-		Parent = mapContent,
+		Parent = board,
 	})
 	local icon = Components.text({ text = "", size = 40, color = C.inkLight, font = Tokens.font.number })
 	icon.Name = "Icon"
@@ -152,16 +168,25 @@ function EventMarker.refresh(view: any)
 	local last = lastOpen
 	if last and (current == nil or current.eventSlot ~= last.slot) then
 		lastOpen = nil
-		stampClosed(last)
+		stampClosed(last.place)
 	end
-	if ev == nil then
+	local b = board
+	if ev == nil or b == nil or placeFor == nil then
 		m.Visible = false
 		m.Rotation = 0
+		if b then
+			b.Enabled = false
+		end
 		return
 	end
+	local place = (placeFor :: (number) -> BasePart?)(placeIndex(ev.placeId))
+	if place == nil then
+		b.Enabled = false
+		return
+	end
+	b.Adornee = place
+	b.Enabled = true
 	m.Visible = true
-	local p = MapLayout.eventPlace(placeIndex(ev.placeId))
-	m.Position = UDim2.fromOffset(p.x, p.y)
 	local icon = m:FindFirstChild("Icon") :: TextLabel
 	Components.setText(icon, KIND_ICON[ev.kind] or "?")
 	icon.TextTransparency = if notice then 0.4 else 0
@@ -176,7 +201,7 @@ function EventMarker.refresh(view: any)
 		joinedChip.Visible = false
 		return
 	end
-	lastOpen = { slot = ev.eventSlot, x = p.x, y = p.y }
+	lastOpen = { slot = ev.eventSlot, place = place }
 	local left = ev.closesIn or 0
 	local ending = left <= ENDING_SECONDS
 	-- 締め切り間近は小さく揺れる（D-269 ③）。「点滅を減らす」なら揺れも小さく（D-145）
@@ -211,8 +236,8 @@ function EventMarker.refresh(view: any)
 		local sale = view.merchant
 		local n = 0
 		if sale and sale.eventSlot == ev.eventSlot then
-			for _, b in sale.bought or {} do
-				if b then
+			for _, bought in sale.bought or {} do
+				if bought then
 					n += 1
 				end
 			end
