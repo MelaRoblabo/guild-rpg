@@ -4,7 +4,8 @@
 --   - ダンジョン：解放済みは表示、次に解放するものは Highlight で半透明の黒、その先は出さない（D-270 ③）。
 --   - 馬車：移動中・帰り道だけ地図の上を動く。速さは距離に関係なく探索の移動秒数で往復（D-270 ②）。目的地へ Beam の点線。
 --     見本は ReplicatedStorage.MapModels.PartyCart（Studio で置いた駒。台座の底の真ん中が基準点、馬は +X）。
---     ギルド・ダンジョン・商人・レイドボスの模型に触れている間は出さない（模型にめり込むため）。
+--     ギルド・ダンジョン・商人・レイドボスの模型に触れている間は出さない（模型にめり込むため：D-277）。
+--   - 中でパーティが探索中のダンジョンは、模型がボードゲームの駒のように小さく跳ねる。
 --   - ギルド・ダンジョンの中のパーティは、その物の上に BillboardGui でリーダーのアイコン（D-270 ⑥・D-271）。
 --   - ゲームパッドのときは画面の中央に照準。重なった物の縁を光らせて名前の札を出し、A で開く（D-273 ④）。
 --   - タップした物（ダンジョン・ギルド・馬車）は handlers に渡す。画面の変更はすべてこの端末の中だけ（サーバーへは送らない）。
@@ -49,6 +50,14 @@ local CART_TEMPLATE = "PartyCart" -- ReplicatedStorage.MapModels の馬車の見
 local BEAM_FROM_HEIGHT = 1 -- 見本の馬車の点線の出る高さ（台座の底から）
 -- 馬車を隠し始める近さ。0 で馬車の真ん中が模型の足もとに入ったとき、1 で台座の縁が触れたとき（1 だと道の途中で消えた）
 local CART_HIDE_REACH = 0.25
+-- 探索中のダンジョンの模型の跳ね（ボードゲームの駒を指で持ち上げてトンと置くくらい）
+local HOP_HEIGHT = 0.3 -- 1回目の跳ねの高さ（2回目はその HOP_SECOND 倍）
+local HOP_SECOND = 0.45
+local HOP_TIME = 0.3 -- 1回目の跳ねの長さ（秒）
+local HOP_TILT = math.rad(3.5) -- 跳ねている間の傾き
+local HOP_ROCK = math.rad(1.4) -- 着地のあとの揺り戻し
+local HOP_ROCK_TIME = 0.26
+local HOP_PAUSE_MIN, HOP_PAUSE_MAX = 0.6, 1.6 -- 跳ねと跳ねの間（秒）
 local ICON_SIZE = 54 -- ギルド・ダンジョンの上のリーダーのアイコン
 
 local mapPart: BasePart? = nil
@@ -70,6 +79,17 @@ local handlers: Handlers? = nil
 local cartFolder: Folder? = nil
 local boardFolder: Instance? = nil
 local lastStatus: { [number]: any } = {}
+local exploringIn: { [BasePart]: boolean } = {} -- 中でパーティが探索中のダンジョン
+
+-- 跳ねているダンジョン：動かす模型（物の子）と元の位置、次の跳ねの時刻
+type Hop = {
+	rest: { [Instance]: CFrame },
+	rng: Random,
+	startAt: number, -- 今の跳ねの始まり
+	axis: Vector3, -- 傾ける軸（水平）
+	moved: boolean,
+}
+local hops: { [BasePart]: Hop } = {}
 
 -- ゲームパッドの照準（D-273 ④）
 type Target = { kind: string, id: string?, index: number?, model: Instance }
@@ -742,10 +762,17 @@ function World3D.refresh(view: any)
 	end
 	-- パーティ：ギルド・ダンジョンの中ならアイコン、移動中なら馬車
 	local inPlace: { [BasePart]: { [number]: boolean } } = {}
+	table.clear(exploringIn)
 	for _, party in view.parties or {} do
 		local i = party.index
 		local s = HubState.status(view, i)
 		lastStatus[i] = s
+		if s.state == "exploring" and s.dungeonId and not s.merchant then
+			local d = dungeonObjs[s.dungeonId]
+			if d and not hidden[d] then
+				exploringIn[d] = true -- 中で探索している（模型が跳ねる）
+			end
+		end
 		local place: BasePart? = nil
 		if s.state == "waiting" then
 			place = guildObj
@@ -883,6 +910,92 @@ local function touchesAny(pos: Vector3, list: { Blocker }): boolean
 	return false
 end
 
+-- 探索中のダンジョンの模型を、ボードゲームの駒のように小さく跳ねさせる（中で暴れている様子）。
+-- 1回トンと跳ね（少し傾く）、小さくもう1回跳ね、着地で少し揺り戻して、しばらく止まる。
+-- 動かすのは物の子の模型だけ（外側の箱・板・点線の行き先は動かさない）
+local function hopOffset(h: Hop, t: number, pivot: Vector3): CFrame?
+	local u = t - h.startAt
+	if u < 0 then
+		return nil
+	end
+	local y, angle = 0, 0
+	local t2 = HOP_TIME * 0.6
+	if u < HOP_TIME then
+		local v = u / HOP_TIME
+		y = HOP_HEIGHT * 4 * v * (1 - v)
+		angle = HOP_TILT * math.sin(math.pi * v)
+	elseif u < HOP_TIME + t2 then
+		local v = (u - HOP_TIME) / t2
+		y = HOP_HEIGHT * HOP_SECOND * 4 * v * (1 - v)
+		angle = -HOP_TILT * HOP_SECOND * math.sin(math.pi * v)
+	elseif u < HOP_TIME + t2 + HOP_ROCK_TIME then
+		local v = (u - HOP_TIME - t2) / HOP_ROCK_TIME
+		angle = HOP_ROCK * math.sin(2 * math.pi * v) * (1 - v)
+	else
+		return nil -- 止まっている
+	end
+	return CFrame.new(pivot + Vector3.new(0, y, 0)) * CFrame.fromAxisAngle(h.axis, angle) * CFrame.new(-pivot)
+end
+
+local function placeHop(h: Hop, offset: CFrame?)
+	for inst, cf in h.rest do
+		local to = if offset then offset * cf else cf
+		if inst:IsA("Model") then
+			inst:PivotTo(to)
+		elseif inst:IsA("BasePart") then
+			inst.CFrame = to
+		end
+	end
+	h.moved = offset ~= nil
+end
+
+local function nextHop(h: Hop, from: number)
+	h.startAt = from + h.rng:NextNumber(HOP_PAUSE_MIN, HOP_PAUSE_MAX)
+	local a = h.rng:NextNumber(0, 2 * math.pi)
+	h.axis = Vector3.new(math.cos(a), 0, math.sin(a))
+end
+
+local function stepHops(now: number)
+	for obj in exploringIn do
+		if hops[obj] == nil then
+			boundsOf(obj) -- 足もと・板の位置は止まっている形で先に測っておく
+			local rest: { [Instance]: CFrame } = {}
+			for _, c in obj:GetChildren() do
+				if c:IsA("Model") then
+					rest[c] = c:GetPivot()
+				elseif c:IsA("BasePart") then
+					rest[c] = c.CFrame
+				end
+			end
+			local seed = 0
+			for _, ch in { string.byte(obj.Name, 1, -1) } do
+				seed += ch
+			end
+			local h: Hop = { rest = rest, rng = Random.new(seed), startAt = 0, axis = Vector3.xAxis, moved = false }
+			nextHop(h, now - HOP_PAUSE_MIN) -- 始まってすぐ跳ねることもある（ダンジョンごとにずらす）
+			hops[obj] = h
+		end
+	end
+	for obj, h in hops do
+		if not exploringIn[obj] then
+			if h.moved then
+				placeHop(h, nil) -- 探索が終わったら元の位置に戻す
+			end
+			hops[obj] = nil
+		else
+			local offset = hopOffset(h, now, groundOf(obj))
+			if offset then
+				placeHop(h, offset)
+			elseif h.moved then
+				placeHop(h, nil)
+			end
+			if now > h.startAt + HOP_TIME * 1.6 + HOP_ROCK_TIME then
+				nextHop(h, now)
+			end
+		end
+	end
+end
+
 -- 毎フレーム：馬車を道の上で動かす（行きはギルド→ダンジョン、帰りはダンジョン→ギルド。along で位置）
 function World3D.step()
 	local view = Session.view
@@ -891,6 +1004,7 @@ function World3D.step()
 	end
 	-- 秒より細かい今の時刻で位置を出す（Session.now は秒で切り捨てるので、馬車がカクついた）
 	local now = Workspace:GetServerTimeNow()
+	stepHops(os.clock())
 	local blockers: { Blocker }? = nil -- 模型の足もとの範囲（このフレームで一度だけ集める）
 	for i, cart in carts do
 		if cartMoving[i] and cart.PrimaryPart then
