@@ -468,31 +468,33 @@ function World3D.focusDungeon(id: string)
 	end
 end
 
--- パーティのいる所（馬車か、ギルド・ダンジョン）へ
-function World3D.focusParty(partyIndex: number)
-	local cart = carts[partyIndex]
-	if cart and cart.Parent and cart.PrimaryPart then
-		-- 動く馬車は、寄ったあとも追う（ギルド・ダンジョンに入ったら止まる）
-		MapCamera.focus(cart.PrimaryPart.Position, function(): Vector3?
-			local c = carts[partyIndex]
-			if c and c.Parent and c.PrimaryPart then
-				return (c.PrimaryPart :: BasePart).Position
-			end
-			return nil
-		end)
-		return
-	end
+-- パーティの今いる所：移動中・帰り道は馬車（模型に入って隠れている間も、馬車の位置は毎フレーム動いている）、
+-- 探索中・商人のところは行き先の物、待機中はギルド
+local function partyPos(partyIndex: number): Vector3?
 	local s = lastStatus[partyIndex]
-	if s and s.state == "exploring" and s.merchant then
+	local cart = carts[partyIndex]
+	if s and (s.state == "moving" or s.state == "returning") and cart and cartMoving[partyIndex] then
+		return cart:GetPivot().Position
+	end
+	if s and (s.state == "exploring" or s.state == "returning") then
 		local dest = destOf(Game.query.expeditionOf(Session.view, partyIndex))
 		if dest then
-			MapCamera.focus(groundOf(dest))
+			return groundOf(dest)
 		end
-	elseif s and s.state == "exploring" and s.dungeonId then
-		World3D.focusDungeon(s.dungeonId)
-	else
-		World3D.focusGuild()
 	end
+	return if guildObj then groundOf(guildObj :: BasePart) else nil
+end
+
+-- パーティのいる所（馬車か、ギルド・ダンジョン）へ寄り、プレイヤーが次に何かを選ぶか、カメラを動かすまで追い続ける
+-- （出発 → 馬車 → ダンジョン → 馬車 → ギルドと、居場所が変わってもそのパーティから離れない）
+function World3D.focusParty(partyIndex: number)
+	local pos = partyPos(partyIndex)
+	if pos == nil then
+		return
+	end
+	MapCamera.focus(pos, function(): Vector3?
+		return partyPos(partyIndex)
+	end)
 end
 
 -- 光線が当たった物（馬車・ギルド・ダンジョン）
