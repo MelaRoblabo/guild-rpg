@@ -8,6 +8,7 @@
 
 local Chest = require("./Chest")
 local Inbox = require("./Inbox")
+local MapEvent = require("./MapEvent")
 local Rng = require("./Rng")
 
 local Raid = {}
@@ -98,6 +99,56 @@ function Raid.arrive(state: any, e: any, takeRng: () -> Rng.Rng, master: any, ev
 			Inbox.push(state, "raid", at, { chests = { { pileKey = "special:raid", count = 1 } } }, takeRng, master)
 		table.insert(events, { type = "RaidReward", at = at, eventSlot = e.eventSlot, inboxUid = entry.uid })
 	end
+end
+
+-- マップに出ているレイドボス（画面用：D-275）。{ { eventSlot, placeId, phase, closesIn?, coming, arriveIn? } }
+--   phase："open"（出発できる3分間）・"closed"（3分間は過ぎたが、向かっているパーティがまだ着いていない）
+--   coming：向かっている（まだ着いていない）パーティの番号。討伐したら出さない
+function Raid.presence(state: any, now: number, master: any): { any }
+	local K = master.K
+	local bySlot: { [number]: any } = {}
+	local function entry(slot: number): any
+		local r = Raid.stateFor(state, slot)
+		if r and r.defeated then
+			return nil
+		end
+		local e = bySlot[slot]
+		if e == nil then
+			local ev = MapEvent.eventAt(slot, master)
+			e = { eventSlot = slot, placeId = ev.placeId, phase = "closed", coming = {} }
+			bySlot[slot] = e
+		end
+		return e
+	end
+	local slot = MapEvent.slotOf(now, K)
+	local cur = MapEvent.eventAt(slot, master)
+	if cur.kind == "raid" and now < cur.closeAt then
+		local e = entry(slot)
+		if e then
+			e.phase = "open"
+			e.closesIn = cur.closeAt - now
+		end
+	end
+	for _, x in state.expeditions do
+		if x.raidDamage and not x.raidArrived and now < x.arriveAt then
+			local e = entry(x.eventSlot)
+			if e then
+				table.insert(e.coming, x.partyIndex)
+				e.arriveIn = math.min(e.arriveIn or math.huge, x.arriveAt - now) -- 最初に着くパーティまで
+			end
+		end
+	end
+	local out = {}
+	for _, e in bySlot do
+		if e.phase == "open" or #e.coming > 0 then
+			table.sort(e.coming)
+			table.insert(out, e)
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.eventSlot < b.eventSlot
+	end)
+	return out
 end
 
 return Raid

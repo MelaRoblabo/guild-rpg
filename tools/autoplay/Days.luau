@@ -143,6 +143,10 @@ function Days.run(opts: any, master: any): any
 		local t = limit
 		for _, e in state.expeditions do
 			t = math.min(t, e.returnAt)
+			-- 商人に着く時刻（着いたら買って帰る：D-274）
+			if e.merchant and e.leaveAt == nil and e.arriveAt > now then
+				t = math.min(t, e.arriveAt)
+			end
 		end
 		local interval = K.mapEventIntervalSeconds
 		local idle = Policy.hasIdleParty(state)
@@ -150,7 +154,7 @@ function Days.run(opts: any, master: any): any
 		while MapEvent.startOf(slot, K) < t do
 			local kind = MapEvent.eventAt(slot, master).kind
 			if
-				(kind == "merchant" and Schedule.behavior.merchant)
+				(kind == "merchant" and idle and Schedule.behavior.merchant)
 				or ((kind == "rareDungeon" or kind == "raid") and idle and Schedule.behavior.mapEvents)
 			then
 				t = MapEvent.startOf(slot, K)
@@ -245,7 +249,11 @@ function Days.run(opts: any, master: any): any
 				local evs = stepOnline(now)
 				local returned = false
 				for _, ev in evs do
-					if ev.type == "ExpeditionReturned" or ev.type == "RaidReturned" then
+					if
+						ev.type == "ExpeditionReturned"
+						or ev.type == "RaidReturned"
+						or ev.type == "MerchantReturned"
+					then
 						returned = true
 						break
 					end

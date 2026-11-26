@@ -238,6 +238,18 @@ end
 -- 帰還処理：報酬を状態に反映する
 -- restActive：休息ボーナスが効くか（オンライン中の帰還で、帰還時に残りがある：06章 §14）
 local function collect(state: any, e: any, master: any, events: { any }, restActive: boolean)
+	if e.merchant then
+		-- 商人からの帰還（D-274）：買った品はその場で倉庫に入れた。ここでは帰るだけ
+		state.expeditions[e.uid] = nil
+		bump(state, "merchantReturns")
+		table.insert(events, {
+			type = "MerchantReturned",
+			at = e.returnAt,
+			partyIndex = e.partyIndex,
+			eventSlot = e.eventSlot,
+		})
+		return
+	end
 	if e.raidDamage then
 		-- レイドからの帰還：報酬は到着時に入れた（受け取り箱：D-179）。ここでは帰るだけ
 		state.expeditions[e.uid] = nil
@@ -473,6 +485,12 @@ local function advanceOffline(state: any, ctx: Ctx, events: { any })
 	state.restBonusSeconds = math.min((state.restBonusSeconds or 0) + gained, K.restBonusMaxSeconds)
 	-- ログアウトの前に出発したレイドのダメージは入れる（結果は出発時に決まる：D-152）。留守中は新しく参加しない（D-161）
 	raidArrivals(state, ctx.now, master, events)
+	-- 商人のところのパーティは、ログアウトの時刻（まだ着いていなければ着いた時刻）に帰り始める（D-274）
+	for _, e in state.expeditions do
+		if e.merchant and e.leaveAt == nil then
+			Merchant.leave(e, start, K)
+		end
+	end
 
 	while true do
 		local nextE = nextReturn(state, ctx.now)
@@ -1451,11 +1469,11 @@ handlers.DispatchEvent = function(state, cmd, ctx)
 		return fail("PARTY_NOT_FOUND")
 	end
 	local slot = cmd.eventSlot
-	-- 種類はその時間帯のイベント（全員共通）で決まる。商人には派遣できない
+	-- 種類はその時間帯のイベント（全員共通）で決まる。商人へも派遣する（D-274：着かないと買えない）
 	local kind = if type(slot) == "number" and slot == math.floor(slot)
 		then MapEvent.eventAt(slot, master).kind
 		else nil
-	if kind ~= "rareDungeon" and kind ~= "raid" then
+	if kind ~= "rareDungeon" and kind ~= "raid" and kind ~= "merchant" then
 		return fail("EVENT_NOT_ACTIVE")
 	end
 	local err = MapEvent.check(slot, kind, ctx.now, master)
@@ -1468,6 +1486,9 @@ handlers.DispatchEvent = function(state, cmd, ctx)
 	then
 		return fail("EVENT_ALREADY_JOINED") -- 1パーティ1回まで（D-152）
 	end
+	if kind == "merchant" and Merchant.sent(state, slot) then
+		return fail("EVENT_ALREADY_JOINED") -- 1つの商人に1パーティだけ（D-274）
+	end
 	if Party.isBusy(state, cmd.partyIndex) then
 		return fail("PARTY_BUSY")
 	end
@@ -1478,6 +1499,31 @@ handlers.DispatchEvent = function(state, cmd, ctx)
 		return fail("PARTY_EMPTY")
 	end
 	local events: { any } = {}
+	if kind == "merchant" then
+		-- 商人へ向かう（D-274）。片道は場所の距離だけで決まる。着いたら Leave まで、とどまって買える
+		local memberUids = {}
+		for _, sn in Party.snapshots(state, cmd.partyIndex, master) do
+			table.insert(memberUids, sn.uid)
+		end
+		local dungeonId = MapEvent.rareDungeonTarget(state, master).dungeonId
+		local e = commitExpedition(
+			state,
+			Merchant.planExpedition(state, slot, cmd.partyIndex, memberUids, dungeonId, ctx.now, master)
+		)
+		state.merchant = { eventSlot = slot }
+		bump(state, "merchantDispatches")
+		table.insert(events, {
+			type = "EventDispatched",
+			at = ctx.now,
+			kind = kind,
+			eventSlot = slot,
+			partyIndex = cmd.partyIndex,
+			placeId = e.placeId,
+			arriveAt = e.arriveAt,
+		})
+		-- 探索ではないので「探索の回数」には数えない（D-274）
+		return { ok = true, events = events }
+	end
 	if kind == "rareDungeon" then
 		-- 強さは踏破済みの一番深いダンジョン、宝箱 × rareDungeonChestMult、山は special:rare:<1段上>（D-152, D-171, D-185）
 		local target = MapEvent.rareDungeonTarget(state, master)
@@ -1561,13 +1607,23 @@ handlers.DispatchEvent = function(state, cmd, ctx)
 	return { ok = true, events = events }
 end
 
+-- 買えるのは、その時間帯の商人のところにパーティがいる間だけ（D-274。商人の3分間は過ぎていてもよい）
 handlers.BuyFromMerchant = function(state, cmd, ctx)
 	local master = ctx.master
-	local err = MapEvent.check(cmd.eventSlot, "merchant", ctx.now, master)
-	if err then
-		return fail(err)
+	local slot = cmd.eventSlot
+	if
+		type(slot) ~= "number"
+		or slot ~= math.floor(slot)
+		or slot > MapEvent.slotOf(ctx.now, master.K)
+		or MapEvent.eventAt(slot, master).kind ~= "merchant"
+	then
+		return fail("EVENT_NOT_ACTIVE")
 	end
-	local buyErr, r = Merchant.buy(state, cmd.eventSlot, cmd.itemIndex, master)
+	local e = Merchant.expeditionFor(state, slot)
+	if e == nil or not Merchant.isHere(e, ctx.now, master.K) then
+		return fail("MERCHANT_NO_PARTY")
+	end
+	local buyErr, r = Merchant.buy(state, slot, cmd.itemIndex, master)
 	if buyErr then
 		return fail(buyErr)
 	end
@@ -1583,6 +1639,31 @@ handlers.BuyFromMerchant = function(state, cmd, ctx)
 				itemIndex = cmd.itemIndex,
 				equipmentUid = r.equipment.uid,
 				price = r.price,
+			},
+		},
+	}
+end
+
+-- 商人のところから帰る（D-274）。帰り始めたら、もう買えない（商人も去る）
+handlers.LeaveMerchant = function(state, cmd, ctx)
+	local master = ctx.master
+	local e = Game.query.expeditionOf(state, cmd.partyIndex)
+	if e == nil or not e.merchant then
+		return fail("MERCHANT_NO_PARTY")
+	end
+	if not Merchant.isHere(e, ctx.now, master.K) then
+		return fail(if ctx.now < e.arriveAt then "MERCHANT_NOT_ARRIVED" else "MERCHANT_NO_PARTY")
+	end
+	Merchant.leave(e, ctx.now, master.K)
+	return {
+		ok = true,
+		events = {
+			{
+				type = "MerchantLeft",
+				at = ctx.now,
+				partyIndex = cmd.partyIndex,
+				eventSlot = e.eventSlot,
+				returnAt = e.returnAt,
 			},
 		},
 	}
@@ -1900,11 +1981,36 @@ function Game.query.merchant(state: any, eventSlot: number, now: number, master:
 		row.bought = bought[i] == true
 		table.insert(items, row)
 	end
+	-- open：買える（パーティが商人のところにいる：D-274）。partyIndex・arriveAt：向かった・とどまっているパーティ
+	local e = Merchant.expeditionFor(state, eventSlot)
 	return {
 		eventSlot = eventSlot,
-		open = MapEvent.check(eventSlot, "merchant", now, master) == nil,
+		open = e ~= nil and Merchant.isHere(e, now, master.K),
+		partyIndex = if e then e.partyIndex else nil,
+		arriveAt = if e then e.arriveAt else nil,
+		travelSeconds = Merchant.travelSeconds(ev.placeId, master),
 		items = items,
 	}
+end
+
+-- マップに出ているレイドボス（D-275。Raid.presence）
+function Game.query.raidPresence(state: any, now: number, master: any): { any }
+	return Raid.presence(state, now, master)
+end
+
+-- その時間帯のイベント（全員共通。種類・場所：D-152）
+function Game.query.mapEventAt(slot: number, master: any): any
+	return MapEvent.eventAt(slot, master)
+end
+
+-- マップに出ている商人（D-274。Merchant.presence）
+function Game.query.merchantPresence(state: any, now: number, master: any): { any }
+	return Merchant.presence(state, now, master)
+end
+
+-- 商人の場所までの片道秒（D-274）
+function Game.query.merchantTravelSeconds(placeId: string, master: any): number
+	return Merchant.travelSeconds(placeId, master)
 end
 
 -- レイドボスの進み具合（D-152。自分専用）。その時間帯がレイドでなければ nil

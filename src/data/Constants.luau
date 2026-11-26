@@ -229,6 +229,8 @@ return {
 	merchantPriceMult = 10, -- 価格 = 売却価格 × この倍率 × グレード・修飾語の倍率（約10：D-152）。M7b-6 で見直し、据え置き（D-198）
 	merchantGradeCoef = 0.5, -- 仮（M7b-6）
 	merchantModifierCoef = 0.5, -- 仮（M7b-6）
+	-- 商人のところにとどまれる長さの上限（D-274）。Leave を押すかログアウトで帰り始める。押さないままでも、この秒数で帰り始める
+	merchantStayMaxSeconds = 1800,
 
 	-- クエスト（D-153。06章 §15）。お題の候補と報酬は src/data/Quests.luau
 	questDailyCount = 3,

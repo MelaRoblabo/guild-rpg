@@ -132,6 +132,45 @@ return function(t)
 			expect(MapLayout.cameraX(2000, 1280, 4000)).toBe(2000 - 640)
 		end)
 	end)
+	describe("D-274 商人へ向かうパーティの状態", function()
+		-- 片道 30 秒、上限 1800 秒とどまる（フロアなし）
+		local function merchantExpedition(leaveAt: number?): any
+			local stay = if leaveAt then leaveAt - 1030 else 1800
+			return {
+				merchant = true,
+				dungeonId = "dng_graveyard",
+				arriveAt = 1030,
+				leaveAt = leaveAt,
+				returnAt = 1030 + stay + 30,
+				log = {
+					departAt = 1000,
+					travelSeconds = 30,
+					replaySeconds = stay,
+					totalSeconds = 60 + stay,
+					floors = {},
+				},
+			}
+		end
+		it(
+			"D-274 向かっている間の残りは着くまで。とどまっている間は探索中で残りなし",
+			function()
+				local e = merchantExpedition(nil)
+				local s1 = PartyStatus.compute(e, 1010, Expedition.progressAt, MAX, 0.3)
+				expect(s1.state).toBe("moving")
+				expect(s1.remaining).toBe(20)
+				expect(s1.merchant).toBe(true)
+				local s2 = PartyStatus.compute(e, 1100, Expedition.progressAt, MAX, 0.3)
+				expect(s2.state).toBe("exploring")
+				expect(s2.remaining).toBe(nil)
+			end
+		)
+		it("D-274 Leave の後は帰り道（残りは帰るまで）", function()
+			local e = merchantExpedition(1100)
+			local s = PartyStatus.compute(e, 1110, Expedition.progressAt, MAX, 0.3)
+			expect(s.state).toBe("returning")
+			expect(s.remaining).toBe(20)
+		end)
+	end)
 	describe("D-251 マップイベントの仮の場所", function()
 		it(
 			"上の帯（右上のボタンの高さ）より下で、ダンジョンの丸と重ならない",

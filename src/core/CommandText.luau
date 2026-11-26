@@ -136,6 +136,8 @@ function CommandText.fromTokens(tokens: { string }): any?
 		return { type = "DispatchEvent", partyIndex = tonumber(tokens[2]), eventSlot = tonumber(tokens[3]) }
 	elseif c == "buy" then
 		return { type = "BuyFromMerchant", itemIndex = tonumber(tokens[2]), eventSlot = tonumber(tokens[3]) }
+	elseif c == "leave" then
+		return { type = "LeaveMerchant", partyIndex = tonumber(tokens[2]) } -- D-274
 	elseif c == "autosell" then
 		return {
 			type = "SetAutoSell",

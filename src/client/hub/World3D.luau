@@ -19,6 +19,7 @@ local Create = require("../ui/Create")
 local HubState = require("./HubState")
 local MapAmbience = require("./MapAmbience")
 local MapCamera = require("./MapCamera")
+local EventWorld = require("./EventWorld")
 local PartyIcon = require("../ui/PartyIcon")
 local Root = require("../ui/Root")
 local Session = require("../Session")
@@ -35,6 +36,8 @@ export type Handlers = {
 	onDungeon: (dungeonId: string) -> (),
 	onGuild: () -> (),
 	onParty: (partyIndex: number) -> (),
+	onMerchant: (eventSlot: number) -> (), -- 旅の商人（D-274）
+	onRaid: (eventSlot: number) -> (), -- レイドボス（D-275）
 }
 
 local DOT_TEXTURE = "rbxasset://textures/ui/traildot.png" -- Beam の点線（D-270 ②）
@@ -298,11 +301,55 @@ function World3D.mount(h: Handlers)
 	makeReticle(boardFolder :: Instance)
 	RunService.RenderStepped:Connect(World3D.step)
 	RunService.RenderStepped:Connect(updateAim)
+	-- 旅の商人（D-274）・レイドボス（D-275）：ReplicatedStorage.MapModels の模型を見本に、出ている間だけ場所に置く
+	EventWorld.mount(
+		World3D.placeOf,
+		topY,
+		function(): Vector3?
+			return if guildObj then groundOf(guildObj :: BasePart) else nil
+		end,
+		boardFolder :: Instance,
+		function(kind: string, slot: number)
+			local hd = handlers
+			if hd == nil then
+				return
+			end
+			if kind == "raid" then
+				hd.onRaid(slot)
+			else
+				hd.onMerchant(slot)
+			end
+		end
+	)
 end
 
 -- マップイベントの場所（Studio の EventPlace01〜）
 function World3D.eventPlace(index: number): BasePart?
 	return eventPlaces[((index - 1) % math.max(1, #eventPlaces)) + 1]
+end
+
+-- マップイベントの場所の id → 地図の上の Part
+function World3D.placeOf(placeId: string): BasePart?
+	for i, pl in master.mapEventPlaces do
+		if pl.id == placeId then
+			return World3D.eventPlace(i)
+		end
+	end
+	return nil
+end
+
+-- 探索の行き先の物（商人へ向かうパーティは商人の場所：D-274。ほかはダンジョン）
+local function destOf(e: any): BasePart?
+	if e == nil then
+		return nil
+	end
+	if e.merchant then
+		return World3D.placeOf(e.placeId)
+	end
+	if e.raidDamage and e.eventSlot then
+		return World3D.placeOf(Game.query.mapEventAt(e.eventSlot, master).placeId) -- レイドボスの場所（D-275）
+	end
+	return dungeonObjs[e.dungeonId]
 end
 
 function World3D.dungeonObject(id: string): BasePart?
@@ -357,7 +404,12 @@ function World3D.focusParty(partyIndex: number)
 		return
 	end
 	local s = lastStatus[partyIndex]
-	if s and s.state == "exploring" and s.dungeonId then
+	if s and s.state == "exploring" and s.merchant then
+		local dest = destOf(Game.query.expeditionOf(Session.view, partyIndex))
+		if dest then
+			MapCamera.focus(groundOf(dest))
+		end
+	elseif s and s.state == "exploring" and s.dungeonId then
 		World3D.focusDungeon(s.dungeonId)
 	else
 		World3D.focusGuild()
@@ -375,12 +427,21 @@ local function hitBy(ray: Ray): Target?
 	if cartFolder then
 		table.insert(list, cartFolder :: Instance)
 	end
+	local mf = EventWorld.folder()
+	if mf then
+		table.insert(list, mf :: Instance)
+	end
 	params.FilterDescendantsInstances = list
 	local hit = Workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
 	if hit == nil then
 		return nil
 	end
 	local inst: Instance? = hit.Instance
+	-- 旅の商人（D-274）・レイドボス（D-275）
+	local evKind, slot = EventWorld.hit(inst)
+	if evKind and slot then
+		return { kind = evKind, index = slot, model = EventWorld.model(evKind, slot) :: Model }
+	end
 	-- 馬車
 	for i, c in carts do
 		if inst and inst:IsDescendantOf(c) then
@@ -414,6 +475,10 @@ local function open(t: Target?)
 		h.onParty(t.index :: number)
 	elseif t.kind == "guild" then
 		h.onGuild()
+	elseif t.kind == "merchant" then
+		h.onMerchant(t.index :: number)
+	elseif t.kind == "raid" then
+		h.onRaid(t.index :: number)
 	else
 		h.onDungeon(t.id :: string)
 	end
@@ -434,6 +499,10 @@ local function targetName(t: Target): string
 		return PartyIcon.name(Session.view, t.index :: number)
 	elseif t.kind == "guild" then
 		return Words.guild
+	elseif t.kind == "merchant" then
+		return Words.merchant
+	elseif t.kind == "raid" then
+		return Words.raidBoss
 	end
 	local d = master.dungeons[t.id :: string]
 	return if d then d.nameEn else ""
@@ -441,7 +510,7 @@ end
 
 -- 縁を光らせる所：見えている模型（外側の箱は透明なので、子の Model・Part）
 local function lightTarget(t: Target): Instance
-	if t.kind == "party" then
+	if t.kind == "party" or t.kind == "merchant" or t.kind == "raid" then
 		return t.model
 	end
 	for _, c in t.model:GetChildren() do
@@ -621,8 +690,8 @@ function World3D.refresh(view: any)
 		local place: BasePart? = nil
 		if s.state == "waiting" then
 			place = guildObj
-		elseif s.state == "exploring" and s.dungeonId then
-			place = dungeonObjs[s.dungeonId]
+		elseif s.state == "exploring" and s.dungeonId and not s.merchant then
+			place = dungeonObjs[s.dungeonId] -- 商人のところにいるときは、商人の頭上の札に顔を出す（D-274）
 		end
 		if place then
 			inPlace[place] = inPlace[place] or {}
@@ -643,7 +712,7 @@ function World3D.refresh(view: any)
 		-- 点線（馬車 → 目的地）
 		local beam = beams[i]
 		if moving and cart and s.dungeonId then
-			local dest = if s.state == "moving" then dungeonObjs[s.dungeonId] else guildObj
+			local dest = if s.state == "moving" then destOf(Game.query.expeditionOf(view, i)) else guildObj
 			if dest then
 				if beam == nil then
 					beam = new("Beam", {
@@ -682,6 +751,7 @@ function World3D.refresh(view: any)
 			end
 		end
 	end
+	EventWorld.refresh(view)
 end
 
 -- 毎フレーム：馬車を道の上で動かす（行きはギルド→ダンジョン、帰りはダンジョン→ギルド。along で位置）
@@ -695,7 +765,7 @@ function World3D.step()
 	for i, cart in carts do
 		if cart.Parent and cart.PrimaryPart then
 			local e = Game.query.expeditionOf(view, i)
-			local d = if e then dungeonObjs[e.dungeonId] else nil
+			local d = destOf(e)
 			if e and e.log and d then
 				local pr = Expedition.progressAt(e.log, now)
 				local along = if pr.phase == "outbound"

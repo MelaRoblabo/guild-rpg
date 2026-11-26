@@ -135,6 +135,7 @@
 | `merchantItemCount` | `{ min = 3, max = 5 }`。品のレアリティは、そのダンジョンの宝箱の表からコモンを除いて引く（コモンしかない表ならコモン） | D-152, D-189 |
 | `merchantDungeonCount` | 2（品を引くダンジョン＝踏破済みのうち深い方からこの数。一番深いダンジョンとその1つ浅いダンジョン。06章 §12）。検証：1以上の整数 | D-202 |
 | `merchantRarityBias` | 12（品のレアリティの重み＝宝箱の表の重み × この値 ^ (rank − 2)。コモンは除く。「誰かの今の装備より良い品」が約15%になるよう自動プレイで合わせた。06章 §12）。検証：1以上 | D-204 |
+| `merchantStayMaxSeconds` | 1800（商人のところにとどまれる長さの上限。Leave を押さなくてもこの秒数で帰り始める。保存できる値にするため）。検証：1以上の整数 | D-274 |
 | `merchantPriceMult` / `merchantGradeCoef` / `merchantModifierCoef` | 10 / 0.5 / 0.5（10 は M7b-6 で見直して据え置き：D-198。係数 0.5 は仮のまま） | D-152, D-198 |
 | `rewardShareTargets` | §13 の表（まだ置いていない。自動プレイの `Ledger.TARGETS` に写して比べる） | D-160, D-200 |
 
@@ -281,7 +282,7 @@ M7b-4 で置いた候補（すべて仮。M7b-6）：デイリーは5種類（�
 
 ## 12. マップイベント・旅の商人（MapEvents.luau・Merchant.luau、D-152）
 
-- `MapEvents`：`kinds`（`{ id, kind }`。`mev_rare_dungeon`＝rareDungeon・`mev_raid`＝raid・`mev_merchant`＝merchant）と、出る場所の一覧 `places`（`{ id }`。中身は M8 のマップ設計で決める。M7b-4 は `mev_place_1〜4` の仮）。種類の割合は `mapEventKindWeights`（未決（M7b-6））。検証：割合の id は kinds を指す、kind の重複なし、場所は1行以上。
+- `MapEvents`：`kinds`（`{ id, kind }`。`mev_rare_dungeon`＝rareDungeon・`mev_raid`＝raid・`mev_merchant`＝merchant）と、出る場所の一覧 `places`（`{ id, distance }`。位置は Studio の EventPlace01〜（並び順）、distance はギルドの街からの距離で商人への片道秒に使う：D-274。3D の地図の距離 ÷ 16 が目安）。種類の割合は `mapEventKindWeights`（未決（M7b-6））。検証：割合の id は kinds を指す、kind の重複なし、場所は1行以上。
 - 旅の商人の決まりは別のファイルを作らず `Constants` に置く：品の数（`merchantItemCount`）、価格（売却額 × `merchantPriceMult`、グレード・修飾語で上がる。06章 §12）。品は装備だけ（チケットなど量を管理している品は売らない）。アイテムレベル・レアリティは踏破済みの範囲まで（品ごとに、踏破した一番深いダンジョンとその1つ浅いダンジョン（`merchantDungeonCount`。踏破が1つならそのダンジョン、未踏破なら古い墓地：D-187, D-202）から1つ選び、そのダンジョンの `chestRarityWeights` からコモンを除き、上位ほど重くした表（`merchantRarityBias`：D-204。コモンしかなければコモン：D-189）と宝箱の中身の抽選で作る。06章 §12）。
 
 ## 13. 報酬の入手先の配分（rewardShareTargets、D-160）

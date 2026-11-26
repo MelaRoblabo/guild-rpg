@@ -2,7 +2,8 @@
 -- マップイベント（D-152、docs/system/04_master_data.md §12、06章 §12）
 -- kinds：種類（割合は Constants.mapEventKindWeights）。kind は処理の種類
 -- places：出る場所の一覧。どこに出るかは時間帯ごとに全員共通で抽選する（calendarSeed）
---   場所の中身（マップ上の位置）は M8 のマップの設計で決める。今は id だけの仮の行
+--   マップ上の位置は Studio の EventPlace01〜（並び順）。distance はギルドの街からの距離（D-274：商人への片道秒 =
+--   ceil(distance × travelSecondsPerDistance)）。3D の地図の距離（スタッド）÷ 16 を目安にした（ダンジョン01：約24スタッド ≒ 1.5）
 
 return {
 	kinds = {
@@ -10,10 +11,10 @@ return {
 		{ id = "mev_raid", kind = "raid" }, -- レイドボス（DispatchEvent。まず自分専用）
 		{ id = "mev_merchant", kind = "merchant" }, -- 旅の商人（BuyFromMerchant）
 	},
-	places = { -- 仮（M8）
-		{ id = "mev_place_1" },
-		{ id = "mev_place_2" },
-		{ id = "mev_place_3" },
-		{ id = "mev_place_4" },
+	places = {
+		{ id = "mev_place_1", distance = 3.4 }, -- 約55スタッド
+		{ id = "mev_place_2", distance = 3.3 }, -- 約53スタッド
+		{ id = "mev_place_3", distance = 2.1 }, -- 約34スタッド
+		{ id = "mev_place_4", distance = 5.2 }, -- 約83スタッド
 	},
 }

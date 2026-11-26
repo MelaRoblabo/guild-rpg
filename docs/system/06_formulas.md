@@ -142,7 +142,7 @@ weekIndex(now) = floor((dayIndex(now) + 3) / 7)      -- 週の始まり＝月曜
 次の日の区切りの時刻 = (dayIndex(now) + 1) × 86400   -- 画面の残り時間・「明日の日替わり」の表示用
 ```
 
-## 12. マップイベントの時間帯・旅の商人（D-152, D-187, D-189, D-202, D-204）
+## 12. マップイベントの時間帯・旅の商人（D-152, D-187, D-189, D-202, D-204, D-274）
 
 ```
 eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごとに1つ
@@ -158,7 +158,10 @@ eventSlot(now) = floor(now / mapEventIntervalSeconds)              -- 5分ごと
                  重み = chestRarityWeights[rank] × merchantRarityBias ^ (rank − 2)        -- D-204：上位ほど出やすく。0 の rank は 0 のまま（宝箱で出る範囲は超えない）
                  （コモンしかない表のときはコモンの重みのまま）
               → 宝箱の中身と同じ装備の抽選（アイテムレベル＝そのダンジョンの tier。宝箱で出る範囲は超えない）
-              候補のダンジョンはその時間帯で最初に買ったときに state.merchant.dungeonIds に写す（3分間のうちに踏破が進んでも品ぞろえを変えない）
+              候補のダンジョンは商人へ派遣したときに派遣の記録（dungeonIds）に写す（とどまっている間に踏破が進んでも品ぞろえを変えない：D-274）
+商人への片道 ：ceil( 場所の distance（MapEvents.places） × travelSecondsPerDistance )   -- D-274：俊敏・地形のギフトは効かない
+商人の滞在   ：着いた時刻 ≤ 今 < 帰り始める時刻（Leave・ログアウトの時刻。なければ 着いた時刻 + merchantStayMaxSeconds） の間だけ買える   -- D-274
+              帰る時刻 = 帰り始める時刻 + 片道。商人は送られていなければ出てから3分間、送られたら帰り始めるまで地図に出る
 商人の価格   ：floor( 売却価格（§10） × merchantPriceMult × (1 + merchantGradeCoef × grade) × (修飾語つきなら 1 + merchantModifierCoef) )   -- 係数は未決（M7b-6）
 買える間     ：イベントの出発と同じ3分間（mapEventWindowSeconds）                                 -- D-179
 レアダンジョン：強さは踏破済みの一番深いダンジョンと同じ（まだどこも踏破していなければ古い墓地：D-187）。宝箱の数 × rareDungeonChestMult（端数は確率で切り上げ：D-173）

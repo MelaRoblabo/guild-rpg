@@ -4,6 +4,8 @@
 --   - 手持ちのゴールドは右上にずっと出す。値段が足りない品は警告の色。
 --   - 面の中の下：残り時間（176×56）と、右の金＝買う（手提げ袋＋費用）。倉庫がいっぱい／ゴールドが足りないときは押せない色と理由の札。
 --   - 買った品は判子＋暗く。商人で買った装備は自動売却しない（D-152）。
+--   - D-274：買えるのはパーティが商人のところにいる間だけ。向かっている間は「Arrives in」と灰色の Buy（押すと理由）。
+--     着いたら左下に Leave（帰る）。帰り始めると商人は去り、面も閉じる。
 
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
@@ -72,11 +74,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		end
 		local now = Session.now()
 		local q = goods
-		local ev = Game.query.mapEvent(now, master).current
-		if q == nil or not q.open or ev.eventSlot ~= slot then
+		-- 向かっている・着いている商人（D-274）。いなくなったら閉じる
+		local here: any = nil
+		for _, p in Game.query.merchantPresence(view, now, master) do
+			if p.eventSlot == slot and p.phase ~= "open" then
+				here = p
+			end
+		end
+		if q == nil or here == nil then
 			api.close()
 			return
 		end
+		local arrived = here.phase == "here"
 		local items = q.items
 		if items[pick] == nil or items[pick].bought then
 			pick = 1
@@ -230,13 +239,42 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			BackgroundTransparency = 1,
 			Parent = content,
 		})
-		local timer = WarehouseCommon.pill("@time", clock(q and ev.closesIn or 0), 30)
-		timer.AnchorPoint = Vector2.new(0, 0.5)
-		timer.Position = UDim2.fromScale(0, 0.5)
-		timer.Parent = foot
+		if arrived then
+			-- 帰る（D-274）：押すと帰り始め、商人は去る
+			local leave = Components.button({
+				kind = "brown",
+				width = 200,
+				icon = "◀",
+				label = Words.leave,
+				name = "Leave",
+				glyph = "X",
+				onClick = function()
+					if busy then
+						return
+					end
+					busy = true
+					local r = Session.sendAndWait({ type = "LeaveMerchant", partyIndex = here.partyIndex })
+					busy = false
+					if r and r.ok then
+						api.close()
+					else
+						render()
+					end
+				end,
+			})
+			leave.AnchorPoint = Vector2.new(0, 0.5)
+			leave.Position = UDim2.fromScale(0, 0.5)
+			leave.Parent = foot
+		else
+			-- 向かっている：着くまでの時計（D-274）
+			local timer = WarehouseCommon.pill("@time", Words.arrivesIn .. " " .. clock(here.arriveIn or 0), 30)
+			timer.AnchorPoint = Vector2.new(0, 0.5)
+			timer.Position = UDim2.fromScale(0, 0.5)
+			timer.Parent = foot
+		end
 		local full = Inventory.warehouseFree(view) < 1
-		local can = cur ~= nil and not cur.bought and not full and not poor
-		if full or poor then
+		local can = arrived and cur ~= nil and not cur.bought and not full and not poor
+		if arrived and (full or poor) then
 			local why =
 				WarehouseCommon.pill(if full then WarehouseCommon.icon.warehouse else Components.icon.coin, "⚠", 25)
 			why.AnchorPoint = Vector2.new(1, 0.5)
@@ -250,6 +288,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			label = Words.buy,
 			cost = if cur then HubState.formatNumber(cur.price) else nil,
 			name = "Buy",
+			reason = if not arrived then Words.reason.partyOnTheWay else nil, -- 着くまで買えない（D-274）
 			glyph = "A",
 			onClick = function()
 				if busy or not can then

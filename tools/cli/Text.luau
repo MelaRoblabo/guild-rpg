@@ -79,6 +79,8 @@ local ERRORS = {
 	EVENT_NOT_ACTIVE = "そのイベントは今は出ていません（event で確認）",
 	EVENT_WINDOW_CLOSED = "そのイベントの受付は締め切られました（出発・購入できるのは出てから3分間）",
 	EVENT_ALREADY_JOINED = "そのパーティはこのイベントにもう参加しました（1パーティ1回まで）",
+	MERCHANT_NO_PARTY = "商人のところにパーティがいません（パーティを送って、着いてから買えます）",
+	MERCHANT_NOT_ARRIVED = "パーティはまだ商人のところに着いていません",
 	ALREADY_BOUGHT = "その品はもう買いました",
 }
 
@@ -313,7 +315,10 @@ function Text.event(save: any, master: any): string
 			)
 		end
 	else
-		table.insert(lines, "  品は merchant で表示（buy <番号>）")
+		table.insert(
+			lines,
+			"  パーティを送って（eventgo <n>）、着いたら品を merchant で表示（buy <番号>・leave <n>）"
+		)
 	end
 	if q.next then
 		table.insert(
@@ -328,13 +333,23 @@ end
 
 -- 旅の商人の品（D-152）
 function Text.merchant(save: any, master: any): string
+	-- パーティが向かっている・とどまっている商人があればそちら（D-274）
 	local slot = Game.query.mapEvent(save.clock, master).current.eventSlot
+	for _, p in Game.query.merchantPresence(save.state, save.clock, master) do
+		if p.phase ~= "open" then
+			slot = p.eventSlot
+		end
+	end
 	local m = Game.query.merchant(save.state, slot, save.clock, master)
 	if m == nil then
 		return "今は旅の商人は出ていません（event で確認）"
 	end
-	local lines =
-		{ `【旅の商人】{if m.open then "受付中" else "受付終了"}（所持金 {save.state.gold}G）` }
+	local lines = {
+		`【旅の商人】{if m.open
+			then "パーティが着いている（買える）"
+			elseif m.partyIndex then "パーティが向かっている"
+			else "パーティを送ると買える"}（所持金 {save.state.gold}G）`,
+	}
 	for i, it in m.items do
 		table.insert(
 			lines,
@@ -637,7 +652,13 @@ function Text.events(events: { any }, save: any, master: any): string
 					.. (if e.restBonus then " ［休息ボーナス］" else "")
 			)
 		elseif e.type == "EventDispatched" then
-			if e.kind == "raid" then
+			if e.kind == "merchant" then
+				table.insert(
+					lines,
+					t
+						.. `パーティ{e.partyIndex}が旅の商人へ出発（到着 {hms(e.arriveAt - START_CLOCK)}。着いたら buy・leave {e.partyIndex}）`
+				)
+			elseif e.kind == "raid" then
 				table.insert(
 					lines,
 					t
@@ -669,6 +690,16 @@ function Text.events(events: { any }, save: any, master: any): string
 			table.insert(lines, t .. "レイドの宝箱が受け取り箱に届いた")
 		elseif e.type == "RaidReturned" then
 			table.insert(lines, t .. `パーティ{e.partyIndex}がレイドから帰還`)
+		elseif e.type == "MerchantLeft" then
+			table.insert(
+				lines,
+				t
+					.. `パーティ{e.partyIndex}が旅の商人のところを出発（帰還 {hms(
+						e.returnAt - START_CLOCK
+					)}）`
+			)
+		elseif e.type == "MerchantReturned" then
+			table.insert(lines, t .. `パーティ{e.partyIndex}が旅の商人から帰還`)
 		elseif e.type == "MerchantBought" then
 			local eq = save.state.equipment[e.equipmentUid]
 			table.insert(

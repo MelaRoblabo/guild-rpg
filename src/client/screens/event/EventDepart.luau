@@ -7,6 +7,7 @@
 --   - レイド：ボスの HP の棒に、選んだパーティのダメージの見込みを薄く重ねる（数字なし：D-231 ⑬）／
 --     参加したら★の宝箱（出発したパーティの番号と ✓）。
 --   - パーティは「番号＋状態の札」から選ぶ（D-231 ⑰）。探索中は押せない、出発済みは ✓。
+--   - 旅の商人（D-274）：片道の時間（One way）と品のレアリティの形。送れるのは1パーティだけ。着いたら商人の面で買う。
 --   - 金の Go（馬車＋種類のアイコン）＝DispatchEvent。
 
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
@@ -14,6 +15,7 @@ local ExclusiveGift = require("@game/ReplicatedStorage/Core/ExclusiveGift")
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Party = require("@game/ReplicatedStorage/Core/Party")
+local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Hint = require("../../party/Hint")
@@ -30,7 +32,7 @@ local C = Tokens.color
 local new = Create.new
 local CHILDREN = Create.Children
 
-local KIND_ICON = { rareDungeon = "@rare_dungeon", raid = "@raid" }
+local KIND_ICON = { rareDungeon = "@rare_dungeon", raid = "@raid", merchant = "@merchant" }
 local ROMAN = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }
 local deps = {
 	weights = AutoEquip.weights,
@@ -111,6 +113,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local function fetchRaid()
 		raidQuery = Session.query({ kind = "raid", eventSlot = slot })
 	end
+	-- 商人の品もサーバーで作る（seed は要約で隠している）。開いたときに一度だけ
+	local merchantQuery: any = nil
 
 	render = function()
 		body:ClearAllChildren()
@@ -125,6 +129,23 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			return
 		end
 		local raid = ev.kind == "raid"
+		local merchant = ev.kind == "merchant"
+		if merchant then
+			-- もう送った（向かっている・着いている）なら閉じる（D-274：1パーティだけ）
+			local waiting = false
+			for _, p in Game.query.merchantPresence(view, now, master) do
+				if p.eventSlot == slot and p.phase == "open" then
+					waiting = true
+				end
+			end
+			if not waiting then
+				api.close()
+				return
+			end
+			if merchantQuery == nil then
+				merchantQuery = Session.query({ kind = "merchant", eventSlot = slot }) or {}
+			end
+		end
 		local joined: { number } = {}
 		local raidInfo = nil
 		local target = nil
@@ -139,7 +160,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				raidInfo = raidQuery
 			end
 			joined = (raidInfo and raidInfo.parties) or {}
-		else
+		elseif not merchant then
 			target = Game.query.rareDungeon(view, slot, master)
 			joined = target.joined
 		end
@@ -194,7 +215,17 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			},
 			Parent = content,
 		})
-		if not raid and target then
+		if merchant then
+			-- 片道の時間（D-274）と品のレアリティの形（差を見せる：D-218）
+			local r1 = row(box, 1, 60)
+			label(r1, 1, "@time", 28)
+			label(r1, 2, Words.oneWay .. " " .. clock(Game.query.merchantTravelSeconds(ev.placeId, master)), 25)
+			local r2 = row(box, 2, 60)
+			label(r2, 1, "@merchant", 28)
+			for i, it in (merchantQuery and merchantQuery.items) or {} do
+				label(r2, 1 + i, ChestCommon.rarityShape(it.rarity), 28, ChestCommon.rarityColor(it.rarity))
+			end
+		elseif not raid and target then
 			local d = master.dungeons[target.dungeonId]
 			local r1 = row(box, 1, 60)
 			local num = WarehouseCommon.pill("✓", if d then ROMAN[d.tier] or tostring(d.tier) else "?", 23)

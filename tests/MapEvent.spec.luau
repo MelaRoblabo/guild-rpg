@@ -68,6 +68,16 @@ return function(t)
 	local function startOf(slot: number): number
 		return MapEvent.startOf(slot, K)
 	end
+	-- パーティ1を商人へ送り、その派遣の記録を返す（D-274）
+	local function sendToMerchant(s: any, slot: number, at: number?): any
+		local r = Game.execute(
+			s,
+			{ type = "DispatchEvent", partyIndex = 1, eventSlot = slot },
+			{ now = at or MapEvent.startOf(slot, K), master = master, online = true }
+		)
+		assert(r.ok, r.error)
+		return Merchant.expeditionFor(s, slot)
+	end
 	-- パーティ2を足し、新しく雇った4人を入れる
 	local function addParty(s: any, m: any?)
 		local mm = m or master
@@ -176,7 +186,7 @@ return function(t)
 
 	describe("DispatchEvent の受付（D-152, D-179）", function()
 		it(
-			"D-152 締め切り後・過ぎた時間帯は EVENT_WINDOW_CLOSED、まだの時間帯と商人は EVENT_NOT_ACTIVE",
+			"D-152 締め切り後・過ぎた時間帯は EVENT_WINDOW_CLOSED、まだの時間帯は EVENT_NOT_ACTIVE（D-274：商人へは出発できる）",
 			function()
 				local slot = findSlot("rareDungeon")
 				local s = newState()
@@ -194,7 +204,7 @@ return function(t)
 					exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, startOf(slot + 1) + 1).error
 				).toBe("EVENT_WINDOW_CLOSED")
 				local m = findSlot("merchant")
-				expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = m }, startOf(m) + 1).error).toBe(
+				expect(exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = m }, startOf(m) - 1).error).toBe(
 					"EVENT_NOT_ACTIVE"
 				)
 				-- 締め切りの1秒前は出発できる
@@ -620,13 +630,14 @@ return function(t)
 			expect(Merchant.price(modded, master) > Merchant.price(item, master)).toBe(true)
 		end)
 		it(
-			"D-152 D-175 買った装備は fromMerchant で倉庫へ。購入済みは状態に持ち、2回は買えない",
+			"D-152 D-175 D-274 買った装備は fromMerchant で倉庫へ。購入済みは派遣の記録に持ち、2回は買えない",
 			function()
 				local slot = findSlot("merchant")
 				local s = newState()
 				s.gold = 10 ^ 9
 				local g = Merchant.goods(s, slot, master)
-				local r = exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, startOf(slot) + 1)
+				local e = sendToMerchant(s, slot)
+				local r = exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, e.arriveAt)
 				expect(r.ok).toBe(true)
 				local ev = eventsOf(r.events, "MerchantBought")[1]
 				local eq = s.equipment[ev.equipmentUid]
@@ -634,65 +645,214 @@ return function(t)
 				expect(eq.baseId).toBe(g[1].item.baseId)
 				expect(eq.rarity).toBe(g[1].item.rarity)
 				expect(s.gold).toBe(10 ^ 9 - g[1].price)
-				expect(s.merchant.eventSlot).toBe(slot)
-				expect(s.merchant.bought[1]).toBe(true)
-				expect(#s.merchant.bought).toBe(#g)
-				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, startOf(slot) + 2).error).toBe(
+				local cur = Merchant.expeditionFor(s, slot)
+				expect(cur.bought[1]).toBe(true)
+				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, e.arriveAt + 1).error).toBe(
 					"ALREADY_BOUGHT"
 				)
-				local q = Game.query.merchant(s, slot, startOf(slot) + 2, master)
+				local q = Game.query.merchant(s, slot, e.arriveAt + 1, master)
 				expect(q.items[1].bought).toBe(true)
 				expect(q.items[2].bought).toBe(false)
 				expect(q.open).toBe(true)
+				expect(q.partyIndex).toBe(1)
 				-- 一括売却で売らない（D-175）
 				expect(Inventory.isWeakForBulkSell(s, eq, master)).toBe(false)
 			end
 		)
 		it(
-			"D-179 買えるのは3分間。締め切り後は EVENT_WINDOW_CLOSED、商人でない時間帯は EVENT_NOT_ACTIVE",
+			"D-274 買えるのはパーティが商人のところにいる間だけ（3分間を過ぎていてもよい。Leave の後は買えない）",
 			function()
 				local slot = findSlot("merchant")
 				local s = newState()
 				s.gold = 10 ^ 9
-				expect(
-					exec(
-						s,
-						{ type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 },
-						startOf(slot) + K.mapEventWindowSeconds
-					).error
-				).toBe("EVENT_WINDOW_CLOSED")
+				-- パーティを送っていない
+				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, startOf(slot)).error).toBe(
+					"MERCHANT_NO_PARTY"
+				)
+				-- 向かっている途中
+				local e = sendToMerchant(s, slot, startOf(slot) + K.mapEventWindowSeconds - 1)
+				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, e.arriveAt - 1).error).toBe(
+					"MERCHANT_NO_PARTY"
+				)
+				-- 着いた（3分間は過ぎている）
+				expect(e.arriveAt > startOf(slot) + K.mapEventWindowSeconds).toBe(true)
+				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, e.arriveAt).ok).toBe(true)
+				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 99 }, e.arriveAt).error).toBe(
+					"ITEM_NOT_FOUND"
+				)
+				-- Leave の後
+				expect(exec(s, { type = "LeaveMerchant", partyIndex = 1 }, e.arriveAt + 5).ok).toBe(true)
+				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 2 }, e.arriveAt + 5).error).toBe(
+					"MERCHANT_NO_PARTY"
+				)
+				-- 商人でない時間帯
 				local raid = findSlot("raid")
 				expect(exec(s, { type = "BuyFromMerchant", eventSlot = raid, itemIndex = 1 }, startOf(raid)).error).toBe(
 					"EVENT_NOT_ACTIVE"
-				)
-				expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 99 }, startOf(slot)).error).toBe(
-					"ITEM_NOT_FOUND"
 				)
 			end
 		)
 		it("D-152 お金が足りない・倉庫がいっぱいなら買えない", function()
 			local slot = findSlot("merchant")
 			local s = newState()
+			local e = sendToMerchant(s, slot)
 			s.gold = 0
-			expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, startOf(slot)).error).toBe(
+			expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, e.arriveAt).error).toBe(
 				"NOT_ENOUGH_GOLD"
 			)
 			s.gold = 10 ^ 9
 			s.expansions.warehouseSize = Inventory.warehouseUsage(s)
-			expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, startOf(slot)).error).toBe(
+			expect(exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, e.arriveAt).error).toBe(
 				"WAREHOUSE_FULL"
 			)
 		end)
+		it("D-274 派遣した後に新しく踏破しても、品ぞろえは変わらない", function()
+			local slot = findSlot("merchant")
+			local s = newState()
+			local before = Merchant.goods(s, slot, master)
+			sendToMerchant(s, slot)
+			clearUpTo(s, 5)
+			expect(Merchant.goods(s, slot, master)).toEqual(before)
+		end)
 		it(
-			"D-152 3分間のうちに新しく踏破しても、最初に買った後の品ぞろえは変わらない",
+			"D-274 片道秒は場所の距離 × travelSecondsPerDistance（切り上げ）。Leave から片道秒で帰り、MerchantReturned",
 			function()
 				local slot = findSlot("merchant")
 				local s = newState()
-				s.gold = 10 ^ 9
-				local before = Merchant.goods(s, slot, master)
-				exec(s, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = 1 }, startOf(slot))
-				clearUpTo(s, 5)
-				expect(Merchant.goods(s, slot, master)).toEqual(before)
+				local place = MapEvent.eventAt(slot, master).placeId
+				local dist = 0
+				for _, pl in master.mapEventPlaces do
+					if pl.id == place then
+						dist = pl.distance
+					end
+				end
+				local travel = math.ceil(dist * K.travelSecondsPerDistance)
+				local at = startOf(slot) + 3
+				local e = sendToMerchant(s, slot, at)
+				expect(e.arriveAt).toBe(at + travel)
+				expect(e.placeId).toBe(place)
+				expect(Merchant.travelSeconds(place, master)).toBe(travel)
+				-- 着く前は Leave できない
+				expect(exec(s, { type = "LeaveMerchant", partyIndex = 1 }, e.arriveAt - 1).error).toBe(
+					"MERCHANT_NOT_ARRIVED"
+				)
+				local r = exec(s, { type = "LeaveMerchant", partyIndex = 1 }, e.arriveAt + 20)
+				expect(r.ok).toBe(true)
+				local cur = Merchant.expeditionFor(s, slot)
+				expect(cur.returnAt).toBe(e.arriveAt + 20 + travel)
+				expect(cur.log.totalSeconds).toBe(travel * 2 + 20)
+				expect(Expedition.progressAt(cur.log, e.arriveAt + 21).phase).toBe("inbound")
+				local evs = Game.advance(s, ctx(cur.returnAt))
+				expect(#eventsOf(evs, "MerchantReturned")).toBe(1)
+				expect(Merchant.expeditionFor(s, slot)).toBe(nil)
+				expect(Party.isBusy(s, 1)).toBe(false)
+				-- 待機中のパーティは Leave できない
+				expect(exec(s, { type = "LeaveMerchant", partyIndex = 1 }, cur.returnAt + 1).error).toBe(
+					"MERCHANT_NO_PARTY"
+				)
+			end
+		)
+		it("D-274 1つの商人に送れるのは1パーティだけ（帰ってきた後も）", function()
+			local slot = findSlot("merchant")
+			local s = newState()
+			addParty(s)
+			local e = sendToMerchant(s, slot)
+			expect(exec(s, { type = "DispatchEvent", partyIndex = 2, eventSlot = slot }, startOf(slot) + 1).error).toBe(
+				"EVENT_ALREADY_JOINED"
+			)
+			exec(s, { type = "LeaveMerchant", partyIndex = 1 }, e.arriveAt)
+			local back = Merchant.expeditionFor(s, slot).returnAt
+			Game.advance(s, ctx(back))
+			expect(back < startOf(slot) + K.mapEventWindowSeconds).toBe(true)
+			expect(exec(s, { type = "DispatchEvent", partyIndex = 2, eventSlot = slot }, back + 1).error).toBe(
+				"EVENT_ALREADY_JOINED"
+			)
+		end)
+		it("D-274 Leave を押さなければ merchantStayMaxSeconds で帰り始める", function()
+			local slot = findSlot("merchant")
+			local s = newState()
+			local e = sendToMerchant(s, slot)
+			local travel = e.log.travelSeconds
+			expect(e.returnAt).toBe(e.arriveAt + K.merchantStayMaxSeconds + travel)
+			expect(Merchant.isHere(e, e.arriveAt + K.merchantStayMaxSeconds - 1, K)).toBe(true)
+			expect(Merchant.isHere(e, e.arriveAt + K.merchantStayMaxSeconds, K)).toBe(false)
+			local evs = Game.advance(s, ctx(e.returnAt))
+			expect(#eventsOf(evs, "MerchantReturned")).toBe(1)
+		end)
+		it(
+			"D-274 ログアウトしたら、ログアウトの時刻（まだ着いていなければ着いた時刻）に帰り始める",
+			function()
+				local slot = findSlot("merchant")
+				-- とどまっている間にログアウト
+				local s = newState()
+				local e = sendToMerchant(s, slot)
+				local travel = e.log.travelSeconds
+				s.lastAdvancedAt = e.arriveAt + 30
+				s.lastSavedAt = e.arriveAt + 30
+				local evs = Game.advance(s, ctx(e.arriveAt + 3600, false))
+				local back = eventsOf(evs, "MerchantReturned")[1]
+				expect(back.at).toBe(e.arriveAt + 30 + travel)
+				-- 向かっている途中にログアウト
+				local s2 = newState()
+				local e2 = sendToMerchant(s2, slot)
+				s2.lastAdvancedAt = e2.departAt + 1
+				s2.lastSavedAt = e2.departAt + 1
+				local evs2 = Game.advance(s2, ctx(e2.arriveAt + 3600, false))
+				expect(eventsOf(evs2, "MerchantReturned")[1].at).toBe(e2.arriveAt + travel)
+			end
+		)
+		it(
+			"D-274 マップの商人：向かうパーティを待つ（3分間）→ 向かっている → 着いている → Leave で去る。送らなければ3分間で去る",
+			function()
+				local slot = findSlot("merchant")
+				local s = newState()
+				local at = startOf(slot)
+				local p0 = Merchant.presence(s, at + 1, master)
+				expect(#p0).toBe(1)
+				expect(p0[1].phase).toBe("open")
+				expect(p0[1].closesIn).toBe(K.mapEventWindowSeconds - 1)
+				-- 送らなければ3分間で去る
+				expect(#Merchant.presence(s, at + K.mapEventWindowSeconds, master)).toBe(0)
+				-- 送る
+				local e = sendToMerchant(s, slot, at + K.mapEventWindowSeconds - 1)
+				local p1 = Merchant.presence(s, e.arriveAt - 1, master)
+				expect(p1[1].phase).toBe("coming")
+				expect(p1[1].partyIndex).toBe(1)
+				expect(p1[1].arriveIn).toBe(1)
+				local p2 = Merchant.presence(s, e.arriveAt + 100, master)
+				expect(p2[1].phase).toBe("here")
+				exec(s, { type = "LeaveMerchant", partyIndex = 1 }, e.arriveAt + 100)
+				expect(#Merchant.presence(s, e.arriveAt + 100, master)).toBe(0)
+			end
+		)
+	end)
+
+	describe("マップのレイドボス（D-275）", function()
+		it(
+			"D-275 出発できる3分間は出ている。過ぎても向かっているパーティが着くまでは出ている。討伐したら出さない",
+			function()
+				local slot = findSlot("raid")
+				local s = newState()
+				local at = startOf(slot)
+				local p0 = Raid.presence(s, at + 1, master)
+				expect(#p0).toBe(1)
+				expect(p0[1].phase).toBe("open")
+				expect(p0[1].placeId).toBe(MapEvent.eventAt(slot, master).placeId)
+				expect(p0[1].closesIn).toBe(K.mapEventWindowSeconds - 1)
+				-- 誰も出ていなければ3分間で去る
+				expect(#Raid.presence(s, at + K.mapEventWindowSeconds, master)).toBe(0)
+				-- 締め切りの直前に出発：着くまでは出ている
+				local leave = at + K.mapEventWindowSeconds - 1
+				exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, leave)
+				local p1 = Raid.presence(s, leave + 5, master)
+				expect(p1[1].phase).toBe("closed")
+				expect(p1[1].coming).toEqual({ 1 })
+				expect(#Raid.presence(s, leave + K.raidTravelSeconds, master)).toBe(0)
+				-- 討伐したら出さない
+				local s2 = newState()
+				exec(s2, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, at)
+				s2.raid.defeated = true
+				expect(#Raid.presence(s2, at + 2, master)).toBe(0)
 			end
 		)
 	end)
@@ -1061,6 +1221,8 @@ return function(t)
 			)
 			expect((Protocol.validateCommand({ type = "DispatchEvent", partyIndex = 1 }))).toBe(false)
 			expect((Protocol.validateCommand({ type = "BuyFromMerchant", eventSlot = 1.5, itemIndex = 1 }))).toBe(false)
+			expect((Protocol.validateCommand({ type = "LeaveMerchant", partyIndex = 1 }))).toBe(true) -- D-274
+			expect((Protocol.validateCommand({ type = "LeaveMerchant" }))).toBe(false)
 		end)
 		it("D-152 CommandText：eventgo <n> [時間帯]・buy <番号> [時間帯]", function()
 			expect(CommandText.parse("eventgo 2 100")).toEqual({
@@ -1070,6 +1232,7 @@ return function(t)
 			})
 			expect(CommandText.parse("eventgo 1")).toEqual({ type = "DispatchEvent", partyIndex = 1 })
 			expect(CommandText.parse("buy 3")).toEqual({ type = "BuyFromMerchant", itemIndex = 3 })
+			expect(CommandText.parse("leave 2")).toEqual({ type = "LeaveMerchant", partyIndex = 2 }) -- D-274
 		end)
 		it("D-152 Protocol.view は商人・レイドの状態を JSON にして送れる", function()
 			local slot = findSlot("raid")

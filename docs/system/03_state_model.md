@@ -63,6 +63,9 @@ export type Expedition = {
 	dailyTraitId: string?,            -- 出発時に当たっていた日替わりの特性（D-156）。留守番も出発した日の特性。M7b-3（version 7）で追加
 	eventSlot: number?,               -- マップイベントへの派遣なら、そのイベントの時間帯の番号（D-152、06章 §12）
 	raidDamage: number?,              -- レイドへの派遣なら、出発時に計算したダメージ（到着時刻に入れる。D-152）
+	merchant: boolean?,               -- 旅の商人への派遣（D-274）。placeId（行き先の場所）・arriveAt（着く時刻）・leaveAt（帰り始めた時刻。まだなら nil）・
+	                                  --   dungeonIds（派遣したときの品の候補のダンジョン）・bought（買った品の番号）を持つ。log は floors なし、
+	                                  --   replaySeconds＝とどまる長さ（Leave までは merchantStayMaxSeconds、Leave で縮める）
 	arriveAt: number?,                -- レイドへの派遣なら、ボスに着く時刻（出発 + raidTravelSeconds。06章 §12）
 	raidArrived: boolean?,            -- レイドのダメージを入れ終わった
 	chestPile: string?,               -- レアダンジョンへの派遣なら、宝箱の山の鍵 special:rare:<相当するダンジョン>（D-171, D-185）
@@ -180,7 +183,7 @@ export type PlayerState = {
 		claimedDeliveries: { [string]: boolean }, -- 招待した側：受け取った届け物の id（例 "referral:<招待された人の UserId>"）。同じ id は二度受け取らない
 		weekIndex: number, weekCount: number,     -- 招待した側の人数の上限（週）
 	},                                -- 招待した側への報酬は「届け物」として別の保存場所に置き、次のログインで受け取り箱へ入れる（D-180。届け物そのものはこのセーブには書かない。詳細は M7b-5）
-	merchant: { eventSlot: number, bought: { boolean }, dungeonIds: { string } }?,  -- 今の旅の商人の品のうち買ったもの（D-152）。version 10。品ぞろえは eventSlot と seed から決まるので保存しない
+	merchant: { eventSlot: number }?,  -- 最後にパーティを送った旅の商人の時間帯（D-274：同じ商人へ2組目を送らない）。買ったもの・候補のダンジョンは派遣の記録（expeditions[*].bought・dungeonIds）に持つ。旧版の bought・dungeonIds は読まない
 	                                  -- bought は品の数だけの配列（穴なし）。dungeonIds は最初に買ったときの候補のダンジョン（3分間のうちに踏破が進んでも品ぞろえを変えない：06章 §12）
 	raid: { eventSlot: number, hp: number, damage: number, defeated: boolean, parties: { number }, arrived: number }?,  -- 今のレイドボスの進み具合（D-152。自分専用）。version 10
 	                                  -- hp は最初に出発したときに決める。parties は出発したパーティ（1パーティ1回まで）、arrived は到着した数（宝箱の数に使う：D-179）

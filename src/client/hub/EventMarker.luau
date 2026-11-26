@@ -7,6 +7,7 @@
 --   種類のアイコン：レアダンジョン＝宝石（門はパーティの「探索中」：D-234 ②）、レイド＝稲妻、商人＝カート。
 --   ⑤ 締め切り間近は印が小さく揺れ、締め切ったら「Closed」のハンコを押して消える（D-269 ③。黙って消えていた）。
 --   3D マップ（D-270 ⑦）：印は地図の上の場所（Studio の EventPlace01〜）に BillboardGui で出す。
+--   旅の商人・レイドボスには印を出さない（D-274・D-275：地図の上の物そのものと頭上の時計：EventWorld）。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
@@ -162,6 +163,9 @@ function EventMarker.refresh(view: any)
 	elseif st.next then
 		ev = st.next
 		notice = true
+	end
+	if ev and (ev.kind == "merchant" or ev.kind == "raid") then
+		ev = nil -- 商人・レイドボスは地図の上の物（EventWorld）が出す（D-274・D-275）
 	end
 	current = if notice then nil else ev
 	-- 出ていたイベントが締め切られた（次の予告になった・消えた）ら、その場所に Closed のハンコ

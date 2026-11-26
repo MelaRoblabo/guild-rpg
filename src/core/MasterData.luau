@@ -410,6 +410,7 @@ local function validateConstants(c: Checker, k: any, nRarity: number)
 	c:number(p .. ".merchantPriceMult", k.merchantPriceMult, 0)
 	c:number(p .. ".merchantGradeCoef", k.merchantGradeCoef, 0)
 	c:number(p .. ".merchantModifierCoef", k.merchantModifierCoef, 0)
+	c:integer(p .. ".merchantStayMaxSeconds", k.merchantStayMaxSeconds, 1) -- D-274
 
 	c:integer(p .. ".questDailyCount", k.questDailyCount, 1)
 	c:integer(p .. ".questWeeklyCount", k.questWeeklyCount, 1)
@@ -1485,6 +1486,11 @@ local function validateMapEvents(c: Checker, d: any)
 	local placeIds = c:uniqueIds("MapEvents.places", M.places, "mev_")
 	if type(M.places) == "table" and #M.places == 0 then
 		c:error("MapEvents.places", "1行以上が必要")
+	end
+	if type(M.places) == "table" then
+		for i, r in M.places do
+			c:number(`MapEvents.places[{i}].distance`, if type(r) == "table" then r.distance else nil, 0.1) -- D-274
+		end
 	end
 	for id in placeIds do
 		if ids[id] then

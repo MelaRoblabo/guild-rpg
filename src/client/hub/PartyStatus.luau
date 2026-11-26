@@ -20,6 +20,8 @@ export type Status = {
 	remaining: number?, -- 帰るまでの残り秒（行き・探索・帰りを通して。D-249 ①）
 	exploreRatio: number?, -- ダンジョンの中の進み 0〜1（探索中だけ。マップの輪：D-249 ②）
 	inBattle: boolean, -- 今のフロアが戦闘か（馬車が揺れて ⚔：D-249 ②）
+	merchant: boolean?, -- 商人へ向かっている・とどまっている（D-274。行き先はダンジョンでなく商人の場所）
+	raid: boolean?, -- レイドボスへ（D-275。行き先はレイドボスの場所）
 }
 
 export type Progress = { phase: string, ratio: number, floorIndex: number? }
@@ -63,6 +65,17 @@ function PartyStatus.compute(
 		remaining = math.max(0, (expedition.returnAt or (log.departAt + log.totalSeconds)) - now),
 		inBattle = false,
 	}
+	s.merchant = expedition.merchant == true
+	s.raid = expedition.raidDamage ~= nil
+	if expedition.merchant then
+		-- 商人へ（D-274）：着くまでの残り。とどまっている間は帰る時刻が決まっていないので残りなし
+		if p.phase == "floor" then
+			s.state, s.along, s.remaining = "exploring", 1, nil
+			return s
+		elseif p.phase == "outbound" then
+			s.remaining = math.max(0, (expedition.arriveAt or now) - now)
+		end
+	end
 	if p.phase == "outbound" then
 		s.state, s.along = "moving", p.ratio
 	elseif p.phase == "floor" then

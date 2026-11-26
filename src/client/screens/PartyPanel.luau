@@ -325,7 +325,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if s.state ~= "waiting" and s.dungeonId then
 			local d = master.dungeons[s.dungeonId]
 			local line = Components.text({
-				text = (if d then d.nameEn else s.dungeonId),
+				text = if s.merchant
+					then Words.merchant -- 商人へ（D-274）
+					elseif s.raid then Words.raidBoss -- レイドボスへ（D-275）
+					elseif d then d.nameEn
+					else s.dungeonId,
 				size = 23,
 				color = C.inkDark,
 				font = Tokens.font.bodyStrong,
@@ -596,6 +600,20 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			p.AnchorPoint = Vector2.new(1, 0)
 			p.Position = UDim2.new(1, -6, 0, 6)
 			p.Parent = scene
+		end
+		-- 旅の商人へ（D-274）：向かっている間は着くまで、とどまっている間は商人の印と Shopping、帰り道はふだんどおり
+		if e.merchant and st.phase ~= "inbound" then
+			if st.phase == "outbound" then
+				center("▶", 40, C.inkLight, 0.4)
+				center(Words.arrivesIn .. " " .. clock(math.max(0, e.arriveAt - Session.now())), 30, C.inkLight, 0.72)
+			else
+				local icon = Components.text({ text = "@merchant", size = 48, color = C.inkLight })
+				icon.AnchorPoint = Vector2.new(0.5, 0.5)
+				icon.Position = UDim2.fromScale(0.5, 0.4)
+				icon.Parent = scene
+				center(Words.shopping, 30, C.okGreen, 0.72)
+			end
+			return
 		end
 		-- 帰るまでの残り（左の一覧の行と同じ時計：D-249 ①）。時間は「Back in」の1つだけ（D-269 ①）。
 		-- 移動中・帰り道は真ん中に大きく出すので、左上の札はフロアにいる間だけ

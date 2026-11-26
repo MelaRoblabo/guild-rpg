@@ -88,6 +88,7 @@ Protocol.CLIENT_COMMANDS = {
 	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）
 	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
 	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179
+	LeaveMerchant = { partyIndex = int(1, 20) }, -- D-274。商人のところから帰る
 	MarkNotifyPrompt = { stage = enum({ "firstReturn", "loginDay2" }) }, -- D-196。通知の許可の画面を出した記録
 	SetGuideStep = { step = int(1, 99) }, -- D-244 ①。初回の誘導の済んだ段の数
 } :: { [string]: { [string]: Field } }

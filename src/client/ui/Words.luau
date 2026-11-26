@@ -66,6 +66,14 @@ local Words = {
 	items = "Items",
 	inbox = "Inbox",
 	autoSell = "Auto Sell",
+	-- 旅の商人（D-274）
+	merchant = "Merchant",
+	raidBoss = "Raid Boss", -- レイドボス（D-275。照準の札）
+	leave = "Leave", -- 商人のところから帰る
+	leavesIn = "Leaves in", -- 商人が去るまで（頭上の時計）
+	arrivesIn = "Arrives in", -- パーティが商人に着くまで
+	oneWay = "One way", -- 商人までの片道
+	shopping = "Shopping", -- パーティが商人のところにいる
 }
 
 -- 押せない理由・アラート（1行・12語まで：D-264 ②③）
@@ -74,6 +82,7 @@ Words.reason = {
 	noBetterGear = "No better gear in Warehouse", -- D-266 ④
 	allOut = "All parties are out", -- D-269 ④
 	noneCanEquip = "No one can equip this now", -- D-265 ⑤（付けられる人がいない・全員が冒険中）
+	partyOnTheWay = "Your party is still on the way", -- D-274（商人に着くまで買えない）
 }
 
 -- 画面のタイトル（1〜3語：D-264 ②）

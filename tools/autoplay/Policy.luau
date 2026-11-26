@@ -322,20 +322,40 @@ end
 
 -- 商人の計測（D-198 の価格倍率の見直し用。行動には使わない）
 local merchantSeen: { [number]: boolean } = {}
+local shopAt: (state: any, ctx: Ctx, eventSlot: number) -> ()
 local merchantStats = { offers = 0, priceSum = 0, upgrades = 0, affordable = 0, bought = 0, spent = 0 }
 Policy.merchantStats = merchantStats
 
--- 旅の商人（D-152）：今の時間帯が商人なら、誰かの今の装備より良い品を、予算（転生の備えを除いた所持金 × merchantBudgetShare）内で買う
+-- 旅の商人（D-152, D-274）：今の時間帯が商人で、まだ送っていなければ、空いているパーティ（番号の大きい方）を送る。
+-- 着いたら、誰かの今の装備より良い品を、予算（転生の備えを除いた所持金 × merchantBudgetShare）内で買い、すぐ帰る（Leave）
 local function buyFromMerchant(state: any, ctx: Ctx)
 	if not behavior.merchant then
 		return
 	end
 	local master = ctx.master
 	local cur = Game.query.mapEvent(ctx.now, master).current
-	if cur.kind ~= "merchant" or not cur.open then
-		return
+	if cur.kind == "merchant" and cur.open then
+		for i = #state.parties, 1, -1 do
+			if not Party.isBusy(state, i) and not Party.isEmpty(state.parties[i]) then
+				if exec(state, { type = "DispatchEvent", partyIndex = i, eventSlot = cur.eventSlot }, ctx).ok then
+					break
+				end
+			end
+		end
 	end
-	local m = Game.query.merchant(state, cur.eventSlot, ctx.now, master)
+	for _, p in Game.query.merchantPresence(state, ctx.now, master) do
+		if p.phase == "here" then
+			shopAt(state, ctx, p.eventSlot)
+			exec(state, { type = "LeaveMerchant", partyIndex = p.partyIndex }, ctx)
+		end
+	end
+end
+
+-- 商人のところで買う（パーティが着いている時間帯）
+shopAt = function(state: any, ctx: Ctx, eventSlot: number)
+	local master = ctx.master
+	local cur = { eventSlot = eventSlot }
+	local m = Game.query.merchant(state, eventSlot, ctx.now, master)
 	if not m or not m.open then
 		return
 	end

@@ -431,6 +431,8 @@ function Expedition.progressAt(log: Log, now: number): Progress
 				return { phase = "floor", floorIndex = i, ratio = (t - f.startOffset) / math.max(f.duration, 1) }
 			end
 		end
+		-- フロアのない間（商人のところにとどまっている：D-274）は行き先にいる（フロアの番号なし）
+		return { phase = "floor", ratio = (t - log.travelSeconds) / math.max(log.replaySeconds, 1) }
 	end
 	if t < log.totalSeconds then
 		return { phase = "inbound", ratio = (t - replayEnd) / log.travelSeconds }

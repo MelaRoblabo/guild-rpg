@@ -7,6 +7,7 @@
 
 local RunService = game:GetService("RunService")
 
+local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local Art = require("../ui/Art")
@@ -27,6 +28,7 @@ local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
 local Words = require("../ui/Words")
+local master = require("../Master")
 
 local C = Tokens.color
 local I = Components.icon
@@ -68,6 +70,32 @@ local function mount3D()
 			Nav.open("HireDesk") -- ギルド（S-20＝受付の広間：D-122・D-231 ③）
 		end,
 		onParty = openParty,
+		-- レイドボス（D-275）：出発できる間は出発の面
+		onRaid = function(slot: number)
+			local cur = Game.query.mapEvent(Session.now(), master).current
+			if Session.view and cur.kind == "raid" and cur.eventSlot == slot and cur.open then
+				PickMode.stop()
+				Nav.open("EventDepart", { slot = slot })
+			end
+		end,
+		-- 旅の商人（D-274）：向かうパーティを待っているなら出発の面、向かっている・着いているなら商人の面
+		onMerchant = function(slot: number)
+			local view = Session.view
+			if view == nil then
+				return
+			end
+			for _, p in Game.query.merchantPresence(view, Session.now(), master) do
+				if p.eventSlot == slot then
+					PickMode.stop()
+					if p.phase == "open" then
+						Nav.open("EventDepart", { slot = slot })
+					else
+						Nav.open("Merchant", { slot = slot })
+					end
+					return
+				end
+			end
+		end,
 	})
 	-- キーボードでカメラを動かすのは、マップを見ているときだけ（面がない・パーティやダンジョンの面だけ）
 	MapCamera.keysAllowed = function(): boolean
