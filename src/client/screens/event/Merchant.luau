@@ -61,6 +61,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	})
 	local pick = 1
 	local busy = false
+	local leaving = false
 	-- 品はサーバーで作る（seed は要約で隠している：Session.query）。開いたときと買ったあとに取り直す
 	local goods: any = Session.query({ kind = "merchant", eventSlot = slot })
 	local alive = true
@@ -249,12 +250,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				name = "Leave",
 				glyph = "X",
 				onClick = function()
-					if busy then
+					-- 買う処理（busy）とは別の印。買う処理の返事が遅れても帰れるようにする
+					if leaving then
 						return
 					end
-					busy = true
-					local r = Session.sendAndWait({ type = "LeaveMerchant", partyIndex = here.partyIndex })
-					busy = false
+					leaving = true
+					local ok, r = pcall(Session.sendAndWait, { type = "LeaveMerchant", partyIndex = here.partyIndex })
+					leaving = false
+					r = if ok then r else nil
 					if r and r.ok then
 						api.close()
 					else
@@ -295,10 +298,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					return
 				end
 				busy = true
-				Session.sendAndWait({ type = "BuyFromMerchant", eventSlot = slot, itemIndex = pick })
-				goods = Session.query({ kind = "merchant", eventSlot = slot })
+				-- 返事を待つ間のエラーで busy が残ると買えなくなる。必ず戻す
+				pcall(Session.sendAndWait, { type = "BuyFromMerchant", eventSlot = slot, itemIndex = pick })
 				busy = false
 				render()
+				-- 品の取り直しは待たない（返事が遅れても画面と Leave を止めない）
+				task.spawn(function()
+					local ok, g = pcall(Session.query, { kind = "merchant", eventSlot = slot })
+					if ok and g and alive then
+						goods = g
+						render()
+					end
+				end)
 			end,
 		})
 		buy.AnchorPoint = Vector2.new(1, 0.5)
@@ -307,11 +318,30 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	end
 
 	render()
+	-- 1秒ごとに見直すが、作り直すのは見えるものが変わったときだけ（作り直しの間に押した品・ボタンが消えないように）
+	local function shownKey(): string
+		local view = Session.view
+		if view == nil then
+			return ""
+		end
+		local k = tostring(view.gold) .. ":" .. tostring(pick)
+		for _, p in Game.query.merchantPresence(view, Session.now(), master) do
+			if p.eventSlot == slot then
+				k ..= ":" .. tostring(p.phase) .. ":" .. (if p.phase == "here" then "" else tostring(p.arriveIn))
+			end
+		end
+		return k
+	end
+	local lastKey = shownKey()
 	task.spawn(function()
 		while alive do
 			task.wait(1)
 			if alive and not busy then
-				render()
+				local k = shownKey()
+				if k ~= lastKey then
+					lastKey = k
+					render()
+				end
 			end
 		end
 	end)

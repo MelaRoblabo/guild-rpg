@@ -277,8 +277,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			width = if equipable then 160 else 320,
 			height = if equipable then 66 else nil,
 			icon = I.next,
-			label = Words.next
-				.. (if index < #batch.special then " " .. string.rep("●", #batch.special - index) else ""),
+			-- 残りの数は点を並べず「14 left」と語で（点だと多いときにボタンからあふれる：D-264）
+			label = Words.next .. (if index < #batch.special
+				then "  " .. string.format(Words.leftCount, #batch.special - index)
+				else ""),
 			name = "Next",
 			glyph = if equipable then "X" else "A",
 			onClick = goNext,
@@ -352,7 +354,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			label = Words.equip,
 			name = "Equip",
 			glyph = "A",
+			reason = if busy then Words.reason.equipOut else nil,
 			onClick = function()
+				if busy then
+					return
+				end
 				local r = Session.sendAndWait({ type = "Equip", adventurerUid = adv.uid, equipmentUid = item.uid })
 				if r and r.ok then
 					Guide.done("equip")

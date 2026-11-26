@@ -70,7 +70,10 @@ end
 function PartyIcon.set(f: Frame, view: any, partyIndex: number, state: string?)
 	local uid = view and Party.leader(view, partyIndex)
 	local adv = uid and view.adventurers[uid]
-	local face = f:FindFirstChild("Face") :: Frame
+	local face = f:FindFirstChild("Face") :: Frame?
+	if face == nil then
+		return -- 閉じた画面のアイコン（中身はもうない）
+	end
 	if face:GetAttribute("Uid") ~= (uid or "") then
 		face:SetAttribute("Uid", uid or "")
 		for _, c in face:GetChildren() do
@@ -90,7 +93,10 @@ function PartyIcon.set(f: Frame, view: any, partyIndex: number, state: string?)
 			t.Parent = face
 		end
 	end
-	local badge = f:FindFirstChild("State") :: TextLabel
+	local badge = f:FindFirstChild("State") :: TextLabel?
+	if badge == nil then
+		return
+	end
 	badge.Visible = state ~= nil
 	if state then
 		badges[badge] = state

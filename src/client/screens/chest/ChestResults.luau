@@ -284,7 +284,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						icon = "@slot_" .. slot,
 						label = Words.equip .. " to " .. adv.name,
 						name = "Equip",
-						reason = Words.reason.partyOut,
+						reason = Words.reason.equipOut,
 						onClick = function()
 							if busy then
 								return

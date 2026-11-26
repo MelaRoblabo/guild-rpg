@@ -32,7 +32,14 @@ function Signal.fire<T...>(self: Signal<T...>, ...: T...)
 		return a.id < b.id
 	end)
 	for _, h in list do
-		h.fn(...)
+		-- 通知の途中で外された接続は呼ばない（閉じた画面の描画を呼ばない）
+		if self.handlers[h.id] == h.fn then
+			-- 1つの受け手のエラーで、残りの受け手と送り手（コマンドの返事を待つ処理など）を止めない
+			local ok, err = pcall(h.fn, ...)
+			if not ok then
+				print("[Signal] 受け手のエラー: " .. tostring(err))
+			end
+		end
 	end
 end
 
