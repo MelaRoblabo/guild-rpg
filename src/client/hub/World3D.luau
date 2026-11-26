@@ -1,6 +1,6 @@
 --!strict
 -- 3D マップ（D-270）。テーブルの上の地図（Workspace.MAP）と、その上のミニチュア（Workspace["MAP Object"]）。
---   - Guild・Dungeon01〜12・EventPlace01〜04 の位置は Studio で動かす。ここは名前で探して位置を読む。
+--   - Guild・Dungeon01〜12・EventPlace01〜14 の位置は Studio で動かす。ここは名前で探して位置を読む。
 --   - ダンジョン：解放済みは表示、次に解放するものは Highlight で半透明の黒、その先は出さない（D-270 ③）。
 --   - 馬車：移動中・帰り道だけ地図の上を動く。速さは距離に関係なく探索の移動秒数で往復（D-270 ②）。目的地へ Beam の点線。
 --   - ギルド・ダンジョンの中のパーティは、その物の上に BillboardGui でリーダーのアイコン（D-270 ⑥・D-271）。
@@ -281,7 +281,7 @@ function World3D.mount(h: Handlers)
 				hideShell(obj)
 			end
 		end
-		for i = 1, 8 do
+		for i = 1, #master.mapEventPlaces do -- マスターデータの場所の数だけ（D-276）
 			local p = f:FindFirstChild(string.format("EventPlace%02d", i)) :: BasePart?
 			if p then
 				p.Transparency = 1
