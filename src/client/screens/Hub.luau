@@ -17,6 +17,7 @@ local MapLayout = require("../hub/MapLayout")
 local Nav = require("../ui/Nav")
 local EventMarker = require("../hub/EventMarker")
 local Guide = require("../hub/Guide")
+local LevelUpMarks = require("../hub/LevelUpMarks")
 local PickMode = require("../hub/PickMode")
 local LoginSequence = require("../hub/LoginSequence")
 local ReturnToast = require("../hub/ReturnToast")
@@ -47,6 +48,7 @@ local rows: { [number]: { button: TextButton, glyph: TextLabel, pinch: Frame, ri
 local markers: { [string]: TextButton } = {}
 local goldText: TextLabel
 local chestCount: TextLabel
+local levelUpBadge: TextLabel? = nil -- Adventurers のボタンの ▲（D-269 ③）
 local lastChestTotal: number? = nil -- 前に見た宝箱の数（増えたら馬車から宝箱が飛ぶ：D-268 ①）
 local chestNotice: Frame
 local chestButton: Frame
@@ -224,15 +226,68 @@ local function buildMap(parent: Frame)
 			})
 		end
 	end
-	-- 行き先を選ぶ形（D-231 ⑦）：選べるダンジョンは琥珀の輪
+	-- 行き先を選ぶ形（D-231 ⑦）：選べるダンジョンは琥珀の輪。
+	-- 入ったときは選べる丸が順に跳ね、ギルドから今の行き先へ点線の道が伸びる（D-269 ②）
+	local pickDots: Frame? = nil
+	local function clearPickDots()
+		if pickDots then
+			pickDots:Destroy()
+			pickDots = nil
+		end
+	end
 	local function showPickMode()
 		local view = Session.view
-		for id, mk in markers do
-			local stroke = mk:FindFirstChildOfClass("UIStroke")
-			local open = view ~= nil and view.unlockedDungeons ~= nil and view.unlockedDungeons[id] == true
+		local picking = PickMode.partyIndex ~= nil
+		local k = 0
+		for _, d in master.dungeonList do
+			local mk = markers[d.id]
+			local open = view ~= nil and view.unlockedDungeons ~= nil and view.unlockedDungeons[d.id] == true
+			local stroke = mk and mk:FindFirstChildOfClass("UIStroke")
 			if stroke then
-				stroke.Color = if PickMode.partyIndex and open then C.selAmber else C.bronze
-				stroke.Thickness = if PickMode.partyIndex and open then 5 else 3
+				stroke.Color = if picking and open then C.selAmber else C.bronze
+				stroke.Thickness = if picking and open then 5 else 3
+			end
+			if picking and open and mk then
+				k += 1
+				task.delay(0.08 * k, function()
+					Motion.bump(mk, 0.25)
+				end)
+			end
+		end
+		clearPickDots()
+		if picking and view then
+			local party = view.parties[PickMode.partyIndex :: number]
+			local dest = (party and party.lastDungeonId) or HubState.firstUnlocked(view)
+			local di = HubState.dungeonIndex(dest)
+			if di then
+				local g, t = MapLayout.guild(), MapLayout.dungeon(di)
+				local holder: Frame = new("Frame", {
+					Name = "PickPath",
+					Size = UDim2.fromScale(1, 1),
+					BackgroundTransparency = 1,
+					ZIndex = 2,
+					Parent = mapContent,
+				})
+				pickDots = holder
+				local dx, dy = t.x - g.x, t.y - g.y
+				local len = math.sqrt(dx * dx + dy * dy)
+				local steps = math.max(1, math.floor(len / 26))
+				for j = 1, steps - 1 do
+					local dot: Frame = new("Frame", {
+						Name = "Dot" .. j,
+						AnchorPoint = Vector2.new(0.5, 0.5),
+						Position = UDim2.fromOffset(g.x + dx * j / steps, g.y + dy * j / steps),
+						Size = UDim2.fromOffset(9, 9),
+						BackgroundColor3 = C.selAmber,
+						Visible = false,
+						ZIndex = 3,
+						[CHILDREN] = { Components.corner(5), Components.stroke(C.ch05, 1) },
+						Parent = holder,
+					})
+					task.delay(0.5 * j / steps, function()
+						dot.Visible = true
+					end)
+				end
 			end
 		end
 	end
@@ -259,27 +314,54 @@ local function wagonFor(partyIndex: number): Frame
 	end
 	w = new("Frame", {
 		Name = "Wagon" .. partyIndex,
-		Size = UDim2.fromOffset(66, 50),
+		Size = UDim2.fromOffset(84, 64),
 		BackgroundColor3 = C.ch28,
 		ZIndex = 6,
 		[CHILDREN] = {
 			Components.corner(10),
 			Components.stroke(C.ch05, 2),
-			(function()
-				local t = Components.text({
-					text = tostring(partyIndex),
-					size = 25,
-					color = C.inkLight,
-					font = Tokens.font.display,
-				})
-				t.AutomaticSize = Enum.AutomaticSize.None
-				t.Size = UDim2.fromScale(1, 1)
-				t.ZIndex = 7
-				return t
-			end)(),
 		},
 		Parent = mapContent,
 	})
+	-- 馬車の絵（ui_cart）。番号は旗にする（D-269 ②。「1」と書いた四角では馬車と分からなかった）
+	if Art.put(w, Art.ui("cart"), { zIndex = 7 }) then
+		w.BackgroundTransparency = 1
+		local stroke = w:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Enabled = false
+		end
+	end
+	local flag: Frame = new("Frame", {
+		Name = "Flag",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromOffset(-6, 14),
+		Size = UDim2.fromOffset(34, 28),
+		BackgroundColor3 = C.ctaGoldRim,
+		ZIndex = 8,
+		[CHILDREN] = { Components.corner(4), Components.stroke(C.ch05, 2) },
+		Parent = w,
+	})
+	new("Frame", {
+		Name = "Pole",
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.new(0, -2, 1, 0),
+		Size = UDim2.fromOffset(3, 16),
+		BackgroundColor3 = C.ch05,
+		BorderSizePixel = 0,
+		ZIndex = 8,
+		Parent = flag,
+	})
+	local num = Components.text({
+		text = tostring(partyIndex),
+		size = 21,
+		color = C.inkWhite,
+		font = Tokens.font.display,
+		stroke = true,
+	})
+	num.AutomaticSize = Enum.AutomaticSize.None
+	num.Size = UDim2.fromScale(1, 1)
+	num.ZIndex = 9
+	num.Parent = flag
 	-- 指示待ちの吹き出しの「！」（D-215 ⑦）
 	new("TextLabel", {
 		Name = "Waiting",
@@ -614,6 +696,24 @@ local function buildEdges(parent: Frame)
 			b.Activated:Connect(function()
 				Nav.open("AdvList")
 			end)
+			-- Lv が上がった人がいれば ▲ の札（一覧を開くまで残す：D-269 ③）
+			local up: TextLabel = new("TextLabel", {
+				Name = "LevelUp",
+				Text = "",
+				TextSize = 21,
+				FontFace = Tokens.font.number,
+				TextColor3 = C.inkDark,
+				BackgroundColor3 = C.okGreen,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(1, -6, 0, 6),
+				Size = UDim2.fromOffset(32, 32),
+				Visible = false,
+				ZIndex = 8,
+				[CHILDREN] = { Components.corner(16), Components.stroke(C.ch13, 2) },
+				Parent = b,
+			})
+			Components.setText(up, "@up")
+			levelUpBadge = up
 		end
 	end
 end
@@ -710,6 +810,9 @@ local function refreshMoving(view: any)
 		return
 	end
 	refreshGuide(view)
+	if levelUpBadge then
+		levelUpBadge.Visible = LevelUpMarks.anyUnseen()
+	end
 	-- ギルドの建物の NEW の顔（全員が冒険中に雇った人：D-265 ②。雇った直後にも出すので 0.1 秒ごとに見る）
 	local guildNode = HubState.guildNode
 	local newFace = guildNode and guildNode:FindFirstChild("NewFace") :: Frame?

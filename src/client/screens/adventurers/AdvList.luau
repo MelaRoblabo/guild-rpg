@@ -11,6 +11,7 @@ local AdvCommon = require("./AdvCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Portrait = require("../../ui/Portrait")
+local LevelUpMarks = require("../../hub/LevelUpMarks")
 local Nav = require("../../ui/Nav")
 local Root = require("../../ui/Root")
 local Roster = require("../../adventurers/Roster")
@@ -83,20 +84,23 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 	if Portrait.fill(pic, adv.appearanceId) then
 		face.Visible = false
 	end
-	-- 左上：パーティの番号と状態
+	-- 顔の下の帯：パーティの番号と状態（顔にかからないように：D-269 ②）
 	local badge = AdvCommon.partyBadge(view, adv.uid)
 	if badge then
 		local tag: Frame = new("Frame", {
 			Name = "Party",
-			Size = UDim2.fromOffset(0, 40),
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.fromScale(0, 1),
+			Size = UDim2.fromOffset(0, 34),
 			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundColor3 = C.ch10,
+			BackgroundTransparency = 0.15,
 			ZIndex = 11,
-			[CHILDREN] = { Components.corner(10), Components.padding(0, 10, 0, 8), Components.stroke(C.ch16, 2) },
-			Parent = b,
+			[CHILDREN] = { Components.corner(6), Components.padding(0, 10, 0, 8) },
+			Parent = pic,
 		})
 		local bt = smallText("", 21, C.inkLight, tag, 12)
-		bt.Size = UDim2.fromOffset(0, 40)
+		bt.Size = UDim2.fromOffset(0, 34)
 		Components.setParts(bt, badge)
 	end
 	-- 右上：転生できる「!」、もっと良い装備の ▲
@@ -161,6 +165,7 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 end
 
 local function build(_params: any?, api: Nav.Api): Nav.Built
+	LevelUpMarks.seenAll() -- Adventurers のボタンの ▲ の札を消す（D-269 ③）
 	local band = Root.bandBottom()
 	local frame = Screen.scene("AdvList")
 	Screen.closeTopRight(frame, api.close)

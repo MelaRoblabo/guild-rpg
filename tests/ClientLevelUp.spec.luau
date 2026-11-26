@@ -33,4 +33,19 @@ return function(t)
 			expect(LevelUpMarks.lit("adv_3", 50)).toBe(true)
 		end)
 	end)
+	describe("D-269 ③ Adventurers のボタンの ▲ の札", function()
+		it(
+			"上がった人がいれば、一覧を開くまで残る（パーティの面で光り終わっても）",
+			function()
+				LevelUpMarks.clear()
+				expect(LevelUpMarks.anyUnseen()).toBe(false)
+				LevelUpMarks.note("adv_4")
+				LevelUpMarks.lit("adv_4", 10)
+				LevelUpMarks.lit("adv_4", 10 + LIT)
+				expect(LevelUpMarks.anyUnseen()).toBe(true)
+				LevelUpMarks.seenAll()
+				expect(LevelUpMarks.anyUnseen()).toBe(false)
+			end
+		)
+	end)
 end

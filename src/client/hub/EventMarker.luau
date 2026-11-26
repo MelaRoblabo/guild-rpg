@@ -5,11 +5,13 @@
 --   ③ 残りわずか（30秒から）：輪が点滅し、時計が警告の色。
 --   ④ 出発済み：輪の下にパーティの番号（レア・レイド）か、買った印（商人）。
 --   種類のアイコン：レアダンジョン＝宝石（門はパーティの「探索中」：D-234 ②）、レイド＝稲妻、商人＝カート。
+--   ⑤ 締め切り間近は印が小さく揺れ、締め切ったら「Closed」のハンコを押して消える（D-269 ③。黙って消えていた）。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local Guide = require("./Guide")
+local Motion = require("../ui/Motion")
 local MapLayout = require("./MapLayout")
 local Nav = require("../ui/Nav")
 local Session = require("../Session")
@@ -27,6 +29,8 @@ local EventMarker = {}
 
 local marker: TextButton? = nil
 local current: any = nil
+local content: Frame? = nil -- マップの中身（Closed のハンコを置く）
+local lastOpen: { slot: number, x: number, y: number }? = nil -- 最後に出ていたイベント
 
 local function clock(s: number): string
 	s = math.max(0, math.floor(s))
@@ -42,7 +46,29 @@ local function placeIndex(placeId: string): number
 	return 1
 end
 
+-- 締め切ったイベントの場所に「Closed」のハンコを押して消す
+local function stampClosed(at: { x: number, y: number })
+	local parent = content
+	if parent == nil then
+		return
+	end
+	local holder: Frame = new("Frame", {
+		Name = "ClosedStamp",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(at.x, at.y),
+		Size = UDim2.fromOffset(120, 120),
+		BackgroundTransparency = 1,
+		ZIndex = 8,
+		Parent = parent,
+	})
+	Motion.stamp(holder, "Closed", C.warnDark, 120)
+	task.delay(1.4, function()
+		holder:Destroy()
+	end)
+end
+
 function EventMarker.mount(mapContent: Frame)
+	content = mapContent
 	local m: TextButton = new("TextButton", {
 		Name = "MapEvent",
 		Text = "",
@@ -122,8 +148,15 @@ function EventMarker.refresh(view: any)
 		notice = true
 	end
 	current = if notice then nil else ev
+	-- 出ていたイベントが締め切られた（次の予告になった・消えた）ら、その場所に Closed のハンコ
+	local last = lastOpen
+	if last and (current == nil or current.eventSlot ~= last.slot) then
+		lastOpen = nil
+		stampClosed(last)
+	end
 	if ev == nil then
 		m.Visible = false
+		m.Rotation = 0
 		return
 	end
 	m.Visible = true
@@ -138,12 +171,16 @@ function EventMarker.refresh(view: any)
 	if notice then
 		stroke.Color = C.ch45
 		stroke.Thickness = 3
+		m.Rotation = 0
 		setChip(timer, "@time", clock(ev.startsIn or 0))
 		joinedChip.Visible = false
 		return
 	end
+	lastOpen = { slot = ev.eventSlot, x = p.x, y = p.y }
 	local left = ev.closesIn or 0
 	local ending = left <= ENDING_SECONDS
+	-- 締め切り間近は小さく揺れる（D-269 ③）。「点滅を減らす」なら揺れも小さく（D-145）
+	m.Rotation = if ending then math.sin(now * 10) * (if Motion.reduced() then 2 else 5) else 0
 	-- 残りわずかは点滅（0.5秒ごと）
 	local blink = ending and (math.floor(now * 2) % 2 == 0)
 	stroke.Color = if ev.kind == "raid" then C.warnDark else C.barFill

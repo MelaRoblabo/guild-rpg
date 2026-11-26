@@ -300,7 +300,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			est.BackgroundTransparency = 1
 			-- 罠のよけやすさ：語と % と棒（D-269 ①④。記号の ⚠ だけでは分からなかった）
 			label(est, 1, "Dodge", 23)
-			bar(est, 2, evade, 150, 26)
+			bar(est, 2, evade, 116, 26)
 			local dp =
 				WarehouseCommon.pill("", string.format("%d%%", math.floor(math.clamp(evade, 0, 1) * 100 + 0.5)), 23)
 			dp.LayoutOrder = 3

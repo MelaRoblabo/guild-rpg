@@ -320,7 +320,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				})
 				local tag: TextButton = new("TextButton", {
 					Name = "Tag",
-					Text = "▶ " .. (if idx then (ROMAN[idx] or tostring(idx)) .. "  " else "") .. dd.nameEn,
+					-- 押すと選べる形（開くもの）に見えるよう、末尾に ▼（D-269 ②）
+					Text = (if idx then (ROMAN[idx] or tostring(idx)) .. "  " else "") .. dd.nameEn .. "  ▼",
 					TextSize = 21,
 					FontFace = Tokens.font.display,
 					TextColor3 = C.inkLight,

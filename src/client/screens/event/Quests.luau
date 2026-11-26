@@ -12,6 +12,7 @@ local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Rebirth = require("@game/ReplicatedStorage/Core/Rebirth")
+local Art = require("../../ui/Art")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Guide = require("../../hub/Guide")
@@ -215,20 +216,48 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				},
 				Parent = b,
 			})
-			local chestIc =
-				Components.text({ text = "▣★", size = 25, color = C.inkDark, font = Tokens.font.number })
-			chestIc.Position = UDim2.fromOffset(4, 8)
-			chestIc.Parent = bonusRow
-			local count = WarehouseCommon.pill("", done .. " / " .. #book.entries, 21, nil)
-			count.Position = UDim2.fromOffset(0, 40)
-			if all then
-				count.BackgroundColor3 = C.okGreen
+			-- 「全部終えるともらえる」を、行の数だけの小さなチェック枠が埋まっていく形で見せる（D-269 ②。▣★ 0/3 では分からなかった）
+			local bonusWord =
+				Components.text({ text = "Bonus", size = 21, color = C.inkDark, font = Tokens.font.display })
+			bonusWord.Position = UDim2.fromOffset(2, 6)
+			bonusWord.Parent = bonusRow
+			local checks: Frame = new("Frame", {
+				Name = "Checks",
+				Position = UDim2.fromOffset(0, 40),
+				Size = UDim2.fromOffset(0, 28),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 1,
+				[CHILDREN] = {
+					new("UIListLayout", {
+						FillDirection = Enum.FillDirection.Horizontal,
+						Padding = UDim.new(0, 4),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+				},
+				Parent = bonusRow,
+			})
+			for j = 1, #book.entries do
+				local filled = j <= done
+				local box: Frame = new("Frame", {
+					Name = "Check" .. j,
+					LayoutOrder = j,
+					Size = UDim2.fromOffset(24, 24),
+					BackgroundColor3 = if filled then C.okGreen else C.ch13,
+					[CHILDREN] = { Components.corner(5), Components.stroke(C.ch16, 2) },
+					Parent = checks,
+				})
+				if filled then
+					local ok =
+						Components.text({ text = "✓", size = 21, color = C.inkDark, font = Tokens.font.number })
+					ok.AutomaticSize = Enum.AutomaticSize.None
+					ok.Size = UDim2.fromScale(1, 1)
+					ok.Parent = box
+				end
 			end
-			count.Parent = bonusRow
 			local items: Frame = new("Frame", {
 				Name = "Items",
-				Position = UDim2.fromOffset(84, 0),
-				Size = UDim2.new(1, -84, 1, 0),
+				Position = UDim2.fromOffset(124, 0),
+				Size = UDim2.new(1, -124, 1, 0),
 				BackgroundTransparency = 1,
 				[CHILDREN] = {
 					new("UIListLayout", {
@@ -242,11 +271,43 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				Parent = bonusRow,
 			})
 			local k = 0
-			local function chip(icon: string, text: string)
+			-- ボーナスの1つ：背景なしの小さな「絵＋数」（列の高さに2行で収める）
+			local function compact(text: string): (Frame, Frame)
 				k += 1
-				local p = WarehouseCommon.pill(icon, text, 21)
-				p.LayoutOrder = k
-				p.Parent = items
+				local f: Frame = new("Frame", {
+					Name = "Reward" .. k,
+					LayoutOrder = k,
+					Size = UDim2.fromOffset(0, 30),
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundTransparency = 1,
+					[CHILDREN] = {
+						new("UIListLayout", {
+							FillDirection = Enum.FillDirection.Horizontal,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							Padding = UDim.new(0, 4),
+							SortOrder = Enum.SortOrder.LayoutOrder,
+						}),
+					},
+					Parent = items,
+				})
+				local pic: Frame = new("Frame", {
+					Name = "Pic",
+					LayoutOrder = 1,
+					Size = UDim2.fromOffset(26, 26),
+					BackgroundTransparency = 1,
+					Parent = f,
+				})
+				local t = Components.text({ text = text, size = 21, color = C.inkDark, font = Tokens.font.number })
+				t.LayoutOrder = 2
+				t.Parent = f
+				return f, pic
+			end
+			local function chip(icon: string, text: string)
+				local _, pic = compact(text)
+				local g = Components.text({ text = icon, size = 21, color = C.inkDark, font = Tokens.font.number })
+				g.AutomaticSize = Enum.AutomaticSize.None
+				g.Size = UDim2.fromScale(1, 1)
+				g.Parent = pic
 			end
 			if bonus.goldMult then
 				chip(Components.icon.coin, HubState.formatNumber(Formulas.rewardGold(base, bonus.goldMult, master.K)))
@@ -254,9 +315,19 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			for _, c in bonus.chests or {} do
 				chip("@chest", "×" .. c.count)
 			end
+			-- 品は絵（D-269 ④。◈ の記号だけでは分からなかった）。列の高さが決まっているので名前は入れず、絵と数
 			for itemId, n in bonus.items or {} do
 				local def = master.items[itemId]
-				chip(if def and def.kind == "ticket" then Components.icon.ticket else "◈", "×" .. n)
+				local _, pic = compact("×" .. n)
+				if not Art.put(pic, Art.item(itemId)) then
+					local g = Components.text({
+						text = if def and def.kind == "ticket" then Components.icon.ticket else "◈",
+						size = 21,
+						color = C.inkDark,
+						font = Tokens.font.number,
+					})
+					g.Parent = pic
+				end
 			end
 		end
 	end

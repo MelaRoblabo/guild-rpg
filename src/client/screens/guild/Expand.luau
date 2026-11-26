@@ -127,14 +127,28 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					p.Parent = b
 				end
 				if r.needClear then
+					-- 条件のダンジョン：鍵＋マップと同じ丸の小さな絵（ローマ数字）＋「Clear」（D-269 ②。赤い門の記号では分からなかった）
 					local d = master.dungeons[r.needClear]
-					local p = WarehouseCommon.pill(
-						"@locked",
-						"⛩ " .. (if d then ROMAN[d.tier] or tostring(d.tier) else "?"),
-						21
-					)
+					local p = WarehouseCommon.pill("@locked", "Clear", 21)
 					p.LayoutOrder = 5
 					p.Parent = b
+					local disc: Frame = new("Frame", {
+						Name = "Dungeon",
+						LayoutOrder = 3,
+						Size = UDim2.fromOffset(30, 30),
+						BackgroundColor3 = C.ch16,
+						[CHILDREN] = { Components.corner(15), Components.stroke(C.bronze, 2) },
+						Parent = p,
+					})
+					local num = Components.text({
+						text = if d then ROMAN[d.tier] or tostring(d.tier) else "?",
+						size = 21,
+						color = C.inkLight,
+						font = Tokens.font.display,
+					})
+					num.AutomaticSize = Enum.AutomaticSize.None
+					num.Size = UDim2.fromScale(1, 1)
+					num.Parent = disc
 				end
 				local cost = WarehouseCommon.pill(
 					Components.icon.coin,

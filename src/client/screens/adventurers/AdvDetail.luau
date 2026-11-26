@@ -152,21 +152,21 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end
 		end)
 		-- 道具：アイコン＋語の2列（D-245。アイコンだけの小さな丸から大きさを変えた）
+		-- 肖像の絵にかからないよう、肖像の枠の下に1列で並べる（D-269 ②）
 		local tools: Frame = new("Frame", {
 			Name = "Tools",
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -14),
-			Size = UDim2.new(1, -28, 0, 66 * 2 + 12),
+			Position = UDim2.fromOffset(40, Root.bandBottom() + 16 + 486 + 8),
+			Size = UDim2.fromOffset(460, 70),
 			BackgroundTransparency = 1,
 			ZIndex = 9,
 			[CHILDREN] = {
 				new("UIGridLayout", {
-					CellSize = UDim2.new(0.5, -6, 0, 66),
-					CellPadding = UDim2.fromOffset(12, 12),
+					CellSize = UDim2.new(0.25, -6, 0, 66),
+					CellPadding = UDim2.fromOffset(8, 0),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
 			},
-			Parent = portrait,
+			Parent = body,
 		})
 		local function tool(
 			order: number,
