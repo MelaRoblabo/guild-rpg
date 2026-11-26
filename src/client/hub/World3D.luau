@@ -3,11 +3,14 @@
 --   - Guild・Dungeon01〜12・EventPlace01〜14 の位置は Studio で動かす。ここは名前で探して位置を読む。
 --   - ダンジョン：解放済みは表示、次に解放するものは Highlight で半透明の黒、その先は出さない（D-270 ③）。
 --   - 馬車：移動中・帰り道だけ地図の上を動く。速さは距離に関係なく探索の移動秒数で往復（D-270 ②）。目的地へ Beam の点線。
+--     見本は ReplicatedStorage.MapModels.PartyCart（Studio で置いた駒。台座の底の真ん中が基準点、馬は +X）。
+--     ギルド・ダンジョン・商人・レイドボスの模型に触れている間は出さない（模型にめり込むため）。
 --   - ギルド・ダンジョンの中のパーティは、その物の上に BillboardGui でリーダーのアイコン（D-270 ⑥・D-271）。
 --   - ゲームパッドのときは画面の中央に照準。重なった物の縁を光らせて名前の札を出し、A で開く（D-273 ④）。
 --   - タップした物（ダンジョン・ギルド・馬車）は handlers に渡す。画面の変更はすべてこの端末の中だけ（サーバーへは送らない）。
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -41,7 +44,11 @@ export type Handlers = {
 }
 
 local DOT_TEXTURE = "rbxasset://textures/ui/traildot.png" -- Beam の点線（D-270 ②）
-local CART_LIFT = 0.7 -- 地図の上から馬車の中心までの高さ
+local CART_LIFT = 0.7 -- 地図の上から馬車の中心までの高さ（見本がないときの仮の Part の馬車）
+local CART_TEMPLATE = "PartyCart" -- ReplicatedStorage.MapModels の馬車の見本
+local BEAM_FROM_HEIGHT = 1 -- 見本の馬車の点線の出る高さ（台座の底から）
+-- 馬車を隠し始める近さ。0 で馬車の真ん中が模型の足もとに入ったとき、1 で台座の縁が触れたとき（1 だと道の途中で消えた）
+local CART_HIDE_REACH = 0.25
 local ICON_SIZE = 54 -- ギルド・ダンジョンの上のリーダーのアイコン
 
 local mapPart: BasePart? = nil
@@ -52,6 +59,9 @@ local eventPlaces: { BasePart } = {}
 local hidden: { [BasePart]: boolean } = {}
 local highlights: { [BasePart]: { Highlight } } = {}
 local carts: { [number]: Model } = {}
+local cartMoving: { [number]: boolean } = {} -- 移動中・帰り道（模型に触れて隠れている間も true）
+local cartTemplate: Model? = nil
+local cartRadius = 1.6 -- 馬車の足もとの半径（見本を読んだら見本の台座から出す）
 local beams: { [number]: Beam } = {}
 local destAttach: { [BasePart]: Attachment } = {}
 local boards: { [BasePart]: BillboardGui } = {}
@@ -142,8 +152,47 @@ local function hideShell(obj: BasePart)
 	end
 end
 
--- 馬車の模型（仮。Part で組む）
+-- 模型の Part の角を、基準点からの水平の距離で測る（足もとの半径）
+local function footRadiusOf(model: Model): number
+	local pivot = model:GetPivot().Position
+	local r = 0
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			local half = d.Size / 2
+			for _, sx in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					for _, sy in { -1, 1 } do
+						local c = d.CFrame:PointToWorldSpace(Vector3.new(half.X * sx, half.Y * sy, half.Z * sz))
+						r = math.max(r, Vector3.new(c.X - pivot.X, 0, c.Z - pivot.Z).Magnitude)
+					end
+				end
+			end
+		end
+	end
+	return r
+end
+
+-- 馬車の模型。見本（PartyCart）があれば複製する。なければ仮の Part で組む
 local function makeCart(partyIndex: number): Model
+	local tpl = cartTemplate
+	if tpl then
+		local c = tpl:Clone()
+		c.Name = "Cart" .. partyIndex
+		for _, d in c:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = true
+				d.CanCollide = false
+				d.CanTouch = false
+			end
+		end
+		local root = c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart", true)
+		if root then
+			c.PrimaryPart = root
+			local att = new("Attachment", { Name = "BeamFrom", Parent = root }) :: Attachment
+			att.WorldPosition = c:GetPivot().Position + Vector3.new(0, BEAM_FROM_HEIGHT, 0)
+		end
+		return c
+	end
 	local m = new("Model", { Name = "Cart" .. partyIndex }) :: Model
 	local body = new("Part", {
 		Name = "Body",
@@ -293,6 +342,16 @@ function World3D.mount(h: Handlers)
 		end
 	end
 	cartFolder = new("Folder", { Name = "GuildCarts", Parent = Workspace }) :: Folder
+	-- 馬車の見本（ReplicatedStorage.MapModels.PartyCart）。Workspace に置いたままでも読む（その端末では地図から外す）
+	local store = ReplicatedStorage:WaitForChild("MapModels", 10)
+	local tpl = (store and store:FindFirstChild(CART_TEMPLATE)) or Workspace:FindFirstChild(CART_TEMPLATE)
+	if tpl and tpl:IsA("Model") then
+		cartTemplate = tpl
+		cartRadius = footRadiusOf(tpl)
+		if tpl:IsDescendantOf(Workspace) then
+			tpl.Parent = nil
+		end
+	end
 	-- 板（BillboardGui）は PlayerGui の直下に置く（フォルダの中だと押せない・出ないことがある）
 	boardFolder = (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 	MapCamera.onTap = World3D.pick
@@ -706,8 +765,9 @@ function World3D.refresh(view: any)
 			cart = makeCart(i)
 			carts[i] = cart
 		end
-		if cart then
-			cart.Parent = if moving then cartFolder else nil
+		cartMoving[i] = moving
+		if cart and not moving then
+			cart.Parent = nil -- 動いている間に出すか隠すかは step で決める（模型に触れている間は隠す）
 		end
 		-- 点線（馬車 → 目的地）
 		local beam = beams[i]
@@ -754,6 +814,75 @@ function World3D.refresh(view: any)
 	EventWorld.refresh(view)
 end
 
+-- 地図の上の模型の足もと（丸い台座なので楕円で見る）。cf の向きで、half は X・Z の半径
+type Blocker = { cf: CFrame, half: Vector2 }
+
+-- 物の足もと。いちばん大きい模型の Part を、その Part の向きのまま測る
+-- （模型は回して置いてあるので、世界の軸で囲むと角の分だけ大きくなり、道の途中で消えた）
+local footCache: { [BasePart]: Blocker } = {}
+local function footOf(obj: BasePart): Blocker
+	local cached = footCache[obj]
+	if cached then
+		return cached
+	end
+	local best: BasePart? = nil
+	for _, d in obj:GetDescendants() do
+		if d:IsA("BasePart") and (best == nil or d.Size.X * d.Size.Z > best.Size.X * best.Size.Z) then
+			best = d
+		end
+	end
+	local foot: Blocker
+	if best and best.CFrame.UpVector.Y > 0.99 then
+		local b = best :: BasePart
+		foot = { cf = b.CFrame, half = Vector2.new(b.Size.X / 2, b.Size.Z / 2) }
+	else
+		local minV, maxV = boundsOf(obj) -- 傾いた模型・仮の Part は世界の軸で囲む
+		local size = maxV - minV
+		foot = { cf = CFrame.new((minV + maxV) / 2), half = Vector2.new(size.X / 2, size.Z / 2) }
+	end
+	footCache[obj] = foot
+	return foot
+end
+
+local function blockerShapes(): { Blocker }
+	local list: { Blocker } = {}
+	local function addBounds(obj: BasePart)
+		table.insert(list, footOf(obj))
+	end
+	if guildObj then
+		addBounds(guildObj :: BasePart)
+	end
+	for _, obj in dungeonObjs do
+		if not hidden[obj] then
+			addBounds(obj)
+		end
+	end
+	-- 旅の商人・レイドボス（出ている間だけ。大きさが変わる動きの途中もあるので毎回測る）
+	local mf = EventWorld.folder()
+	if mf then
+		for _, m in mf:GetChildren() do
+			if m:IsA("Model") then
+				local cf, size = m:GetBoundingBox()
+				table.insert(list, { cf = cf, half = Vector2.new(size.X / 2, size.Z / 2) })
+			end
+		end
+	end
+	return list
+end
+
+-- 馬車（pos）が、どれかの模型の足もとに入っているか（台座の半径の CART_HIDE_REACH 倍まで手前で入ったとみなす）
+local function touchesAny(pos: Vector3, list: { Blocker }): boolean
+	local reach = cartRadius * CART_HIDE_REACH
+	for _, b in list do
+		local lp = b.cf:PointToObjectSpace(pos)
+		local ax, az = b.half.X + reach, b.half.Y + reach
+		if ax > 0 and az > 0 and (lp.X / ax) ^ 2 + (lp.Z / az) ^ 2 < 1 then
+			return true
+		end
+	end
+	return false
+end
+
 -- 毎フレーム：馬車を道の上で動かす（行きはギルド→ダンジョン、帰りはダンジョン→ギルド。along で位置）
 function World3D.step()
 	local view = Session.view
@@ -762,8 +891,9 @@ function World3D.step()
 	end
 	-- 秒より細かい今の時刻で位置を出す（Session.now は秒で切り捨てるので、馬車がカクついた）
 	local now = Workspace:GetServerTimeNow()
+	local blockers: { Blocker }? = nil -- 模型の足もとの範囲（このフレームで一度だけ集める）
 	for i, cart in carts do
-		if cart.Parent and cart.PrimaryPart then
+		if cartMoving[i] and cart.PrimaryPart then
 			local e = Game.query.expeditionOf(view, i)
 			local d = destOf(e)
 			if e and e.log and d then
@@ -776,13 +906,22 @@ function World3D.step()
 				local returning = pr.phase == "inbound" or pr.phase == "returned"
 				local g = groundOf(guildObj :: BasePart)
 				local p = groundOf(d)
-				local pos = g:Lerp(p, math.clamp(along, 0, 1)) + Vector3.new(0, CART_LIFT, 0)
+				local lift = if cartTemplate then 0 else CART_LIFT -- 見本は台座の底が基準点
+				local pos = g:Lerp(p, math.clamp(along, 0, 1)) + Vector3.new(0, lift, 0)
 				local toward = if returning then g else p
 				local dir = Vector3.new(toward.X - pos.X, 0, toward.Z - pos.Z)
 				local cf = if dir.Magnitude > 0.01
 					then CFrame.lookAt(pos, pos + dir) * CFrame.Angles(0, math.rad(90), 0)
 					else CFrame.new(pos)
 				cart:PivotTo(cf)
+				if blockers == nil then
+					blockers = blockerShapes()
+				end
+				local hide = touchesAny(pos, blockers :: { Blocker })
+				local parent: Instance? = if hide then nil else cartFolder
+				if cart.Parent ~= parent then
+					cart.Parent = parent
+				end
 			end
 		end
 	end
