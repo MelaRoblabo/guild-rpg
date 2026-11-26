@@ -6,8 +6,16 @@
 --   - サブ（茶）＝条件で一括売却（D-120）：面でレアリティの上限を選び（前回の上限を保存：D-231 ⑮）、対象と合計を見て Sell。
 --   - 並べ替えの面（D-119）：並べ方と向き。前回の並べ方はサーバーに保存（D-117、SetListPrefs）。
 --   - 容量は止まりそうなときだけ右上に倉庫＋⚠＋棒の札（D-218 ⑥）。自動売却の設定 S-51 は右上の茶のボタンから。
+--   - 1つ選んだ装備は、要約の大きな枠に装備の絵（D-268 ⑥）。茶の Equip で付けられる人の顔と差（▲▼）が並び、
+--     選ぶと装備がその人の顔へ飛ぶ（D-265 ⑤）。付けられる人がいなければ灰色で、押すと理由を出す（D-264 ②）。
 
+local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
+local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
+local Party = require("@game/ReplicatedStorage/Core/Party")
+local EquipChoice = require("../../adventurers/EquipChoice")
+local Motion = require("../../ui/Motion")
+local Portrait = require("../../ui/Portrait")
 local ChestCommon = require("../chest/ChestCommon")
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
@@ -28,6 +36,59 @@ local I = WarehouseCommon.icon
 local new = Create.new
 local CHILDREN = Create.Children
 local deps = WarehouseCommon.deps
+-- 付けたときの差（装備の選択 S-42 と同じ計算：EquipChoice.delta）
+local equipDeps = {
+	value = Formulas.bulkSellValue,
+	canEquip = Inventory.canEquip,
+	equipMult = Formulas.equipMult,
+	expPct = Formulas.equipExpPct,
+	memberDef = Party.memberDef,
+	snapshot = Formulas.memberSnapshot,
+}
+
+-- 差の数字に添える語（意味の決まらない数字に語：D-264 ②）
+local function deltaWord(item: any): string
+	local base = master.equipmentBases[item.baseId]
+	if base == nil then
+		return ""
+	end
+	if base.slot == "weapon" then
+		return "ATK "
+	elseif base.stats then
+		local stat = next(base.stats)
+		return string.upper(tostring(stat)) .. " "
+	end
+	return "DEF "
+end
+
+-- その品を付けられる人（探索中でない）と、付けたときの差。差の大きい順
+local function equipCandidates(view: any, item: any): { { uid: string, adv: any, delta: number, ratio: number? } }
+	local base = master.equipmentBases[item.baseId]
+	local out = {}
+	if base == nil then
+		return out
+	end
+	for uid, adv in view.adventurers do
+		if Inventory.canEquip(adv.jobId, item.baseId, master) and not Party.isAdventurerBusy(view, uid) then
+			local curUid = adv.equipment[base.slot]
+			local cur = if curUid then view.equipment[curUid] else nil
+			local d, ratio = EquipChoice.delta(item, cur, master, equipDeps)
+			table.insert(out, { uid = uid, adv = adv, delta = d, ratio = ratio })
+		end
+	end
+	table.sort(out, function(a, b)
+		local da = if a.ratio then a.ratio - 1 else a.delta
+		local db = if b.ratio then b.ratio - 1 else b.delta
+		if da ~= db then
+			return da > db
+		end
+		if a.adv.level ~= b.adv.level then
+			return a.adv.level > b.adv.level
+		end
+		return a.uid < b.uid
+	end)
+	return out
+end
 
 local TABS = { "weapon", "armor", "sub", "items" }
 local SUMMARY_W = 320
@@ -99,7 +160,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local tab = if params and table.find(TABS, (params :: any).tab) then (params :: any).tab else "weapon"
 	local selected: { [string]: boolean } = {}
 	local itemPick: string? = nil
-	local overlay: "sort" | "bulk" | nil = nil
+	local overlay: "sort" | "bulk" | "equip" | nil = nil
+	local equipItem: string? = nil -- Equip の面で付ける品
 	local bulkMax: number? = nil -- 一括売却の面で選んでいる上限（開いたときは前回の上限）
 	local busy = false
 	local render: () -> ()
@@ -339,15 +401,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					Parent = rightContent,
 				})
 				local base = master.equipmentBases[item.baseId]
-				local big = Components.text({
-					text = I[if base then base.slot else "weapon"] or I.weapon,
-					size = 64,
-					color = C.inkLight,
-					font = Tokens.font.number,
-				})
-				big.AnchorPoint = Vector2.new(0.5, 0.5)
-				big.Position = UDim2.fromScale(0.5, 0.5)
-				big.Parent = pic
+				-- 装備の絵（D-268 ⑥）。絵がなければ枠の記号
+				if not Art.put(pic, Art.equip(item), { inset = 6 }) then
+					local big = Components.text({
+						text = I[if base then base.slot else "weapon"] or I.weapon,
+						size = 64,
+						color = C.inkLight,
+						font = Tokens.font.number,
+					})
+					big.AnchorPoint = Vector2.new(0.5, 0.5)
+					big.Position = UDim2.fromScale(0.5, 0.5)
+					big.Parent = pic
+				end
 				local pin: TextButton = new("TextButton", {
 					Name = "Pin",
 					Text = Components.plain(I.pin),
@@ -475,6 +540,30 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			})
 			bulk.LayoutOrder = 1
 			bulk.Parent = actions
+			-- 1つ選んだ装備：Equip（茶）。付けられる人の顔と差の面を開く（D-265 ⑤）
+			if #picked == 1 then
+				local item = view.equipment[picked[1]]
+				local can = #equipCandidates(view, item) > 0
+				local eq = Components.button({
+					kind = if can then "brown" else "disabled",
+					width = 170,
+					height = 66,
+					icon = "@slot_weapon", -- Equip＝武器の枠（D-256）
+					label = Words.equip,
+					name = "Equip",
+					glyph = "Y",
+					reason = Words.reason.noneCanEquip,
+					onClick = function()
+						if can then
+							overlay = "equip"
+							equipItem = item.uid
+							render()
+						end
+					end,
+				})
+				eq.LayoutOrder = 2
+				eq.Parent = actions
+			end
 			local sell = Components.button({
 				kind = if #sellable > 0 then "gold" else "disabled",
 				width = 320,
@@ -486,7 +575,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					sellUids(sellable)
 				end,
 			})
-			sell.LayoutOrder = 2
+			sell.LayoutOrder = 3
 			sell.Parent = actions
 		else
 			-- アイテムのタブ：チケット・ポーションの数だけ（売却額0なので Sell なし）
@@ -533,6 +622,145 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				local n = WarehouseCommon.pill("", "×" .. ((view.items or {})[itemPick] or 0), 25)
 				n.LayoutOrder = 3
 				n.Parent = rightContent
+			end
+		end
+
+		-- Equip の面：付けられる人の顔と差（▲▼）。選ぶと装備がその人の顔へ飛ぶ（D-265 ⑤）
+		local eItem = if overlay == "equip" and equipItem then view.equipment[equipItem] else nil
+		if overlay == "equip" and (eItem == nil or eItem.equippedBy ~= nil) then
+			overlay, equipItem = nil, nil
+			eItem = nil
+		end
+		if eItem then
+			local item = eItem
+			local cands = equipCandidates(view, item)
+			local _, content = sheet(body, "EquipSheet", UDim2.fromOffset(640, 440), function()
+				overlay, equipItem = nil, nil
+				render()
+			end)
+			local title = Components.text({
+				text = Words.equip .. " · " .. WarehouseCommon.fullName(item),
+				size = 25,
+				color = C.inkDark,
+				font = Tokens.font.display,
+				xAlign = Enum.TextXAlignment.Left,
+			})
+			title.ZIndex = 33
+			title.Parent = content
+			local scroll: ScrollingFrame = new("ScrollingFrame", {
+				Name = "List",
+				Position = UDim2.fromOffset(0, 44),
+				Size = UDim2.new(1, 0, 1, -44),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ScrollBarThickness = 4,
+				CanvasSize = UDim2.new(),
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				ZIndex = 33,
+				[CHILDREN] = {
+					new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+				},
+				Parent = content,
+			})
+			local word = deltaWord(item)
+			for i, c in cands do
+				local row: TextButton = new("TextButton", {
+					Name = "Adv_" .. c.uid,
+					LayoutOrder = i,
+					Text = "",
+					AutoButtonColor = false,
+					Size = UDim2.new(1, -8, 0, 80),
+					BackgroundColor3 = C.ch75,
+					ZIndex = 34,
+					[CHILDREN] = { Components.corner(10), Components.stroke(C.ch68, 2) },
+					Parent = scroll,
+				})
+				local face: Frame = new("Frame", {
+					Name = "Face",
+					Position = UDim2.fromOffset(7, 7),
+					Size = UDim2.fromOffset(66, 66),
+					BackgroundColor3 = C.ch13,
+					ZIndex = 35,
+					[CHILDREN] = { Components.corner(10) },
+					Parent = row,
+				})
+				Portrait.fill(face, c.adv.appearanceId)
+				local nm = Components.text({
+					text = c.adv.name,
+					size = 23,
+					color = C.inkDark,
+					font = Tokens.font.display,
+					xAlign = Enum.TextXAlignment.Left,
+				})
+				nm.Position = UDim2.fromOffset(88, 10)
+				nm.ZIndex = 35
+				nm.Parent = row
+				local lv = Components.text({
+					text = "",
+					size = 21,
+					color = C.inkDark,
+					font = Tokens.font.number,
+					xAlign = Enum.TextXAlignment.Left,
+				})
+				local job = master.jobs[c.adv.jobId]
+				Components.setParts(lv, {
+					if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
+					if job then job.nameEn else "",
+					"Lv" .. c.adv.level,
+				})
+				lv.Position = UDim2.fromOffset(88, 44)
+				lv.ZIndex = 35
+				lv.Parent = row
+				local txt, col
+				if c.ratio then
+					txt = string.format("XP ×%.2f", c.ratio)
+					col = if c.ratio >= 1 then C.up else C.warn
+				elseif c.delta > 0 then
+					txt, col = word .. "▲" .. c.delta, C.up
+				elseif c.delta < 0 then
+					txt, col = word .. "▼" .. -c.delta, C.warn
+				else
+					txt, col = word .. "±0", C.inkMid
+				end
+				local d = Components.text({ text = txt, size = 25, color = col, font = Tokens.font.number })
+				d.AnchorPoint = Vector2.new(1, 0.5)
+				d.Position = UDim2.new(1, -16, 0.5, 0)
+				d.ZIndex = 35
+				d.Parent = row
+				row.Activated:Connect(function()
+					if busy then
+						return
+					end
+					local fromPic = body:FindFirstChild("Picture", true) :: GuiObject?
+					local fromAt = if fromPic then Motion.center(fromPic) else Vector2.new(1100, 300)
+					local toAt = Motion.center(face)
+					local r = send({ type = "Equip", adventurerUid = c.uid, equipmentUid = item.uid })
+					if not (r and r.ok) then
+						render()
+						return
+					end
+					-- 装備の絵がその人の顔へ飛ぶ（D-265 ⑤）
+					local vis: Frame = new("Frame", {
+						BackgroundColor3 = C.secondary,
+						[CHILDREN] = {
+							Components.corner(14),
+							Components.stroke(ChestCommon.rarityColor(item.rarity), 3),
+						},
+					})
+					Art.put(vis, Art.equip(item), { inset = 6 })
+					Motion.fly({
+						from = fromAt,
+						to = toAt,
+						visual = vis,
+						size = 96,
+						endSize = 56,
+						onArrive = function()
+							overlay, equipItem = nil, nil
+							selected = {}
+							render()
+						end,
+					})
+				end)
 			end
 		end
 

@@ -71,6 +71,7 @@ Words.reason = {
 	partyOut = "Can't add to a party on an adventure", -- D-265 ②
 	noBetterGear = "No better gear in Warehouse", -- D-266 ④
 	allOut = "All parties are out", -- D-269 ④
+	noneCanEquip = "No one can equip this now", -- D-265 ⑤（付けられる人がいない・全員が冒険中）
 }
 
 -- 画面のタイトル（1〜3語：D-264 ②）
