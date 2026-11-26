@@ -729,6 +729,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	return {
 		frame = frame,
 		scrim = 0.5, -- D-225 ③
+		passThrough = true, -- 開いたままでも 3D マップのカメラを動かせる（D-270）
 		destroy = function()
 			alive = false
 			conn.disconnect()

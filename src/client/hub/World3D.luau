@@ -4,18 +4,25 @@
 --   - ダンジョン：解放済みは表示、次に解放するものは Highlight で半透明の黒、その先は出さない（D-270 ③）。
 --   - 馬車：移動中・帰り道だけ地図の上を動く。速さは距離に関係なく探索の移動秒数で往復（D-270 ②）。目的地へ Beam の点線。
 --   - ギルド・ダンジョンの中のパーティは、その物の上に BillboardGui でリーダーのアイコン（D-270 ⑥・D-271）。
+--   - ゲームパッドのときは画面の中央に照準。重なった物の縁を光らせて名前の札を出し、A で開く（D-273 ④）。
 --   - タップした物（ダンジョン・ギルド・馬車）は handlers に渡す。画面の変更はすべてこの端末の中だけ（サーバーへは送らない）。
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
+local Expedition = require("@game/ReplicatedStorage/Core/Expedition")
+local Game = require("@game/ReplicatedStorage/Core/Game")
+local Components = require("../ui/Components")
 local Create = require("../ui/Create")
 local HubState = require("./HubState")
 local MapCamera = require("./MapCamera")
 local PartyIcon = require("../ui/PartyIcon")
 local Root = require("../ui/Root")
 local Session = require("../Session")
+local Tokens = require("../ui/Tokens")
+local Words = require("../ui/Words")
 local master = require("../Master")
 
 local new = Create.new
@@ -39,24 +46,86 @@ local guildObj: BasePart? = nil
 local dungeonObjs: { [string]: BasePart } = {} -- dungeonId → 物（Dungeon01〜）
 local eventPlaces: { BasePart } = {}
 local hidden: { [BasePart]: boolean } = {}
-local highlights: { [BasePart]: Highlight } = {}
+local highlights: { [BasePart]: { Highlight } } = {}
 local carts: { [number]: Model } = {}
 local beams: { [number]: Beam } = {}
 local destAttach: { [BasePart]: Attachment } = {}
 local boards: { [BasePart]: BillboardGui } = {}
+local topAttach: { [BasePart]: Attachment } = {} -- 物の真上（板を付ける所）
 local handlers: Handlers? = nil
 local cartFolder: Folder? = nil
 local boardFolder: Instance? = nil
 local lastStatus: { [number]: any } = {}
+
+-- ゲームパッドの照準（D-273 ④）
+type Target = { kind: string, id: string?, index: number?, model: Instance }
+local reticle: ScreenGui? = nil
+local aimLabel: TextLabel? = nil
+local aimLight: Highlight? = nil
+local aimed: Target? = nil
+local makeReticle: (parent: Instance) -> ()
+local updateAim: () -> ()
 
 local function topY(): number
 	local m = mapPart
 	return if m then m.Position.Y + m.Size.Y / 2 else 5
 end
 
--- 物の地図の上の位置（足もと）
+-- 物の見えている形（中の模型を含む）の範囲。外側の箱と模型の中心がずれていても、模型の真ん中を使う。
+-- 模型の Part が多い（数百）ので、物ごとに一度だけ計算して覚える（プレイ中は物を動かさない）
+local boundsCache: { [BasePart]: { Vector3 } } = {}
+local function boundsOf(obj: BasePart): (Vector3, Vector3)
+	local cached = boundsCache[obj]
+	if cached then
+		return cached[1], cached[2]
+	end
+	local minV, maxV = nil :: Vector3?, nil :: Vector3?
+	local function add(part: BasePart)
+		local half = part.Size / 2
+		local cf = part.CFrame
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local c = cf:PointToWorldSpace(Vector3.new(half.X * sx, half.Y * sy, half.Z * sz))
+					minV = if minV then minV:Min(c) else c
+					maxV = if maxV then maxV:Max(c) else c
+				end
+			end
+		end
+	end
+	local any = false
+	for _, d in obj:GetDescendants() do
+		if d:IsA("BasePart") then
+			add(d)
+			any = true
+		end
+	end
+	if not any then
+		add(obj) -- 仮の Part（中に模型がない）
+	end
+	boundsCache[obj] = { minV :: Vector3, maxV :: Vector3 }
+	return minV :: Vector3, maxV :: Vector3
+end
+
+-- 物の地図の上の位置（模型の真ん中の足もと）
 local function groundOf(obj: BasePart): Vector3
-	return Vector3.new(obj.Position.X, topY(), obj.Position.Z)
+	local minV, maxV = boundsOf(obj)
+	local c = (minV + maxV) / 2
+	return Vector3.new(c.X, topY(), c.Z)
+end
+
+-- 物の真上（模型のいちばん上の少し上）に置いた Attachment。板（BillboardGui）をここに付ける
+local function topOf(obj: BasePart): Attachment
+	local a = topAttach[obj]
+	if a and a.Parent then
+		return a
+	end
+	local minV, maxV = boundsOf(obj)
+	local c = (minV + maxV) / 2
+	local att = new("Attachment", { Name = "BoardAnchor", Parent = obj }) :: Attachment
+	att.WorldPosition = Vector3.new(c.X, maxV.Y + 2.5, c.Z)
+	topAttach[obj] = att
+	return att
 end
 
 -- 中に模型（子の Part）がある物は、外側の箱を見えなくする（位置と当たり判定のために残す）
@@ -119,12 +188,11 @@ end
 local function attachmentOn(obj: BasePart): Attachment
 	local a = destAttach[obj]
 	if a == nil or a.Parent == nil then
-		a = new("Attachment", {
-			Name = "CartTarget",
-			WorldPosition = groundOf(obj) + Vector3.new(0, 0.3, 0),
-			Parent = obj,
-		}) :: Attachment
-		destAttach[obj] = a
+		-- 先に親を決めてから世界の位置を入れる（親より先に入れると物の中心からの位置になり、宙に浮いた）
+		local att = new("Attachment", { Name = "CartTarget", Parent = obj }) :: Attachment
+		att.WorldPosition = groundOf(obj) + Vector3.new(0, 0.3, 0) -- 物の下（地図の上）
+		destAttach[obj] = att
+		a = att
 	end
 	return a :: Attachment
 end
@@ -137,11 +205,11 @@ local function boardOn(obj: BasePart): BillboardGui
 	end
 	b = new("BillboardGui", {
 		Name = "Board_" .. obj.Name,
-		Adornee = obj,
+		Adornee = topOf(obj), -- 物の真上（模型の真ん中の上）
 		AlwaysOnTop = true,
 		Active = true,
 		Size = UDim2.fromOffset(ICON_SIZE * 4 + 30, ICON_SIZE + 16),
-		StudsOffsetWorldSpace = Vector3.new(0, obj.Size.Y / 2 + 5, 0),
+		SizeOffset = Vector2.new(0, 0.5), -- 板の下の辺を物の真上に合わせる
 		ResetOnSpawn = false,
 		[CHILDREN] = {
 			new("UIListLayout", {
@@ -225,7 +293,9 @@ function World3D.mount(h: Handlers)
 	boardFolder = (Players.LocalPlayer :: Player):WaitForChild("PlayerGui")
 	MapCamera.onTap = World3D.pick
 	MapCamera.enable()
+	makeReticle(boardFolder :: Instance)
 	RunService.RenderStepped:Connect(World3D.step)
+	RunService.RenderStepped:Connect(updateAim)
 end
 
 -- マップイベントの場所（Studio の EventPlace01〜）
@@ -274,7 +344,14 @@ end
 function World3D.focusParty(partyIndex: number)
 	local cart = carts[partyIndex]
 	if cart and cart.Parent and cart.PrimaryPart then
-		MapCamera.focus(cart.PrimaryPart.Position)
+		-- 動く馬車は、寄ったあとも追う（ギルド・ダンジョンに入ったら止まる）
+		MapCamera.focus(cart.PrimaryPart.Position, function(): Vector3?
+			local c = carts[partyIndex]
+			if c and c.Parent and c.PrimaryPart then
+				return (c.PrimaryPart :: BasePart).Position
+			end
+			return nil
+		end)
 		return
 	end
 	local s = lastStatus[partyIndex]
@@ -285,13 +362,8 @@ function World3D.focusParty(partyIndex: number)
 	end
 end
 
--- タップした物を選ぶ
-function World3D.pick(at: Vector2)
-	local cam = Workspace.CurrentCamera
-	if cam == nil or handlers == nil then
-		return
-	end
-	local ray = cam:ScreenPointToRay(at.X, at.Y)
+-- 光線が当たった物（馬車・ギルド・ダンジョン）
+local function hitBy(ray: Ray): Target?
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	local list: { Instance } = {}
@@ -304,14 +376,13 @@ function World3D.pick(at: Vector2)
 	params.FilterDescendantsInstances = list
 	local hit = Workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
 	if hit == nil then
-		return
+		return nil
 	end
 	local inst: Instance? = hit.Instance
 	-- 馬車
 	for i, c in carts do
 		if inst and inst:IsDescendantOf(c) then
-			handlers.onParty(i)
-			return
+			return { kind = "party", index = i, model = c }
 		end
 	end
 	-- ダンジョン・ギルド（物の直下の箱まで上る）
@@ -319,19 +390,166 @@ function World3D.pick(at: Vector2)
 		inst = inst.Parent
 	end
 	if inst == nil then
-		return
+		return nil
 	end
 	if inst == guildObj then
-		handlers.onGuild()
-		return
+		return { kind = "guild", model = inst }
 	end
 	for id, obj in dungeonObjs do
 		if obj == inst and not hidden[obj] then
-			handlers.onDungeon(id)
-			return
+			return { kind = "dungeon", id = id, model = obj }
 		end
 	end
+	return nil
 end
+
+local function open(t: Target?)
+	local h = handlers
+	if t == nil or h == nil then
+		return
+	end
+	if t.kind == "party" then
+		h.onParty(t.index :: number)
+	elseif t.kind == "guild" then
+		h.onGuild()
+	else
+		h.onDungeon(t.id :: string)
+	end
+end
+
+-- タップした物を選ぶ
+function World3D.pick(at: Vector2)
+	local cam = Workspace.CurrentCamera
+	if cam == nil then
+		return
+	end
+	open(hitBy(cam:ScreenPointToRay(at.X, at.Y)))
+end
+
+-- 照準の札の名前
+local function targetName(t: Target): string
+	if t.kind == "party" then
+		return PartyIcon.name(Session.view, t.index :: number)
+	elseif t.kind == "guild" then
+		return Words.guild
+	end
+	local d = master.dungeons[t.id :: string]
+	return if d then d.nameEn else ""
+end
+
+-- 縁を光らせる所：見えている模型（外側の箱は透明なので、子の Model・Part）
+local function lightTarget(t: Target): Instance
+	if t.kind == "party" then
+		return t.model
+	end
+	for _, c in t.model:GetChildren() do
+		if c:IsA("Model") or c:IsA("BasePart") then
+			return c
+		end
+	end
+	return t.model
+end
+
+function makeReticle(parent: Instance)
+	local C = Tokens.color
+	local gui = new("ScreenGui", {
+		Name = "MapReticle",
+		IgnoreGuiInset = true,
+		ResetOnSpawn = false,
+		Enabled = false,
+		Parent = parent,
+	}) :: ScreenGui
+	local ring = new("Frame", {
+		Name = "Ring",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(34, 34),
+		BackgroundTransparency = 1,
+		[CHILDREN] = {
+			Components.corner(17),
+			new("UIStroke", { Color = C.inkLight, Thickness = 3, Transparency = 0.15 }),
+		},
+		Parent = gui,
+	})
+	new("Frame", {
+		Name = "Dot",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(6, 6),
+		BackgroundColor3 = C.inkLight,
+		[CHILDREN] = { Components.corner(3) },
+		Parent = ring,
+	})
+	local label = Components.text({
+		text = "",
+		size = 24,
+		color = C.inkLight,
+		font = Tokens.font.display,
+	})
+	label.Name = "AimName"
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.Position = UDim2.new(0.5, 0, 0.5, 30)
+	label.BackgroundColor3 = C.ch10
+	label.BackgroundTransparency = 0.2
+	label.Visible = false
+	new("UIPadding", {
+		PaddingLeft = UDim.new(0, 12),
+		PaddingRight = UDim.new(0, 12),
+		PaddingTop = UDim.new(0, 4),
+		PaddingBottom = UDim.new(0, 4),
+		Parent = label,
+	})
+	Components.corner(10).Parent = label
+	label.Parent = gui
+	reticle = gui
+	aimLabel = label
+	aimLight = new("Highlight", {
+		Name = "Aim",
+		FillTransparency = 1,
+		OutlineColor = C.selAmber,
+		OutlineTransparency = 0,
+		DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+		Enabled = false,
+		Parent = cartFolder,
+	}) :: Highlight
+end
+
+-- 毎フレーム：照準の下の物を調べる
+function updateAim()
+	local gui, label, light = reticle, aimLabel, aimLight
+	if gui == nil or label == nil or light == nil then
+		return
+	end
+	local cam = Workspace.CurrentCamera
+	local on = cam ~= nil and MapCamera.padMode() and MapCamera.mapAimAllowed()
+	gui.Enabled = on
+	local t: Target? = nil
+	if on and cam then
+		local vp = cam.ViewportSize
+		t = hitBy(cam:ViewportPointToRay(vp.X / 2, vp.Y / 2))
+	end
+	aimed = t
+	if t then
+		light.Adornee = lightTarget(t)
+		light.Enabled = true
+		label.Text = targetName(t)
+		label.Visible = true
+	else
+		light.Enabled = false
+		light.Adornee = nil
+		label.Visible = false
+	end
+end
+
+-- A：照準の物を開く（D-273 ④）
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp or input.KeyCode ~= Enum.KeyCode.ButtonA then
+		return
+	end
+	if aimed and MapCamera.padMode() and MapCamera.mapAimAllowed() then
+		open(aimed)
+	end
+end)
 
 -- 状態が変わったとき（0.1秒ごと）：ダンジョンの見え方とパーティの置き場所
 function World3D.refresh(view: any)
@@ -356,19 +574,38 @@ function World3D.refresh(view: any)
 				obj.Parent = nil
 				hidden[obj] = true
 			end
-			local hl = highlights[obj]
-			if dark and hl == nil then
-				highlights[obj] = new("Highlight", {
-					Name = "NextDungeon",
-					FillColor = Color3.new(0, 0, 0),
-					FillTransparency = 0.45,
-					OutlineTransparency = 1,
-					DepthMode = Enum.HighlightDepthMode.Occluded,
-					Adornee = obj,
-					Parent = obj,
-				}) :: Highlight
-			elseif not dark and hl then
-				hl:Destroy()
+			-- 黒の Highlight は、見えている模型（子の Model・Part）に付ける。外側の箱は透明なので、箱に付けても塗られない
+			local hls = highlights[obj]
+			if dark and hls == nil then
+				local list: { Highlight } = {}
+				local targets: { Instance } = {}
+				for _, c in obj:GetChildren() do
+					if c:IsA("Model") or c:IsA("BasePart") then
+						table.insert(targets, c)
+					end
+				end
+				if #targets == 0 then
+					table.insert(targets, obj) -- 仮の Part
+				end
+				for _, t in targets do
+					table.insert(
+						list,
+						new("Highlight", {
+							Name = "NextDungeon",
+							FillColor = Color3.new(0, 0, 0),
+							FillTransparency = 0.35,
+							OutlineTransparency = 1,
+							DepthMode = Enum.HighlightDepthMode.Occluded,
+							Adornee = t,
+							Parent = obj,
+						}) :: Highlight
+					)
+				end
+				highlights[obj] = list
+			elseif not dark and hls then
+				for _, hl in hls do
+					hl:Destroy()
+				end
 				highlights[obj] = nil
 			end
 		end
@@ -451,15 +688,24 @@ function World3D.step()
 	if view == nil or guildObj == nil then
 		return
 	end
+	-- 秒より細かい今の時刻で位置を出す（Session.now は秒で切り捨てるので、馬車がカクついた）
+	local now = Workspace:GetServerTimeNow()
 	for i, cart in carts do
 		if cart.Parent and cart.PrimaryPart then
-			local s = HubState.status(view, i)
-			local d = if s.dungeonId then dungeonObjs[s.dungeonId] else nil
-			if d then
+			local e = Game.query.expeditionOf(view, i)
+			local d = if e then dungeonObjs[e.dungeonId] else nil
+			if e and e.log and d then
+				local pr = Expedition.progressAt(e.log, now)
+				local along = if pr.phase == "outbound"
+					then pr.ratio
+					elseif pr.phase == "inbound" then 1 - pr.ratio
+					elseif pr.phase == "returned" then 0
+					else 1
+				local returning = pr.phase == "inbound" or pr.phase == "returned"
 				local g = groundOf(guildObj :: BasePart)
 				local p = groundOf(d)
-				local pos = g:Lerp(p, math.clamp(s.along, 0, 1)) + Vector3.new(0, CART_LIFT, 0)
-				local toward = if s.state == "returning" then g else p
+				local pos = g:Lerp(p, math.clamp(along, 0, 1)) + Vector3.new(0, CART_LIFT, 0)
+				local toward = if returning then g else p
 				local dir = Vector3.new(toward.X - pos.X, 0, toward.Z - pos.Z)
 				local cf = if dir.Magnitude > 0.01
 					then CFrame.lookAt(pos, pos + dir) * CFrame.Angles(0, math.rad(90), 0)

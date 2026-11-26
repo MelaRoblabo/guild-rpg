@@ -14,6 +14,7 @@ local HubState = require("../hub/HubState")
 local Motion = require("../ui/Motion")
 local Portrait = require("../ui/Portrait")
 local PartyIcon = require("../ui/PartyIcon")
+local MapCamera = require("../hub/MapCamera")
 local World3D = require("../hub/World3D")
 local Nav = require("../ui/Nav")
 local EventMarker = require("../hub/EventMarker")
@@ -68,6 +69,14 @@ local function mount3D()
 		end,
 		onParty = openParty,
 	})
+	-- キーボードでカメラを動かすのは、マップを見ているときだけ（面がない・パーティやダンジョンの面だけ）
+	MapCamera.keysAllowed = function(): boolean
+		return Nav.depth() == 0 or Nav.topPassThrough()
+	end
+	-- ゲームパッドの左スティック・照準・A は、面を開いていないときだけ（面を開いているときは面の操作：D-273 ⑥）
+	MapCamera.mapOnTop = function(): boolean
+		return Nav.depth() == 0
+	end
 	-- 雇った人のカードが飛び込む先（画面の上のギルドの位置：D-265 ②）
 	HubState.guildPoint = function(): Vector2?
 		return World3D.screenPoint(World3D.guild())

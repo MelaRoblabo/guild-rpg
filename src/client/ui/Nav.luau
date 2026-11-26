@@ -19,7 +19,8 @@ export type Api = {
 	open: (id: string, params: any?) -> (),
 	home: () -> (),
 }
-export type Built = { frame: GuiObject, scrim: number?, destroy: (() -> ())? }
+-- passThrough：画面の外（暗幕）を押しても下へ通す（3D マップのカメラを動かせるように：D-270）
+export type Built = { frame: GuiObject, scrim: number?, destroy: (() -> ())?, passThrough: boolean? }
 export type Builder = (params: any?, api: Api) -> Built
 
 local builders: { [string]: Builder } = {}
@@ -46,7 +47,7 @@ local function makeLayer(id: string, params: any?): { holder: Frame, built: Buil
 		BackgroundColor3 = Tokens.color.scrim,
 		BackgroundTransparency = scrim,
 		ZIndex = 10 + #layers * 10,
-		Active = true, -- 下の画面を押せないようにする
+		Active = not built.passThrough, -- 下の画面を押せないようにする（3D マップの面は通す）
 		Parent = Root.canvas,
 	})
 	built.frame.Parent = holder
@@ -92,6 +93,12 @@ end
 
 function Nav.depth(): number
 	return stack:depth()
+end
+
+-- いちばん上の画面が、下（3D マップ）へ入力を通す面か（パーティ・ダンジョンの面：D-270）
+function Nav.topPassThrough(): boolean
+	local top = layers[#layers]
+	return top ~= nil and top.built.passThrough == true
 end
 
 api = {
