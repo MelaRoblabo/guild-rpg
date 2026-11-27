@@ -81,7 +81,7 @@
 | `expBonusCap` | 1.00（経験値補正の合計の上限、仮） | D-082 |
 | `trainGoldCoef` / `trainGoldExponent` | 10 / 2（1回 = 10 × Lv²、仮） | D-076 |
 | `trainingFacility` | Lv1〜5：上限 Lv10/20/30/40/50、1回の経験値 430/820/1200/1630/2060（仮） | D-077 |
-| `hireCost` | 300G（仮） | Q-006 |
+| `hireCost` | 600G。求人票の引き直し（D-310）も同じ額。最初のダンジョンを2回回って装備を全部売ったときに増えるゴールドくらい | Q-006, D-311 |
 | `hireTotalGreat` / `hireTotalAmazing` | 110 / 130（面接の Total＝HP を除く4項目の合計の特別な演出の線。見せ方だけ。仮） | D-283 |
 | `hireStatRange` | 4項目 1〜40、HP 20〜80。ギルドの成長に関係なく一定（仮） | Q-006, D-081, D-086 |
 | `hireFreeRerolls` | 3（初回を含まない、仮） | Q-006 |
