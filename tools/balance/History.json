@@ -2,94 +2,130 @@
   "entries": [
     {
       "balance": {
-        "fail": 2,
-        "pass": 24,
+        "fail": 3,
+        "pass": 23,
         "warn": 0
       },
-      "commit": "668e6a4",
-      "date": "2026-11-27 11:36",
-      "label": "MX-1 現状（MB-5 の後）",
+      "commit": "8acc38b",
+      "date": "2026-11-27 12:21",
+      "label": "MX-1 現状（並び順をそろえた後）",
       "scores": {
         "core": {
           "categories": {
-            "flow": 35.8230926779314,
-            "habit": 65.37544802867383,
+            "flow": 18.442015626889575,
+            "habit": 63.78155389920095,
             "hook": 86.38888888888887,
-            "novelty": 1.25,
-            "payoff": 57.71533595814641,
+            "novelty": 0,
+            "payoff": 39.63286206787318,
             "return": 100,
-            "rhythm": 99.41666666666666
+            "rhythm": 98.375
           },
           "items": {
-            "bigPerSessionLate": 53.43663506151912,
-            "dailyQuestsPerDay": 65.37544802867383,
+            "bigPerSessionLate": 21.381830144403146,
+            "dailyQuestsPerDay": 63.78155389920095,
             "firstChestSec": 59.166666666666664,
             "firstSessionBig": 100,
             "firstUpgradeSec": 100,
-            "flatDaysLongest": 22.500000000000007,
-            "flatDaysShare": 49.146185355862784,
+            "flatDaysLongest": 0,
+            "flatDaysShare": 36.88403125377915,
             "loginPayoffShare": 100,
             "longestGapMedianSec": 100,
             "noveltyDroughtShare": 0,
-            "noveltyLateHalf": 2.5,
-            "rewardGapP90Sec": 98.83333333333333,
-            "sessionsWithBigShare": 61.9940368547737
+            "noveltyLateHalf": 0,
+            "rewardGapP90Sec": 96.74999999999999,
+            "sessionsWithBigShare": 57.883893991343214
           },
-          "total": 63.70991888861531
+          "se": {
+            "categories": {
+              "flow": 6.51152070040584,
+              "habit": 2.7555675635573498,
+              "hook": 0.08784104611578632,
+              "novelty": 0,
+              "payoff": 6.621437942266202,
+              "return": 0,
+              "rhythm": 0.2124591463996976
+            },
+            "total": 1.9047441951823159
+          },
+          "total": 58.08861721183608
         },
         "heavy": {
           "categories": {
-            "flow": 82.04997383568812,
-            "habit": 73.08424908424908,
+            "flow": 82.22789115646259,
+            "habit": 73.57142857142858,
             "hook": 84.1111111111111,
-            "novelty": 6.25,
+            "novelty": 0,
             "payoff": 100,
             "return": 100,
-            "rhythm": 99.29166666666666
+            "rhythm": 99
           },
           "items": {
             "bigPerSessionLate": 100,
-            "dailyQuestsPerDay": 73.08424908424908,
+            "dailyQuestsPerDay": 73.57142857142858,
             "firstChestSec": 52.33333333333333,
             "firstSessionBig": 100,
             "firstUpgradeSec": 100,
             "flatDaysLongest": 85,
-            "flatDaysShare": 79.09994767137624,
+            "flatDaysShare": 79.45578231292517,
             "loginPayoffShare": 100,
             "longestGapMedianSec": 100,
             "noveltyDroughtShare": 0,
-            "noveltyLateHalf": 12.5,
-            "rewardGapP90Sec": 98.58333333333333,
+            "noveltyLateHalf": 0,
+            "rewardGapP90Sec": 98,
             "sessionsWithBigShare": 100
           },
-          "total": 77.82671438538786
+          "se": {
+            "categories": {
+              "flow": 2.8759227513945,
+              "habit": 3.579356280564978,
+              "hook": 0.05555555555555429,
+              "novelty": 0,
+              "payoff": 1.333333333333334,
+              "return": 0,
+              "rhythm": 0.1976423537605222
+            },
+            "total": 0.9209993134007881
+          },
+          "total": 76.98720440557176
         },
         "light": {
           "categories": {
-            "flow": 0,
-            "habit": 59.524209531756725,
+            "flow": 5.207579755739211,
+            "habit": 61.408464331495026,
             "hook": 84.1111111111111,
-            "novelty": 2.5,
-            "payoff": 11.16176528947512,
+            "novelty": 1.25,
+            "payoff": 15.941654005027527,
             "return": 100,
             "rhythm": 100
           },
           "items": {
-            "bigPerSessionLate": 1.1529020604484561,
-            "dailyQuestsPerDay": 59.524209531756725,
+            "bigPerSessionLate": 9.148985221988342,
+            "dailyQuestsPerDay": 61.408464331495026,
             "firstChestSec": 52.33333333333333,
             "firstSessionBig": 100,
             "firstUpgradeSec": 100,
             "flatDaysLongest": 0,
-            "flatDaysShare": 0,
+            "flatDaysShare": 10.415159511478421,
             "loginPayoffShare": 100,
             "longestGapMedianSec": 100,
             "noveltyDroughtShare": 0,
-            "noveltyLateHalf": 5,
+            "noveltyLateHalf": 2.5,
             "rewardGapP90Sec": 100,
-            "sessionsWithBigShare": 21.170628518501783
+            "sessionsWithBigShare": 22.734322788066713
           },
-          "total": 51.042440847477565
+          "se": {
+            "categories": {
+              "flow": 2.002991994266437,
+              "habit": 1.7886940467943186,
+              "hook": 0.05555555555555429,
+              "novelty": 1.25,
+              "payoff": 1.644779174725778,
+              "return": 0,
+              "rhythm": 0
+            },
+            "total": 0.7101830900321402
+          },
+          "total": 52.55982988619611
         }
       },
       "seeds": 5,
