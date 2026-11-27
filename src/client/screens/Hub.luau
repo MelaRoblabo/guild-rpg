@@ -5,6 +5,7 @@
 --   - 常に出すもの：左のパーティ一覧（リーダーのアイコン：D-271）、右下の宝箱ボタン（唯一の金）、右上のゴールドとその下のフレンド（D-213 ⑯・D-225）。
 --   - 部品はすべて Roblox の帯より下に置く（D-219・D-225 ①）。
 
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
@@ -420,6 +421,54 @@ end
 ---------------------------------------------------------------------------
 -- 縁の部品
 
+-- 上の帯の丸いボタン（D-308）：Roblox の上の帯のボタンと同じ高さ・大きさの丸にアイコンだけ、その下に小さな語。
+-- 戻り値は（並びに入れる枠, 押せる丸）。丸と語の大きさは上の帯に合わせて placeTopRow で決める
+local function topButton(icon: string, word: string, uiKey: string?): (Frame, TextButton)
+	local iconImage = if uiKey then Art.ui(uiKey) else nil
+	local holder: Frame = new("Frame", {
+		Name = word,
+		BackgroundTransparency = 1,
+		ZIndex = 20,
+	})
+	local circle: TextButton = new("TextButton", {
+		Name = "Circle",
+		Text = "",
+		AutoButtonColor = false,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(0.5, 0),
+		BackgroundColor3 = C.ch28,
+		ZIndex = 20,
+		[CHILDREN] = {
+			new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+			Components.stroke(C.bronze, 2),
+		},
+		Parent = holder,
+	})
+	local img = Art.icon(iconImage, 30, 1, C.inkLight, 21)
+	if img then
+		img.AnchorPoint = Vector2.new(0.5, 0.5)
+		img.Position = UDim2.fromScale(0.5, 0.5)
+		img.Size = UDim2.fromScale(0.56, 0.56)
+		img.Parent = circle
+	else
+		local t = Components.text({ text = icon, size = 24, color = C.inkLight, font = Tokens.font.number })
+		t.Name = "Icon"
+		t.AnchorPoint = Vector2.new(0.5, 0.5)
+		t.Position = UDim2.fromScale(0.5, 0.5)
+		t.ZIndex = 21
+		t.Parent = circle
+	end
+	local label = Components.text({ text = word, size = 14, color = C.inkLight, font = Tokens.font.bodyStrong })
+	label.Name = "Word"
+	label.AutomaticSize = Enum.AutomaticSize.None
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.ZIndex = 21
+	label.TextStrokeTransparency = 0.4 -- 地図の上でも読めるように薄い縁
+	label.TextStrokeColor3 = C.ch10
+	label.Parent = holder
+	return holder, circle
+end
+
 -- 縁のボタン：アイコン＋語（D-245。アイコンだけでは分からないので、大きさを変えて語を入れる）
 local function edgeButton(icon: string, word: string, uiKey: string?): TextButton
 	-- UIアイコンの絵があれば記号の代わりに使う（白1色を文字の色で塗る：D-149）
@@ -463,29 +512,28 @@ local function edgeButton(icon: string, word: string, uiKey: string?): TextButto
 end
 
 local function buildEdges(parent: Frame)
-	local band = Root.bandBottom()
-	-- 右上：クエスト・設定（小さなアイコン。D-215 ⑥⑦）とゴールド（常に出す：D-225 ④）
+	-- 右上（D-308）：Quests・Friends・Settings と所持ゴールドを、Roblox の上の帯（左の Roblox のボタン・Admin の ⚙）と
+	-- 同じ高さの1列に並べる。ボタンはアイコンだけの丸で、下に小さく語。ゴールドは常に出す（D-225 ④）
 	local topRight: Frame = new("Frame", {
 		Name = "TopRight",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -40, 0, band + 12),
-		Size = UDim2.fromOffset(0, 66),
-		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
 		ZIndex = 20,
 		[CHILDREN] = {
 			new("UIListLayout", {
 				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				Padding = UDim.new(0, 12),
+				VerticalAlignment = Enum.VerticalAlignment.Top,
+				Padding = UDim.new(0, 10),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),
 		},
 		Parent = parent,
 	})
-	local quest = edgeButton("✔", Words.quests, "quest")
-	quest.LayoutOrder = 1
-	quest.Parent = topRight
+	local questHolder, quest = topButton("✔", Words.quests, "quest")
+	questHolder.LayoutOrder = 1
+	questHolder.Parent = topRight
 	questButton = quest
 	quest.Activated:Connect(function()
 		Nav.open("Quests") -- D-233（M8-6）
@@ -505,16 +553,19 @@ local function buildEdges(parent: Frame)
 		Visible = false,
 		ZIndex = 25,
 		[CHILDREN] = { Components.corner(16), Components.stroke(C.ch75, 2) },
-		Parent = quest:FindFirstChild("Icon") or quest:FindFirstChild("Word"),
+		Parent = quest:FindFirstChild("Icon") or quest,
 	})
-	local gear = edgeButton("⚙", Words.settings, "settings")
-	gear.LayoutOrder = 2
-	gear.Parent = topRight
+	local friendHolder = topButton("♟", Words.friends, "friend") -- 押したときの動きはまだない（D-213 ⑯）
+	friendHolder.LayoutOrder = 2
+	friendHolder.Parent = topRight
+	local gearHolder, gear = topButton("⚙", Words.settings, "settings")
+	gearHolder.LayoutOrder = 3
+	gearHolder.Parent = topRight
 	gear.Activated:Connect(function()
 		Nav.open("Settings") -- S-61（M8-6）
 	end)
 	local gold = Components.chip(I.coin, "0")
-	gold.LayoutOrder = 3
+	gold.LayoutOrder = 4
 	gold.ZIndex = 20
 	gold.Parent = topRight
 	for _, d in gold:GetDescendants() do
@@ -531,11 +582,31 @@ local function buildEdges(parent: Frame)
 			Nav.open("Shop")
 		end
 	end)
-	-- ゴールドの下：フレンドボタン（D-213 ⑯）
-	local friend = edgeButton("♟", Words.friends, "friend")
-	friend.AnchorPoint = Vector2.new(1, 0)
-	friend.Position = UDim2.new(1, -40, 0, band + 12 + 66 + 12)
-	friend.Parent = parent
+	-- 上の帯に合わせて大きさと位置を決める（D-308）。丸は Roblox の上の帯のボタンと同じ画面の大きさ（44px）、
+	-- 語は 13px。Canvas は UIScale で縮むので、画面の px を基準の単位に直して置く
+	local holders = { questHolder, friendHolder, gearHolder }
+	local function placeTopRow()
+		local scale = math.max(Root.frame.scale, 0.01)
+		local inset = GuiService.TopbarInset
+		local barH = if inset.Height > 0 then inset.Height else 58
+		local btn = 44 / scale
+		local centerY = (inset.Min.Y + barH / 2) / scale
+		local labelH = 16 / scale
+		for _, h in holders do
+			local circle = h:FindFirstChild("Circle") :: TextButton
+			local word = h:FindFirstChild("Word") :: TextLabel
+			circle.Size = UDim2.fromOffset(btn, btn)
+			word.Size = UDim2.fromOffset(btn + 30 / scale, labelH)
+			word.Position = UDim2.new(0.5, 0, 0, btn + 1 / scale)
+			word.TextSize = 13 / scale
+			h.Size = UDim2.fromOffset(btn + 6 / scale, btn + labelH)
+		end
+		gold.Size = UDim2.fromOffset(0, btn)
+		topRight.Position = UDim2.new(1, -16 / scale, 0, centerY - btn / 2)
+	end
+	placeTopRow()
+	Root.changed:connect(placeTopRow)
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(placeTopRow)
 
 	-- 右下：宝箱ボタン（唯一の金：D-225 ②）
 	local chest = Components.button({
