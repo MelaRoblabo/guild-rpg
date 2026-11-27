@@ -20,6 +20,7 @@
 | M8 UI設計・実装 | ゲーム仕様書11章、Guild UI（README・layout・icons-and-words・roblox.md）、D-218〜D-227 | `src/client`（画面・部品）、`src/core` は転生の処理の順番（D-224）だけ、`docs/system`（05章・11章）、`tests/` | 11章の画面が Roblox 上で動き、iPhone 11 と PC の大きさで押せる大きさ・文字の大きさを満たす（段階は下の「M8 の進め方」。D-227） |
 | M8-FX 演出（M8 と並行。D-147） | ゲーム仕様書11章 §8、D-140〜D-146 | `src/core`（演出を選ぶ処理を新規）、`src/data`（演出の表を新規）、`src/client`（演出の再生役・確認ツール）、`tools/sim`、`tests/` | 演出の選択がテスト（信頼度どおり・確定演出が外れない・降格しない）を通る。確認ツールで全演出を再生できる。100個あたりの平均時間が上限以内。点滅が1秒3回以内 |
 | MB バランス基盤（D-291〜D-296） | 決定ログ D-160・D-161・D-163・D-199〜D-205・D-279・D-280・D-291〜D-296、`docs/reports/Balance_targets_inventory.md`、04章 §13、09章 | `src/data`（目標の表 `BalanceTargets` を新規。MB-5 だけ数値も）、`src/core/MasterData`（目標の表の検証だけ）、`tools/balance`（新規）、`tools/autoplay`、`tools/sim`、`tools/check`、`docs/system`（04・09・12章）、`tests/`、`out/` | 目標の表が src/data にあり、ツールはそれだけを読む（ツールの中に目標の値を書かない）。`lune run tools/balance` の1回で、型×seed を回して目標ごとの合否と基準との差の成績表が出る。値の上書き（データを書き換えずに試す）ができる。MB-5 で D-291〜D-293 の目標に合わせ、基準を保存する。`lune run tools/check` が通る |
+| MX 体験の設計とスコア（2026-11-27〜） | `docs/reports/MX_engagement.md`（続けたくなる仕組みと体験の時刻表）、決定ログ、ゲーム仕様書の各章 | `docs/reports`、`tools/autoplay`（出来事の記録を足すだけ。方針の行動は変えない）、`tools/balance`（体験の指標とスコア）、`src/data`（スコアの表を新規）、`src/core/MasterData`（スコアの表の検証だけ）、`tools/check`、`docs/system`（04・09・12章）、`tests/`、`out/` | 続けたくなる仕組みの表と型ごとの体験の時刻表がレポートにある。自動プレイの出来事から複数項目の体験スコアが出て、テストプレイと改善のたびに前と比べられる（履歴が残る）。スコアの項目と線は決定ログにある。`lune run tools/check` が通る |
 
 ### M7 の進め方
 
@@ -74,6 +75,17 @@ M8 は 2026-11-25 に完了した。M8 の後へ持ち越すもの（アイコ�
 | MB-3 | 成績表 `tools/balance`：型×seed をまとめて回す、目標ごとの合否、基準の保存と差（D-295）、値の上書き（`--set`） | 済（値を範囲で振って比べる機能は未。`--set` を変えて回す） |
 | MB-4 | `tools/check` に短い確認を入れる、04・09章を今の形に直す、仕様を変えるときの手順を書く | 済（09章 §5） |
 | MB-5 | 合わせ直し：D-291（暦日数）・D-292（宝箱の10倍）・D-293（配分）に合わせる数値の変更（`data:`）、基準を保存 | 済（`docs/reports/MB5_balance.md`。決めたこと D-297（試して廃止）〜D-300。残り：ヘビーのゴールドの10倍と D-294 の踏破率） |
+
+### MX の進め方（体験の設計とスコア。2026-11-27〜）
+
+バランス（数値が目標に合っているか）とは別に、「理論上、続けたくなるゲームになっているか」を自動プレイの出来事から点数にし、改善のたびに比べる。本当に面白いかは人のテストプレイで確かめる。
+
+| 段階 | 内容 | 状態 |
+| --- | --- | --- |
+| MX-1 | レポート：続けたくなる仕組みの表、型ごとの体験の時刻表、今の仕様の空白（`docs/reports/MX_engagement.md`）。自動プレイに出来事の記録を足す | 済（出来事の記録は `Days.run` の `opts.trace`、指標は `tools/balance/Experience.luau`） |
+| MX-2 | スコアの項目と線を決める（決定ログ）。スコアの表を `src/data` に置く | 済（D-301、`src/data/ExperienceScores.luau`） |
+| MX-3 | `tools/balance` に体験の指標とスコアを足し、履歴を残して前と比べる | 済（`--label` で `tools/balance/History.json`、折れ線は `out/balance/history.html`） |
+| MX-4 | 改善のループ：空白を直す案 → スコア → 人のテストプレイ | |
 
 ## 2. 1回の作業の流れ（AI）
 
