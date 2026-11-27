@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
+local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local Expedition = require("@game/ReplicatedStorage/Core/Expedition")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
@@ -433,13 +434,17 @@ function World3D.placeOf(placeId: string): BasePart?
 	return nil
 end
 
--- 探索の行き先の物（商人へ向かうパーティは商人の場所：D-274。ほかはダンジョン）
+-- 探索の行き先の物（商人へ向かうパーティは商人の場所：D-274。レアダンジョンは水晶の祠の場所：D-304。ほかはダンジョン）
 local function destOf(e: any): BasePart?
 	if e == nil then
 		return nil
 	end
 	if e.merchant then
 		return World3D.placeOf(e.placeId)
+	end
+	local pile = e.chestPile
+	if e.eventSlot and type(pile) == "string" and string.sub(pile, 1, #Chest.RARE_PREFIX) == Chest.RARE_PREFIX then
+		return World3D.placeOf(Game.query.mapEventAt(e.eventSlot, master, Session.view).placeId)
 	end
 	if e.raidDamage and e.eventSlot then
 		return World3D.placeOf(Game.query.mapEventAt(e.eventSlot, master, Session.view).placeId) -- レイドボスの場所（D-275）
@@ -787,7 +792,7 @@ function World3D.refresh(view: any)
 		local i = party.index
 		local s = HubState.status(view, i)
 		lastStatus[i] = s
-		if s.state == "exploring" and s.dungeonId and not s.merchant then
+		if s.state == "exploring" and s.dungeonId and not s.merchant and not s.rareSlot then
 			local d = dungeonObjs[s.dungeonId]
 			if d and not hidden[d] then
 				exploringIn[d] = true -- 中で探索している（模型が跳ねる）
@@ -796,8 +801,9 @@ function World3D.refresh(view: any)
 		local place: BasePart? = nil
 		if s.state == "waiting" then
 			place = guildObj
-		elseif s.state == "exploring" and s.dungeonId and not s.merchant then
-			place = dungeonObjs[s.dungeonId] -- 商人のところにいるときは、商人の頭上の札に顔を出す（D-274）
+		elseif s.state == "exploring" and s.dungeonId and not s.merchant and not s.rareSlot then
+			-- 商人のところ・レアダンジョンの中にいるときは、商人・水晶の祠の頭上の札に顔を出す（D-274・D-304）
+			place = dungeonObjs[s.dungeonId]
 		end
 		if place then
 			inPlace[place] = inPlace[place] or {}

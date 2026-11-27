@@ -75,6 +75,7 @@ local Words = {
 	arrivesIn = "Arrives in", -- パーティが商人に着くまで
 	oneWay = "One way", -- 商人までの片道
 	shopping = "Shopping", -- パーティが商人のところにいる
+	backIn = "Back in", -- パーティが帰るまで（水晶の祠の頭上の時計：D-304）
 	unlock = "Unlock", -- ゴールドでダンジョンを先に解放する（D-279）
 	unlocked = "Unlocked", -- 解放できたときのハンコ（D-279・D-269）
 }

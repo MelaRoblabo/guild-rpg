@@ -6,7 +6,8 @@
 --     着いている＝パーティの顔＋「Shopping」。
 --   - レイドボス：Game.query.raidPresence。頭上の札＝出発できる間「Leaves in 2:31」／3分間の後に向かっているパーティがいれば
 --     その顔＋「Arrives in」。討伐したら去る。
---   - レアダンジョン（D-304）：出発できる3分間だけ。頭上の札＝「Leaves in 2:31」、出発したパーティがいればその顔。
+--   - レアダンジョン（D-304）：出発できる3分間と、パーティが向かっている・中にいる間（帰り道に入るまで）。馬車は祠へ向かう。
+--     頭上の札＝出発できる間「Leaves in 2:31」、3分間の後は「Back in」（最初に帰るパーティまで）。向かっている・中にいるパーティがいればその顔。
 --     祠のまわりの宝石（Orbit の Crystal1〜）は浮いてゆっくり回る。
 --   - 残り30秒から警告の色。札か物を触ると開く（World3D の onMerchant・onRaid）。
 --   - 出てくるとき・去るときは、煙がふわっと立ち、物が膨らんで現れる／しぼんで消える。
@@ -17,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
+local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
@@ -612,19 +614,46 @@ function EventWorld.refresh(view: any)
 			end
 		end
 	end
-	-- レアダンジョン（D-304）：出発できる3分間だけ水晶の祠を出す。出発したパーティがいればその顔
+	-- レアダンジョン（D-304）：出発できる3分間と、パーティが向かっている・中にいる間（帰り道に入るまで）水晶の祠を出す
+	local rares: { [number]: { party: number?, inside: boolean, backIn: number } } = {}
+	for _, x in view.expeditions or {} do
+		local pile = x.chestPile
+		if x.eventSlot and type(pile) == "string" and string.sub(pile, 1, #Chest.RARE_PREFIX) == Chest.RARE_PREFIX then
+			local travel = if x.log then x.log.travelSeconds or 0 else 0
+			if now < x.returnAt - travel then -- まだ帰り道に入っていない
+				local r = rares[x.eventSlot]
+				if r == nil or x.partyIndex < (r.party or math.huge) then
+					rares[x.eventSlot] = {
+						party = x.partyIndex,
+						inside = now >= x.departAt + travel,
+						backIn = math.min(if r then r.backIn else math.huge, x.returnAt - now),
+					}
+				elseif r then
+					r.backIn = math.min(r.backIn, x.returnAt - now)
+				end
+			end
+		end
+	end
 	local cur = Game.query.mapEvent(now, master, view).current
-	if cur and cur.open and cur.kind == "rareDungeon" then
-		local e = ensure("rareDungeon", { eventSlot = cur.eventSlot, placeId = cur.placeId, phase = "open" })
+	local openSlot = if cur and cur.open and cur.kind == "rareDungeon" then cur.eventSlot else nil
+	if openSlot and rares[openSlot] == nil then
+		rares[openSlot] = { party = nil, inside = false, backIn = 0 }
+	end
+	for slot, r in rares do
+		local placeId = if slot == openSlot then cur.placeId else Game.query.mapEventAt(slot, master, view).placeId
+		local e = ensure("rareDungeon", { eventSlot = slot, placeId = placeId, phase = "open" })
 		if e then
 			local icon, chip = parts(e)
-			local joined = Game.query.rareDungeon(view, cur.eventSlot, master).joined
-			icon.Visible = #joined > 0
-			if #joined > 0 then
-				PartyIcon.set(icon, view, joined[1], "moving")
+			icon.Visible = r.party ~= nil
+			if r.party then
+				PartyIcon.set(icon, view, r.party, if r.inside then "exploring" else "moving")
 			end
-			local text, color = timerText(cur.closesIn or 0)
-			setChip(chip, "@time", text, color)
+			if slot == openSlot then
+				local text, color = timerText(cur.closesIn or 0)
+				setChip(chip, "@time", text, color)
+			else
+				setChip(chip, "@time", Words.backIn .. " " .. clock(r.backIn))
+			end
 		end
 	end
 	for key, e in entries do

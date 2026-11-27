@@ -22,6 +22,7 @@ export type Status = {
 	inBattle: boolean, -- 今のフロアが戦闘か（馬車が揺れて ⚔：D-249 ②）
 	merchant: boolean?, -- 商人へ向かっている・とどまっている（D-274。行き先はダンジョンでなく商人の場所）
 	raid: boolean?, -- レイドボスへ（D-275。行き先はレイドボスの場所）
+	rareSlot: number?, -- レアダンジョンへの派遣ならその時間帯（D-304。行き先はダンジョンでなく水晶の祠の場所）
 }
 
 export type Progress = { phase: string, ratio: number, floorIndex: number? }
@@ -67,6 +68,11 @@ function PartyStatus.compute(
 	}
 	s.merchant = expedition.merchant == true
 	s.raid = expedition.raidDamage ~= nil
+	-- レアダンジョン（宝箱の山が special:rare: で始まる：Chest.RARE_PREFIX）
+	local pile = expedition.chestPile
+	if expedition.eventSlot and type(pile) == "string" and string.sub(pile, 1, 13) == "special:rare:" then
+		s.rareSlot = expedition.eventSlot
+	end
 	if expedition.merchant then
 		-- 商人へ（D-274）：着くまでの残り。とどまっている間は帰る時刻が決まっていないので残りなし
 		if p.phase == "floor" then

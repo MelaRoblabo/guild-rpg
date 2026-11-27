@@ -132,6 +132,19 @@ return function(t)
 			expect(MapLayout.cameraX(2000, 1280, 4000)).toBe(2000 - 640)
 		end)
 	end)
+	describe("D-304 レアダンジョンへのパーティは行き先が水晶の祠", function()
+		it("D-304 宝箱の山が special:rare: の派遣だけ、その時間帯を rareSlot に持つ", function()
+			local e = makeExpedition({})
+			e.eventSlot = 42
+			e.chestPile = "special:rare:dng_ruins"
+			expect(PartyStatus.compute(e, 1050, Expedition.progressAt, MAX, 0.3).rareSlot).toBe(42)
+			local raid = makeExpedition({})
+			raid.eventSlot = 43
+			raid.raidDamage = 10
+			expect(PartyStatus.compute(raid, 1050, Expedition.progressAt, MAX, 0.3).rareSlot).toBe(nil)
+			expect(PartyStatus.compute(makeExpedition({}), 1050, Expedition.progressAt, MAX, 0.3).rareSlot).toBe(nil)
+		end)
+	end)
 	describe("D-274 商人へ向かうパーティの状態", function()
 		-- 片道 30 秒、上限 1800 秒とどまる（フロアなし）
 		local function merchantExpedition(leaveAt: number?): any
