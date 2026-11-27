@@ -189,4 +189,31 @@ return function(suite)
 			end
 		)
 	end)
+	describe("揺れの扱い（MX）", function()
+		it("D-291 seed の順の値と標準誤差を残す（出なかった seed は false）", function()
+			local a = Judge.aggregate({ 10, false, 14 }, 3)
+			expect(a.mean).toBe(12)
+			expect(a.missing).toBe(1)
+			expect(a.values[2]).toBe(false)
+			expect(a.se).toBeCloseTo(2, 1e-9)
+		end)
+		it("D-295 標準誤差を合わせた幅の2倍以内の差は揺れの範囲", function()
+			expect(Judge.withinNoise(10, 11, 0.5, 0.5)).toBe(true)
+			expect(Judge.withinNoise(10, 13, 0.5, 0.5)).toBe(false)
+			expect(Judge.withinNoise(10, 11, nil, nil)).toBe(false)
+		end)
+		it("D-295 揺れの範囲の差は基準の警告にしない", function()
+			local t = { id = "bal_x", name = "x", decision = "D-295", metric = "milestoneDays", judge = "baseline" }
+			local now = Judge.aggregate({ { a = 10 }, { a = 14 } }, 2)
+			local base = { a = { mean = 8, se = 2 } }
+			expect(Judge.judge(t, "core", now, base, nil).status).toBe("pass")
+		end)
+		it("D-301 seed ごとの点数から分類と総合の標準誤差を出す", function()
+			local es = { categories = { { id = "a", weight = 1, items = { { metric = "x", good = 10, bad = 0 } } } } }
+			local perSeed = { Score.profile(es, { x = 4 }), Score.profile(es, { x = 6 }) }
+			local n = Score.noise(es, perSeed)
+			expect(n.categories.a).toBeCloseTo(10, 1e-9)
+			expect(n.total).toBeCloseTo(10, 1e-9)
+		end)
+	end)
 end

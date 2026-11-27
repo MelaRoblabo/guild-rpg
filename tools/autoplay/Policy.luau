@@ -179,7 +179,13 @@ end
 
 local function equipBest(state: any, ctx: Ctx)
 	local master = ctx.master
-	for uid in table.clone(state.adventurers) do
+	-- 表の読み出し順に任せない（uid の順）。core は操作のたびに状態を複製するので、読み出し順は操作の数で変わる
+	local uids = {}
+	for uid in state.adventurers do
+		table.insert(uids, uid)
+	end
+	table.sort(uids)
+	for _, uid in uids do
 		local adv = state.adventurers[uid]
 		if adv and not Party.isAdventurerBusy(state, uid) then
 			local catching = isCatchingUp(state, adv)
@@ -199,7 +205,8 @@ local function equipBest(state: any, ctx: Ctx)
 					if e.equippedBy == nil and master.equipmentBases[e.baseId].slot == slot then
 						if Inventory.canEquip(adv.jobId, e.baseId, master) then
 							local sc = score(e)
-							if sc > bestScore then
+							-- 同じ点数なら uid の小さい方（読み出し順に任せない）
+							if sc > bestScore or (sc == bestScore and best ~= nil and euid < best) then
 								best, bestScore = euid, sc
 							end
 						end
@@ -228,7 +235,10 @@ local function sellJunk(state: any, ctx: Ctx)
 	local toSell = {}
 	for _, list in groups do
 		table.sort(list, function(a, b)
-			return a.score > b.score
+			if a.score ~= b.score then
+				return a.score > b.score
+			end
+			return a.uid < b.uid -- 同じ点数なら uid の順（読み出し順に任せない）
 		end)
 		for i = 3, #list do
 			table.insert(toSell, list[i].uid)

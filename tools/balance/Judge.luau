@@ -5,7 +5,17 @@ local Settings = require("./Settings")
 
 local Judge = {}
 
-export type Agg = { mean: number?, min: number?, max: number?, n: number, missing: number }
+-- values：seed の順の値（出なかった seed は false）。sd：標準偏差、se：平均の標準誤差（sd ÷ √n）
+export type Agg = {
+	mean: number?,
+	min: number?,
+	max: number?,
+	n: number,
+	missing: number,
+	sd: number?,
+	se: number?,
+	values: { any }?,
+}
 
 -- seed ごとの値（数か、名前つきの数の表）を平均する
 function Judge.aggregate(values: { any }, expected: number): any
@@ -17,20 +27,38 @@ function Judge.aggregate(values: { any }, expected: number): any
 	end
 	if not isTable then
 		local sum, n, lo, hi = 0, 0, math.huge, -math.huge
+		local list = {}
 		for _, v in values do
 			if type(v) == "number" then
 				sum += v
 				n += 1
 				lo = math.min(lo, v)
 				hi = math.max(hi, v)
+				table.insert(list, v)
+			else
+				table.insert(list, false)
 			end
 		end
+		local mean = if n > 0 then sum / n else nil
+		local sd = nil
+		if mean ~= nil and n > 1 then
+			local ss = 0
+			for _, v in list do
+				if type(v) == "number" then
+					ss += (v - mean) ^ 2
+				end
+			end
+			sd = math.sqrt(ss / (n - 1))
+		end
 		return {
-			mean = if n > 0 then sum / n else nil,
+			mean = mean,
 			min = if n > 0 then lo else nil,
 			max = if n > 0 then hi else nil,
 			n = n,
 			missing = expected - n,
+			sd = sd,
+			se = if sd then sd / math.sqrt(n) else nil,
+			values = list,
 		} :: Agg
 	end
 	local keys: { [string]: { any } } = {}
@@ -100,15 +128,29 @@ local function deviates(now: number, base: number, unit: string?): boolean
 	return diff / math.abs(base) > Settings.baselineWarnRel
 end
 
-local function baseDiffText(now: number?, base: number?): string
+-- 揺れの範囲：今と基準の平均の差が、2つの標準誤差を合わせた幅の2倍以内なら、seed の揺れで説明できる差
+function Judge.withinNoise(now: number?, base: number?, nowSe: number?, baseSe: number?): boolean
+	if now == nil or base == nil or (nowSe == nil and baseSe == nil) then
+		return false
+	end
+	local se = math.sqrt((nowSe or 0) ^ 2 + (baseSe or 0) ^ 2)
+	return math.abs(now - base) <= 2 * se
+end
+
+local function baseDiffText(now: number?, base: number?, nowSe: number?, baseSe: number?): string
 	if now == nil or base == nil then
 		return "—"
 	end
+	local noise = if Judge.withinNoise(now, base, nowSe, baseSe) then "（揺れの範囲）" else ""
 	if base == 0 then
-		return if now == 0 then "±0" else "新"
+		return (if now == 0 then "±0" else "新") .. noise
 	end
 	local d = (now - base) / math.abs(base) * 100
-	return string.format("%+.0f%%", d)
+	return string.format("%+.0f%%", d) .. noise
+end
+
+local function seOf(x: any): number?
+	return if type(x) == "table" then x.se else nil
 end
 
 local function unitOf(metric: string): string?
@@ -136,7 +178,11 @@ function Judge.judge(t: any, profile: string?, agg: any, base: any, cap: number?
 		end
 		local function check(key: string, a: Agg, b: any)
 			local bmean = if type(b) == "table" then b.mean else nil
-			local warn = a.mean ~= nil and bmean ~= nil and deviates(a.mean, bmean, unit)
+			-- 揺れの範囲の差は警告しない（seed の揺れで説明できる）
+			local warn = a.mean ~= nil
+				and bmean ~= nil
+				and deviates(a.mean, bmean, unit)
+				and not Judge.withinNoise(a.mean, bmean, a.se, seOf(b))
 			if warn then
 				res.status = "warn"
 			end
@@ -145,7 +191,7 @@ function Judge.judge(t: any, profile: string?, agg: any, base: any, cap: number?
 				now = a,
 				goal = if bmean ~= nil then `基準 {fmt(bmean)}` else "—",
 				status = if bmean == nil then "info" elseif warn then "warn" else "pass",
-				baseDiff = baseDiffText(a.mean, bmean),
+				baseDiff = baseDiffText(a.mean, bmean, a.se, seOf(b)),
 			})
 		end
 		if agg.mean ~= nil or agg.n ~= nil then
@@ -177,13 +223,14 @@ function Judge.judge(t: any, profile: string?, agg: any, base: any, cap: number?
 			if not ok then
 				fails += 1
 			end
-			local b = if type(base) == "table" and base[col] then base[col].mean else nil
+			local bAgg = if type(base) == "table" then base[col] else nil
+			local b = if type(bAgg) == "table" then bAgg.mean else nil
 			table.insert(res.details, {
 				key = col,
 				now = a,
 				goal = `{goal} ± {t.tolPt}`,
 				status = if ok then "pass" else "fail",
-				baseDiff = baseDiffText(a.mean, b),
+				baseDiff = baseDiffText(a.mean, b, a.se, seOf(bAgg)),
 			})
 		end
 		if fails > 0 then
@@ -214,7 +261,7 @@ function Judge.judge(t: any, profile: string?, agg: any, base: any, cap: number?
 		end
 		res.status = status
 		res.goal = text
-		res.baseDiff = baseDiffText(a.mean, if type(base) == "table" then base.mean else nil)
+		res.baseDiff = baseDiffText(a.mean, if type(base) == "table" then base.mean else nil, a.se, seOf(base))
 		return res
 	end
 

@@ -225,7 +225,7 @@ local function runJob(job: any)
 	if r.ok then
 		local data = serde.decode("json", fs.readFile(job.out))
 		results[job.group.key] = results[job.group.key] or {}
-		table.insert(results[job.group.key], data.metrics)
+		results[job.group.key][job.seed] = data.metrics -- seed の順に置く（出なかった seed は空き）
 	else
 		table.insert(failures, `{job.group.key} seed{job.seed}: {r.stderr}`)
 	end
@@ -283,8 +283,10 @@ for _, t in targets do
 				continue
 			end
 			local values = {}
-			for _, m in results[key] or {} do
-				table.insert(values, m[t.metric] or false)
+			local bySeed = results[key] or {}
+			for seed = 1, seeds do
+				local m = bySeed[seed]
+				table.insert(values, if m then m[t.metric] or false else false)
 			end
 			local agg = Judge.aggregate(values, seeds)
 			aggregated[t.id][key] = agg
@@ -330,18 +332,27 @@ local md = Judge.render(judged, {
 local scores: { [string]: any } = {}
 local expMeans: { [string]: any } = {}
 for _, prof in ES.profiles do
-	local list = results[`{prof}/f0`]
-	if list and #list > 0 then
+	local bySeed = results[`{prof}/f0`]
+	if bySeed and next(bySeed) ~= nil then
 		local means = {}
 		for _, m in expMetrics do
 			local values = {}
-			for _, r in list do
-				table.insert(values, r[m] or false)
+			for seed = 1, seeds do
+				local r = bySeed[seed]
+				table.insert(values, if r then r[m] or false else false)
 			end
 			means[m] = Judge.aggregate(values, seeds).mean
 		end
 		expMeans[prof] = means
+		-- 点数は seed の平均の指標から出す。揺れの幅は seed ごとの点数のばらつき（標準誤差）
+		local perSeed = {}
+		for seed = 1, seeds do
+			if bySeed[seed] then
+				table.insert(perSeed, Score.profile(ES, bySeed[seed]))
+			end
+		end
 		scores[prof] = Score.profile(ES, means)
+		scores[prof].se = Score.noise(ES, perSeed)
 	end
 end
 local history = History.load()

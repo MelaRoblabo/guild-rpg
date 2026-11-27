@@ -50,17 +50,62 @@ function Score.profile(es: any, means: { [string]: number? }): any
 	return { total = if wsum > 0 then sum / wsum else nil, categories = cats, items = items }
 end
 
+local function se(list: { number }): number?
+	local n = #list
+	if n < 2 then
+		return nil
+	end
+	local mean = 0
+	for _, v in list do
+		mean += v
+	end
+	mean /= n
+	local ss = 0
+	for _, v in list do
+		ss += (v - mean) ^ 2
+	end
+	return math.sqrt(ss / (n - 1)) / math.sqrt(n)
+end
+
+-- 揺れの幅：seed ごとの点数（Score.profile の結果の一覧）から、分類と総合の標準誤差
+function Score.noise(es: any, perSeed: { any }): any
+	local out = { categories = {} }
+	local totals = {}
+	for _, p in perSeed do
+		if p.total then
+			table.insert(totals, p.total)
+		end
+	end
+	out.total = se(totals)
+	for _, cat in es.categories do
+		local list = {}
+		for _, p in perSeed do
+			local v = p.categories[cat.id]
+			if v then
+				table.insert(list, v)
+			end
+		end
+		out.categories[cat.id] = se(list)
+	end
+	return out
+end
+
 local function fmt(x: number?): string
 	return if x == nil then "—" else string.format("%.0f", x)
 end
 
-local function diff(now: number?, before: number?): string
+-- 前との差。2つの標準誤差を合わせた幅の2倍以内なら「≒」（seed の揺れで説明できる差）
+local function diff(now: number?, before: number?, nowSe: number?, beforeSe: number?): string
 	if now == nil or before == nil then
 		return ""
 	end
 	local d = now - before
 	if math.abs(d) < 0.5 then
 		return "（±0）"
+	end
+	local noise = math.sqrt((nowSe or 0) ^ 2 + (beforeSe or 0) ^ 2)
+	if noise > 0 and math.abs(d) <= 2 * noise then
+		return string.format("（%+.0f ≒）", d)
 	end
 	return string.format("（%+.0f）", d)
 end
@@ -81,7 +126,7 @@ function Score.render(es: any, scores: { [string]: any }, means: { [string]: any
 		"## 体験スコア（D-301。理論上、続けたくなるか）",
 		"",
 		if prev
-			then `（ ）内は履歴の最後「{prev.label}」（{prev.date}）との差`
+			then `（ ）内は履歴の最後「{prev.label}」（{prev.date}）との差。「≒」は seed の揺れの範囲の差（変化とみなさない）`
 			else "履歴はまだない（--label で残す）",
 		"",
 	}
@@ -92,24 +137,34 @@ function Score.render(es: any, scores: { [string]: any }, means: { [string]: any
 	end
 	table.insert(lines, header)
 	table.insert(lines, sep)
-	local function prevOf(p: string, id: string?): number?
+	local function prevOf(p: string, id: string?): (number?, number?)
 		local ps = prev and prev.scores and prev.scores[p]
 		if ps == nil then
+			return nil, nil
+		end
+		local seP = if id then ps.se and ps.se.categories and ps.se.categories[id] else ps.se and ps.se.total
+		return if id then ps.categories and ps.categories[id] else ps.total, seP
+	end
+	local function seNow(p: string, id: string?): number?
+		local sn = scores[p].se
+		if sn == nil then
 			return nil
 		end
-		return if id then ps.categories and ps.categories[id] else ps.total
+		return if id then sn.categories[id] else sn.total
 	end
 	for _, cat in es.categories do
 		local row = `| {cat.name} |`
 		for _, p in profs do
 			local v = scores[p].categories[cat.id]
-			row ..= ` {fmt(v)}{diff(v, prevOf(p, cat.id))} |`
+			local pv, pse = prevOf(p, cat.id)
+			row ..= ` {fmt(v)}{diff(v, pv, seNow(p, cat.id), pse)} |`
 		end
 		table.insert(lines, row)
 	end
 	local row = "| **総合** |"
 	for _, p in profs do
-		row ..= ` **{fmt(scores[p].total)}**{diff(scores[p].total, prevOf(p, nil))} |`
+		local pv, pse = prevOf(p, nil)
+		row ..= ` **{fmt(scores[p].total)}**{diff(scores[p].total, pv, seNow(p, nil), pse)} |`
 	end
 	table.insert(lines, row)
 
