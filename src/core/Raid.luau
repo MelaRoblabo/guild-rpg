@@ -105,7 +105,6 @@ end
 --   phase："open"（出発できる3分間）・"closed"（3分間は過ぎたが、向かっているパーティがまだ着いていない）
 --   coming：向かっている（まだ着いていない）パーティの番号。討伐したら出さない
 function Raid.presence(state: any, now: number, master: any): { any }
-	local K = master.K
 	local bySlot: { [number]: any } = {}
 	local function entry(slot: number): any
 		local r = Raid.stateFor(state, slot)
@@ -114,14 +113,14 @@ function Raid.presence(state: any, now: number, master: any): { any }
 		end
 		local e = bySlot[slot]
 		if e == nil then
-			local ev = MapEvent.eventAt(slot, master)
+			local ev = MapEvent.eventAt(slot, master, state)
 			e = { eventSlot = slot, placeId = ev.placeId, phase = "closed", coming = {} }
 			bySlot[slot] = e
 		end
 		return e
 	end
-	local slot = MapEvent.slotOf(now, K)
-	local cur = MapEvent.eventAt(slot, master)
+	local slot = MapEvent.currentSlot(now, master, state) -- 管理者が出したレイドも（D-306）
+	local cur = MapEvent.eventAt(slot, master, state)
 	if cur.kind == "raid" and now < cur.closeAt then
 		local e = entry(slot)
 		if e then

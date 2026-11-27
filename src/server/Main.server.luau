@@ -8,6 +8,7 @@ Players.CharacterAutoLoads = false
 
 local Data = require("@game/ReplicatedStorage/Data")
 local MasterData = require("@game/ReplicatedStorage/Core/MasterData")
+local Admin = require("./Admin")
 local Config = require("./Config")
 local Network = require("./Network")
 local Notifications = require("./Notifications")
@@ -33,6 +34,7 @@ local sessions = PlayerSessions.new(masterOrErr)
 local notifications = Notifications.new(masterOrErr)
 -- 通信は参加の受け付けより先に用意する（読み込み完了時に全体を通知するため）
 Network.start(sessions)
+Admin.start(sessions) -- 管理者モード（D-306。権限はサーバーで毎回確かめる）
 notifications:start()
 
 local function onPlayerAdded(player: Player)

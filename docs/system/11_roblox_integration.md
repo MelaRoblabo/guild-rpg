@@ -347,3 +347,22 @@ Roblox のエクスペリエンス通知で、遊んでいないプレイヤー�
   - 許可したかどうかはサーバーからは分からないので、2日目は `canPrompt()`（許可済み・13歳未満・最近出したなら false）で確かめ、false なら出さずに記録だけ付ける。
   - 初めての帰還のときに2日目をもう受け取っていたら（帰還より前に2日ログインした）、2日目の機会は過ぎたものとして一緒に記録する（続けて2回出さない）。
 - 設定画面（S-61、D-181）からも `NotificationPrompt.prompt()` を呼ぶ。M8 の画面はまだないので、今はデバッグ画面の `notify` コマンドから呼ぶ。
+
+## 9. 管理者モード（D-306）
+
+開発・確認のための道具。プレイヤーのコマンド（Protocol・`Command`）とは別の入口にして、プレイヤーのコマンドの一覧には入れない。
+
+- **入口**：`ReplicatedStorage.Remotes.Admin`（RemoteFunction）。`{ op, ... }` を受けて `{ ok, result?, error? }` を返す。サーバーは `src/server/Admin.luau`。
+- **使える人**：サーバーが呼び出しのたびに確かめる。端末からの申告は信じない。
+  - Roblox Studio のテストプレイ（`RunService:IsStudio()`）
+  - `Config.adminUserIds` に登録した UserId（今は 3407099658 だけ）。`ServerScriptService` にあるので端末からは見えない。
+  - それ以外の人の呼び出しには何もせず `nil` を返す（`hello` 以外は警告を出す）。
+- **操作**（`op`）：
+  - `hello`：管理者なら `{ gold? }` を返す。端末はこの答えがあるときだけ ⚙ のボタンを出す。
+  - `setGold { gold }`：所持金を 0〜1e12 の整数にする。
+  - `resetData`：自分のデータを新規と同じ状態に戻し（乱数の元も引き直す）、すぐ保存して全体を送り直す。
+  - `forceEvent { kind }`：`"raid"`／`"rareDungeon"` を今の時間帯に出す（そのプレイヤーだけ）。`state.forcedEvent` に書き、今から3分間出発できる（`MapEvent.force`）。同じ時間帯の参加の記録は消す。
+- **送りすぎの制限**：1人1秒に5回。コマンド・時間経過と同じ `busy` で順番に処理する。
+- **端末**：`src/client/admin/AdminTool.luau`。左上の Roblox のメニューの横（`GuiService.TopbarInset` の左端）に ⚙ のボタン。押すと Admin の面（所持金・Force Raid・Force Rare Dungeon・Reset My Data は2回押し）。
+- **Claude（Studio の MCP）から**：テストプレイ中の Client で `game.ReplicatedStorage.Remotes.Admin:InvokeServer({ op = "setGold", gold = 99999 })` のように呼ぶ。
+- **操作を足すとき**：`Admin.luau` の `ops` に1つ足し、`AdminTool` に行を1つ足し、この節に書く。

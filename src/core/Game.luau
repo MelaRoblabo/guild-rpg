@@ -1546,12 +1546,12 @@ handlers.DispatchEvent = function(state, cmd, ctx)
 	local slot = cmd.eventSlot
 	-- 種類はその時間帯のイベント（全員共通）で決まる。商人へも派遣する（D-274：着かないと買えない）
 	local kind = if type(slot) == "number" and slot == math.floor(slot)
-		then MapEvent.eventAt(slot, master).kind
+		then MapEvent.eventAt(slot, master, state).kind
 		else nil
 	if kind ~= "rareDungeon" and kind ~= "raid" and kind ~= "merchant" then
 		return fail("EVENT_NOT_ACTIVE")
 	end
-	local err = MapEvent.check(slot, kind, ctx.now, master)
+	local err = MapEvent.check(slot, kind, ctx.now, master, state)
 	if err then
 		return fail(err)
 	end
@@ -1690,8 +1690,8 @@ handlers.BuyFromMerchant = function(state, cmd, ctx)
 	if
 		type(slot) ~= "number"
 		or slot ~= math.floor(slot)
-		or slot > MapEvent.slotOf(ctx.now, master.K)
-		or MapEvent.eventAt(slot, master).kind ~= "merchant"
+		or slot > MapEvent.currentSlot(ctx.now, master, state)
+		or MapEvent.eventAt(slot, master, state).kind ~= "merchant"
 	then
 		return fail("EVENT_NOT_ACTIVE")
 	end
@@ -2093,15 +2093,16 @@ end
 
 -- 今と次のマップイベント（D-152、06章 §12）。全員共通。next は予告の時間に入るまで nil
 --   { current = { eventSlot, kindId, kind, placeId, startAt, closeAt, open, closesIn }, next = { ..., startsIn }?, nextAt }
-function Game.query.mapEvent(now: number, master: any): any
-	return MapEvent.status(now, master)
+--   state を渡すと、そのプレイヤーに管理者が出したイベント（D-306）も見る
+function Game.query.mapEvent(now: number, master: any, state: any?): any
+	return MapEvent.status(now, master, state)
 end
 
 -- 旅の商人の品（D-152）。その時間帯のプレイヤーごとの品ぞろえと価格・買ったか
 --   { eventSlot, open, items = { { baseId, rarity, grade, itemLevel, modifierId, modifierValue, price, bought } } }
 --   その時間帯が商人でなければ nil
 function Game.query.merchant(state: any, eventSlot: number, now: number, master: any): any
-	local ev = MapEvent.eventAt(eventSlot, master)
+	local ev = MapEvent.eventAt(eventSlot, master, state)
 	if ev.kind ~= "merchant" then
 		return nil
 	end
@@ -2131,8 +2132,8 @@ function Game.query.raidPresence(state: any, now: number, master: any): { any }
 end
 
 -- その時間帯のイベント（全員共通。種類・場所：D-152）
-function Game.query.mapEventAt(slot: number, master: any): any
-	return MapEvent.eventAt(slot, master)
+function Game.query.mapEventAt(slot: number, master: any, state: any?): any
+	return MapEvent.eventAt(slot, master, state)
 end
 
 -- マップに出ている商人（D-274。Merchant.presence）
@@ -2148,7 +2149,7 @@ end
 -- レイドボスの進み具合（D-152。自分専用）。その時間帯がレイドでなければ nil
 --   { eventSlot, hp, damage, defeated, parties（出発したパーティ）, arrived }。まだ誰も出発していなければ HP の見込みと damage = 0
 function Game.query.raid(state: any, eventSlot: number, master: any): any
-	if MapEvent.eventAt(eventSlot, master).kind ~= "raid" then
+	if MapEvent.eventAt(eventSlot, master, state).kind ~= "raid" then
 		return nil
 	end
 	local r = Raid.stateFor(state, eventSlot)

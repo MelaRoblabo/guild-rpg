@@ -19,6 +19,12 @@ return {
 	deliveryKeyPrefix = "delivery_",
 	deliveryMaxItems = 100, -- 仮。1人の届け物の箱に置ける数の上限（DataStore の大きさの保護）
 
+	-- 管理者モード（D-306、src/server/Admin）。Studio のテストプレイのほか、ここに登録した UserId だけが使える。
+	-- ServerScriptService にあるので端末からは見えない
+	adminUserIds = {
+		[3407099658] = true,
+	} :: { [number]: boolean },
+
 	-- サーバー権限・通信（M7-3 で使う）
 	advanceIntervalSeconds = 1, -- 仮
 	commandRateLimit = 10, -- 仮。1人あたり1秒の上限

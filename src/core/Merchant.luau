@@ -69,7 +69,7 @@ function Merchant.planExpedition(
 	master: any
 ): any
 	local K = master.K
-	local ev = MapEvent.eventAt(slot, master)
+	local ev = MapEvent.eventAt(slot, master, state)
 	local travel = Merchant.travelSeconds(ev.placeId, master)
 	local stay = K.merchantStayMaxSeconds
 	return {
@@ -118,7 +118,7 @@ end
 function Merchant.presence(state: any, now: number, master: any): { any }
 	local K = master.K
 	local out = {}
-	local cur = MapEvent.eventAt(MapEvent.slotOf(now, K), master)
+	local cur = MapEvent.eventAt(MapEvent.currentSlot(now, master, state), master, state)
 	local listed: { [number]: boolean } = {}
 	for _, e in state.expeditions do
 		if e.merchant and now < Merchant.stayEnd(e, K) then

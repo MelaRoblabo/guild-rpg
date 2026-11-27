@@ -155,7 +155,7 @@ function EventMarker.refresh(view: any)
 		return
 	end
 	local now = Session.now()
-	local st = Game.query.mapEvent(now, master)
+	local st = Game.query.mapEvent(now, master, view) -- 管理者が出したイベントも（D-306）
 	local cur = st.current
 	local notice = false
 	local ev = nil

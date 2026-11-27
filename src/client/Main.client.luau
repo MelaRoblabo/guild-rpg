@@ -164,7 +164,7 @@ local function submit(line: string)
 	end
 	-- eventgo・buy で時間帯を省いたら、今の時間帯で埋める（テキスト版と同じ：D-152）
 	if (command.type == "DispatchEvent" or command.type == "BuyFromMerchant") and command.eventSlot == nil then
-		command.eventSlot = Game.query.mapEvent(Session.now(), master).current.eventSlot
+		command.eventSlot = Game.query.mapEvent(Session.now(), master, Session.view).current.eventSlot
 	end
 	local r = Session.send(command)
 	if r == nil then
@@ -197,6 +197,8 @@ local Hub = require("./screens/Hub")
 
 Root.mount()
 Hub.mount()
+-- 管理者モード（D-306）：サーバーが管理者と答えたときだけ、左上に ⚙ のボタンを出す
+task.spawn(require("./admin/AdminTool").mount)
 
 UserInputService.InputBegan:Connect(function(io: InputObject, processed: boolean)
 	if processed then

@@ -1302,4 +1302,64 @@ return function(t)
 			) ~= nil).toBe(true)
 		end)
 	end)
+
+	describe("管理者が出すイベント（D-306）", function()
+		it(
+			"D-306 今の時間帯を上書きし、今から3分間だけ出発できる。state を渡さなければ全員共通のまま",
+			function()
+				local s = newState()
+				local slot = findSlot("merchant")
+				local now = startOf(slot) + 250 -- 全員共通の3分間はもう過ぎている
+				local ev = MapEvent.force(s, "mev_raid", now, master)
+				expect(ev.kind).toBe("raid")
+				expect(ev.eventSlot).toBe(slot)
+				local st = Game.query.mapEvent(now, master, s)
+				expect(st.current.kind).toBe("raid")
+				expect(st.current.open).toBe(true)
+				expect(st.current.closesIn).toBe(K.mapEventWindowSeconds)
+				expect(Game.query.mapEvent(now, master).current.kind).toBe("merchant")
+			end
+		)
+		it(
+			"D-306 次の時間帯に入っても、締め切りまでは管理者のイベントが今のイベント。締め切ったら出発できない",
+			function()
+				local s = newState()
+				local slot = findSlot("merchant")
+				local now = startOf(slot) + 250
+				MapEvent.force(s, "mev_rare_dungeon", now, master)
+				local later = startOf(slot + 1) + 10
+				expect(later < now + K.mapEventWindowSeconds).toBe(true)
+				expect(Game.query.mapEvent(later, master, s).current.eventSlot).toBe(slot)
+				expect(MapEvent.check(slot, "rareDungeon", later, master, s)).toBe(nil)
+				local closed = now + K.mapEventWindowSeconds
+				expect(MapEvent.check(slot, "rareDungeon", closed, master, s)).toBe("EVENT_WINDOW_CLOSED")
+				expect(Game.query.mapEvent(closed, master, s).current.eventSlot).toBe(MapEvent.slotOf(closed, K))
+			end
+		)
+		it("D-306 出したレアダンジョン・レイドへ出発できる", function()
+			local s = newState()
+			local slot = findSlot("merchant")
+			local now = startOf(slot) + 200
+			MapEvent.force(s, "mev_rare_dungeon", now, master)
+			local r = exec(s, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, now + 5)
+			expect(r.ok).toBe(true)
+			expect(eventsOf(r.events, "EventDispatched")[1].kind).toBe("rareDungeon")
+			local s2 = newState(2)
+			MapEvent.force(s2, "mev_raid", now, master)
+			local r2 = exec(s2, { type = "DispatchEvent", partyIndex = 1, eventSlot = slot }, now + 5)
+			expect(r2.ok).toBe(true)
+			expect(eventsOf(r2.events, "EventDispatched")[1].kind).toBe("raid")
+			expect(#Raid.presence(s2, now + 5, master)).toBe(1)
+		end)
+		it("D-306 同じ時間帯に出し直すと、その時間帯の参加の記録を消す", function()
+			local s = newState()
+			local slot = findSlot("merchant")
+			local now = startOf(slot) + 30
+			MapEvent.force(s, "mev_rare_dungeon", now, master)
+			s.rareDungeonSlots = { ["1"] = slot, ["2"] = slot - 1 }
+			MapEvent.force(s, "mev_rare_dungeon", now + 10, master)
+			expect(s.rareDungeonSlots["1"]).toBe(nil)
+			expect(s.rareDungeonSlots["2"]).toBe(slot - 1)
+		end)
+	end)
 end

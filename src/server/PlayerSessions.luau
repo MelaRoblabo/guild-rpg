@@ -291,6 +291,15 @@ function PlayerSessions.onPlayerRemoving(self: any, player: Player)
 	end)
 end
 
+-- すぐ保存する（管理者モードのデータの初期化：D-306）。待ちを入れない
+function PlayerSessions.saveNow(self: any, session: Session)
+	task.spawn(withUser, self, session.userId, "管理者の保存", function()
+		if self.sessions[session.userId] == session then
+			saveSession(self, session, false)
+		end
+	end)
+end
+
 -- 定期保存（11章 §3.3）。ロックを失っていたら書かずに切断する。
 -- 保存の待ちの間に入れ替わる（退出・入り直し）ので、先に一覧を写し、保存の前後でセッションが同じか確かめる
 function PlayerSessions.autosave(self: any)

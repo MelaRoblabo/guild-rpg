@@ -10,7 +10,8 @@
         "Command": { "$className": "RemoteFunction" },
         "Query": { "$className": "RemoteFunction" },
         "StateChanged": { "$className": "RemoteEvent" },
-        "WorldChanged": { "$className": "RemoteEvent" }
+        "WorldChanged": { "$className": "RemoteEvent" },
+        "Admin": { "$className": "RemoteFunction" }
       }
     },
     "ServerScriptService": {

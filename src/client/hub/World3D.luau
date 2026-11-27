@@ -442,7 +442,7 @@ local function destOf(e: any): BasePart?
 		return World3D.placeOf(e.placeId)
 	end
 	if e.raidDamage and e.eventSlot then
-		return World3D.placeOf(Game.query.mapEventAt(e.eventSlot, master).placeId) -- レイドボスの場所（D-275）
+		return World3D.placeOf(Game.query.mapEventAt(e.eventSlot, master, Session.view).placeId) -- レイドボスの場所（D-275）
 	end
 	return dungeonObjs[e.dungeonId]
 end

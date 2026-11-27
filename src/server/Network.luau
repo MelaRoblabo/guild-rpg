@@ -129,6 +129,13 @@ function Network.start(sessions: any)
 	sessions.onChanged = function(session: any, events: { any })
 		push(session, "server", events)
 	end
+	-- 管理者モード（D-306）で状態を変えたとき。データの初期化（full）は全体を送り直す
+	sessions.onAdminChanged = function(session: any, full: boolean)
+		if full then
+			session.lastView = nil
+		end
+		push(session, if full then "load" else "server", {})
+	end
 
 	-- 送りすぎの制限（1人あたり1秒に commandRateLimit 回）
 	local function rateLimited(session: any): boolean

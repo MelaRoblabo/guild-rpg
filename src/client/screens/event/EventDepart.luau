@@ -124,7 +124,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			return
 		end
 		local now = Session.now()
-		local ev = Game.query.mapEvent(now, master).current
+		local ev = Game.query.mapEvent(now, master, view).current
 		if ev == nil or ev.eventSlot ~= slot or not ev.open then
 			api.close() -- 締め切り
 			return
