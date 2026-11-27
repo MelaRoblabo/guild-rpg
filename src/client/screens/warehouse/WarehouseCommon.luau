@@ -67,7 +67,7 @@ function WarehouseCommon.values(item: any): { { icon: string, text: string } }
 	if item.modifierId then
 		local mod = master.modifiers[item.modifierId]
 		if mod then
-			table.insert(out, { icon = WarehouseCommon.icon.modifier, text = mod.nameEn })
+			table.insert(out, { icon = WarehouseCommon.icon.modifier, text = mod.nameEn }) -- エンチャント（D-303）
 		end
 	end
 	return out
@@ -160,14 +160,15 @@ export type TileProps = {
 	rarity: number?,
 	grade: number?,
 	count: number?,
-	modifier: boolean?,
+	modifier: boolean?, -- エンチャント装備（修飾語つき：D-303）。マスの背景の色を変える
 	pinned: boolean?,
-	selected: boolean?,
+	selected: boolean?, -- 選んだ品。枠の色は変えず、白い外の縁で示す（D-303）
 	order: number,
 	onClick: () -> (),
 }
 
--- 格子のマス（106×104）：品の絵＋レアリティの色の枠と形（左上）＋グレード（右下）＋修飾語（左下）＋ピン／選んだ印（右上）
+-- 格子のマス（106×104）：品の絵＋レアリティの色の枠＋グレード（右下）＋保護のピン（右上・小さく）。
+-- レアリティの形の印は出さない（枠の色で分かる）。エンチャント装備は背景の色、選んだ品は白い外の縁（D-303）
 function WarehouseCommon.tile(p: TileProps): TextButton
 	local rar = if p.rarity then ChestCommon.rarityColor(p.rarity) else C.ch28
 	local b: TextButton = new("TextButton", {
@@ -175,13 +176,25 @@ function WarehouseCommon.tile(p: TileProps): TextButton
 		LayoutOrder = p.order,
 		Text = "",
 		AutoButtonColor = false,
-		BackgroundColor3 = C.ch13,
-		ZIndex = if p.selected then 9 else 8, -- 選んだマスの印が隣のマスの下にならないように
+		BackgroundColor3 = if p.modifier then C.specialPurple else C.ch13,
+		ZIndex = if p.selected then 9 else 8, -- 選んだマスの縁が隣のマスの下にならないように
 		[CHILDREN] = {
 			Components.corner(10),
-			Components.stroke(if p.selected then C.selAmber else rar, 3),
+			Components.stroke(rar, 3),
 		},
 	})
+	if p.selected then
+		new("Frame", {
+			Name = "Selected",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(1, 10, 1, 10),
+			BackgroundTransparency = 1,
+			ZIndex = 9,
+			[CHILDREN] = { Components.corner(14), Components.stroke(C.inkWhite, 3) },
+			Parent = b,
+		})
+	end
 	local ic = Components.text({ text = p.icon, size = 42, color = C.inkLight, font = Tokens.font.number })
 	ic.AnchorPoint = Vector2.new(0.5, 0.5)
 	ic.Position = UDim2.fromScale(0.5, 0.5)
@@ -189,9 +202,6 @@ function WarehouseCommon.tile(p: TileProps): TextButton
 	ic.Parent = b
 	if Art.put(b, p.image, { inset = 10, zIndex = 9 }) then
 		ic.Visible = false
-	end
-	if p.rarity then
-		badge(b, ChestCommon.rarityShape(p.rarity), rar, C.inkWhite, UDim2.fromOffset(4, 4), 10)
 	end
 	if p.grade and p.grade > 0 then
 		local g = Components.text({
@@ -213,22 +223,14 @@ function WarehouseCommon.tile(p: TileProps): TextButton
 		c.ZIndex = 10
 		c.Parent = b
 	end
-	if p.modifier then
-		local m = Components.text({
-			text = WarehouseCommon.icon.modifier,
-			size = 21,
-			color = C.bronzeHi,
-			font = Tokens.font.number,
-		})
-		m.AnchorPoint = Vector2.new(0, 1)
-		m.Position = UDim2.new(0, 6, 1, -4)
-		m.ZIndex = 10
-		m.Parent = b
-	end
-	if p.selected then
-		badge(b, "✓", C.selAmber, C.inkDark, UDim2.new(1, -4, 0, 4), 11)
-	elseif p.pinned then
-		badge(b, WarehouseCommon.icon.pin, C.ch10, C.inkLight, UDim2.new(1, -4, 0, 4), 11)
+	if p.pinned then
+		local pin = badge(b, WarehouseCommon.icon.pin, C.ch10, C.inkLight, UDim2.new(1, -6, 0, 6), 11)
+		pin.Size = UDim2.fromOffset(22, 22)
+		pin.TextSize = 13
+		local corner = pin:FindFirstChildOfClass("UICorner")
+		if corner then
+			corner.CornerRadius = UDim.new(0, 11)
+		end
 	end
 	b.Activated:Connect(p.onClick)
 	return b

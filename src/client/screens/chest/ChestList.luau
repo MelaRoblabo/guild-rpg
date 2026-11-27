@@ -5,6 +5,7 @@
 --     レアリティは開けるまで見せない（D-087）。右下の金が All（山ごとに最大 chestBatchOpen 個：D-129）。
 --   - 倉庫がいっぱいで開けられないときだけ、警告の札と Sell（今の装備より弱いものを売る：D-167・D-207）。
 --   - 受け取り箱：届いたものの行と、右下の金で受け取れるものを全部受け取る（D-164・D-176）。
+--   - タブの右に Auto Sell（自動売却の設定 S-51 を開く。倉庫から移した：D-303）。
 --   - 状態が変わったら中身を作り直す（開封の画面を閉じて戻ったとき、数が新しくなっている）。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
@@ -18,6 +19,7 @@ local Screen = require("../Screen")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
 local Guide = require("../../hub/Guide")
+local WarehouseCommon = require("../warehouse/WarehouseCommon")
 local Words = require("../../ui/Words")
 local master = require("../../Master")
 
@@ -307,6 +309,24 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				ZIndex = 13,
 				[CHILDREN] = { Components.corner(15) },
 				Parent = inboxTab,
+			})
+		end
+		-- 自動売却の設定（S-51）。宝箱を開けるときに働くので、倉庫からここへ移した（D-303）。オンなら緑の点
+		local auto = WarehouseCommon.tool("AutoSell", { "@gold", Words.autoSell }, 170, function()
+			api.open("AutoSell")
+		end)
+		auto.Position = UDim2.fromOffset(40 + 4 + 250 + 4 + 180 + 4 + 28, band + 16)
+		auto.Parent = body
+		if view.settings and view.settings.autoSell and view.settings.autoSell.enabled then
+			new("Frame", {
+				Name = "On",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(1, -2, 1, -2),
+				Size = UDim2.fromOffset(22, 22),
+				BackgroundColor3 = C.okGreen,
+				ZIndex = 12,
+				[CHILDREN] = { Components.corner(11), Components.stroke(C.ch13, 2) },
+				Parent = auto,
 			})
 		end
 

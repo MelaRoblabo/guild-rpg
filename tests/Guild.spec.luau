@@ -3,6 +3,7 @@ local Chest = require("../src/core/Chest")
 local Game = require("../src/core/Game")
 local Guild = require("../src/core/Guild")
 local Inventory = require("../src/core/Inventory")
+local ListPrefs = require("../src/core/ListPrefs")
 local Fixtures = require("./helpers/Fixtures")
 
 local T0 = 1767225600
@@ -146,31 +147,52 @@ return function(t)
 
 	describe("一覧の並べ方と一括売却の上限（D-117・D-231 ⑮）", function()
 		it(
-			"D-231 ⑮ 保存がなければ初期値（Lv の高い順・レアリティの高い順・一括売却の上限はレア）",
+			"D-231 ⑮ D-303 保存がなければ初期値（Lv の高い順・レアリティの高い順・一括売却は Common〜Rare、エンチャントは売らずプラスは売る）",
 			function()
 				local s = Game.newState(master, 1, T0)
 				local p = Game.query.listPrefs(s, master)
 				expect(p.advSort).toBe("level")
 				expect(p.advDesc).toBe(true)
 				expect(p.whSort).toBe("rarity")
-				expect(p.bulkSellMaxRarity).toBe(3)
+				for r = 1, master.rarityCount do
+					expect(ListPrefs.rarityOn(p.bulkSellRarityMask, r)).toBe(r <= 3)
+				end
+				expect(p.bulkSellEnchanted).toBe(false)
+				expect(p.bulkSellPlus).toBe(true)
+			end
+		)
+		it(
+			"D-303 前の版で「上限のレアリティ」だけ保存されていたら、上限以下を入にする",
+			function()
+				local s = Game.newState(master, 1, T0)
+				s.settings = { listPrefs = { bulkSellMaxRarity = 2 } }
+				local p = Game.query.listPrefs(s, master)
+				expect(p.bulkSellRarityMask).toBe(ListPrefs.maskOf({ 1, 2 }))
 			end
 		)
 		it("D-117 送った項目だけ変わり、保存される", function()
 			local s = Game.newState(master, 1, T0)
 			expect(exec(s, { type = "SetListPrefs", advSort = "attack", advDesc = false }).ok).toBe(true)
-			expect(exec(s, { type = "SetListPrefs", bulkSellMaxRarity = 4 }).ok).toBe(true)
+			local mask = ListPrefs.maskOf({ 2, 4 })
+			expect(
+				exec(
+					s,
+					{ type = "SetListPrefs", bulkSellRarityMask = mask, bulkSellEnchanted = true, bulkSellPlus = false }
+				).ok
+			).toBe(true)
 			local p = Game.query.listPrefs(s, master)
 			expect(p.advSort).toBe("attack")
 			expect(p.advDesc).toBe(false)
 			expect(p.whSort).toBe("rarity")
-			expect(p.bulkSellMaxRarity).toBe(4)
-			expect(s.settings.listPrefs.bulkSellMaxRarity).toBe(4)
+			expect(p.bulkSellRarityMask).toBe(mask)
+			expect(p.bulkSellEnchanted).toBe(true)
+			expect(p.bulkSellPlus).toBe(false)
+			expect(s.settings.listPrefs.bulkSellRarityMask).toBe(mask)
 		end)
 		it("不正な並べ替え・レアリティは断る", function()
 			local s = Game.newState(master, 1, T0)
 			expect(exec(s, { type = "SetListPrefs", whSort = "level" }).error).toBe("INVALID_SORT")
-			expect(exec(s, { type = "SetListPrefs", bulkSellMaxRarity = master.rarityCount + 1 }).error).toBe(
+			expect(exec(s, { type = "SetListPrefs", bulkSellRarityMask = bit32.lshift(1, master.rarityCount) }).error).toBe(
 				"INVALID_RARITY"
 			)
 			expect(s.settings.listPrefs).toBe(nil)

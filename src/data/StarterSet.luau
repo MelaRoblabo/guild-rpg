@@ -27,7 +27,16 @@ return {
 		cutIns = true,
 		otherCarts = true,
 	},
-	listPrefs = { advSort = "level", advDesc = true, whSort = "rarity", whDesc = true, bulkSellMaxRarity = 3 },
+	-- 一括売却の初期の入切（D-303）：Common・Uncommon・Rare を売る、エンチャント装備は売らない、プラスは売る（前の「上限はレア・修飾語つきは売らない」と同じ）
+	listPrefs = {
+		advSort = "level",
+		advDesc = true,
+		whSort = "rarity",
+		whDesc = true,
+		bulkSellRarities = { 1, 2, 3 },
+		bulkSellEnchanted = false,
+		bulkSellPlus = true,
+	},
 	adventurers = {
 		{
 			name = "Aldo",

@@ -1,17 +1,19 @@
 --!strict
 -- S-50 倉庫（D-119・D-120・D-167・D-207・D-217・D-218・D-231 ①⑮）。問い＝「どれを売る（守る）？」
 --   - 上の並んだタブ＝武器・防具・補助・アイテム。左に格子（倉庫の品だけ。装備中は出さない）、右に幅320の要約、右下に Sell。
---   - マスを押すと選ぶ／外す（複数選べる）。要約は1つなら品の中身と保護のピン、複数なら重ねた絵と数。
+--   - マスを押すと選ぶ／外す（1つずつ。複数は選べない：D-303）。選んだマスは白い外の縁。要約は品の中身と保護のピン。
 --   - Sell＝右下の金（語あり＋合計額）。要約と合計額が確認を兼ねる（D-231 ①）。保護中の品は売らない。
---   - サブ（茶）＝条件で一括売却（D-120）：面でレアリティの上限を選び（前回の上限を保存：D-231 ⑮）、対象と合計を見て Sell。
+--   - サブ（茶）＝Bulk Sell（まとめて売るのはここだけ：D-303）：レアリティ（種類ごと）・エンチャント装備も売るか・プラスも売るか、
+--     を入切で選び（前回の入切を保存）、対象と合計を見て Sell。レアリティはその色の文字の名前で出す。
 --   - 並べ替えの面（D-119）：並べ方と向き。前回の並べ方はサーバーに保存（D-117、SetListPrefs）。
---   - 容量は止まりそうなときだけ右上に倉庫＋⚠＋棒の札（D-218 ⑥）。自動売却の設定 S-51 は右上の茶のボタンから。
+--   - 容量は止まりそうなときだけ右上に倉庫＋⚠＋棒の札（D-218 ⑥）。自動売却の設定 S-51 は宝箱の一覧から開く（D-303）。
 --   - 1つ選んだ装備は、要約の大きな枠に装備の絵（D-268 ⑥）。茶の Equip で付けられる人の顔と差（▲▼）が並び、
 --     選ぶと装備がその人の顔へ飛ぶ（D-265 ⑤）。付けられる人がいなければ灰色で、押すと理由を出す（D-264 ②）。
 
 local Formulas = require("@game/ReplicatedStorage/Core/Formulas")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
+local ListPrefs = require("@game/ReplicatedStorage/Core/ListPrefs")
 local Party = require("@game/ReplicatedStorage/Core/Party")
 local EquipChoice = require("../../adventurers/EquipChoice")
 local Motion = require("../../ui/Motion")
@@ -162,7 +164,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local itemPick: string? = nil
 	local overlay: "sort" | "bulk" | "equip" | nil = nil
 	local equipItem: string? = nil -- Equip の面で付ける品
-	local bulkMax: number? = nil -- 一括売却の面で選んでいる上限（開いたときは前回の上限）
 	local busy = false
 	local render: () -> ()
 
@@ -269,25 +270,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			sortBtn.Parent = body
 			x += 150 + 16
 		end
-		-- 自動売却の設定（S-51）。オンなら緑の点
-		local auto = WarehouseCommon.tool("AutoSell", { I.recycle, Words.autoSell }, 170, function()
-			api.open("AutoSell")
-		end)
-		auto.Position = UDim2.fromOffset(x, band + 16)
-		auto.Parent = body
-		if view.settings and view.settings.autoSell and view.settings.autoSell.enabled then
-			new("Frame", {
-				Name = "On",
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(1, -2, 1, -2),
-				Size = UDim2.fromOffset(22, 22),
-				BackgroundColor3 = C.okGreen,
-				ZIndex = 12,
-				[CHILDREN] = { Components.corner(11), Components.stroke(C.ch13, 2) },
-				Parent = auto,
-			})
-		end
-
 		-- 容量：止まりそうなときだけ（宝箱 v3 と同じ札。D-218 ⑥）
 		if ChestCommon.warehouseBlocked(view) then
 			-- 数字（使用数／上限）は出さず、棒で見せる（D-218 ③⑥）
@@ -351,7 +333,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					selected = selected[uid] == true,
 					order = i,
 					onClick = function()
-						selected[uid] = if selected[uid] then nil else true
+						-- 1つずつ選ぶ（D-303）：同じ品なら外す、別の品ならそれだけを選ぶ
+						selected = if selected[uid] then {} else { [uid] = true }
 						render()
 					end,
 				}).Parent =
@@ -413,19 +396,29 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					big.Position = UDim2.fromScale(0.5, 0.5)
 					big.Parent = pic
 				end
+				-- 保護のピン：押せる広さ（66）はそのまま、見える丸は小さく（D-303）
 				local pin: TextButton = new("TextButton", {
 					Name = "Pin",
-					Text = Components.plain(I.pin),
-					TextSize = 28,
-					FontFace = Tokens.font.number,
-					TextColor3 = C.inkLight,
+					Text = "",
 					AutoButtonColor = false,
 					AnchorPoint = Vector2.new(1, 0),
-					Position = UDim2.new(1, -8, 0, 8),
+					Position = UDim2.fromScale(1, 0),
 					Size = UDim2.fromOffset(66, 66),
-					BackgroundColor3 = if item.locked then C.selAmber else C.secondary,
-					[CHILDREN] = { Components.corner(33), Components.stroke(C.bronze, 3) },
+					BackgroundTransparency = 1,
 					Parent = pic,
+				})
+				new("TextLabel", {
+					Name = "Dot",
+					Text = Components.plain(I.pin),
+					TextSize = 20,
+					FontFace = Tokens.font.number,
+					TextColor3 = C.inkLight,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.fromScale(0.5, 0.5),
+					Size = UDim2.fromOffset(40, 40),
+					BackgroundColor3 = if item.locked then C.selAmber else C.secondary,
+					[CHILDREN] = { Components.corner(20), Components.stroke(C.bronze, 2) },
+					Parent = pin,
 				})
 				pin.Activated:Connect(function()
 					if busy then
@@ -489,32 +482,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					pill.LayoutOrder = i
 					pill.Parent = jobs
 				end
-			elseif #picked > 1 then
-				local stack: Frame = new("Frame", {
-					Name = "Stack",
-					LayoutOrder = 1,
-					Size = UDim2.fromOffset(200, 170),
-					BackgroundTransparency = 1,
-					Parent = rightContent,
-				})
-				for k = 1, math.min(3, #picked) do
-					local item = view.equipment[picked[k]]
-					local t = WarehouseCommon.tile({
-						name = "Stacked" .. k,
-						icon = I[tab],
-						image = Art.equip(item),
-						rarity = item.rarity,
-						order = k,
-						onClick = function() end,
-					})
-					t.Size = UDim2.fromOffset(104, 104)
-					t.Position = UDim2.fromOffset(20 + (k - 1) * 34, 30 + (k - 1) * 8)
-					t.Rotation = (k - 2) * 6
-					t.Parent = stack
-				end
-				local n = WarehouseCommon.pill("", "×" .. #picked, 30)
-				n.LayoutOrder = 2
-				n.Parent = rightContent
 			end
 
 			-- 右下：条件で一括売却（茶）と Sell（金・語あり＋合計額）。保護中の品は売らない
@@ -534,7 +501,6 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				glyph = "X",
 				onClick = function()
 					overlay = "bulk"
-					bulkMax = nil
 					render()
 				end,
 			})
@@ -834,58 +800,141 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			end)
 		end
 
-		-- 条件で一括売却の面（D-120・D-231 ①⑮）：上限を選び、対象と合計を見て Sell
+		-- Bulk Sell の面（D-120・D-231 ①⑮・D-303）：売るものを3つの入切で選び、対象と合計を見て Sell。
+		--   レアリティ＝種類ごとの入切（その色の文字で名前）、Enchanted＝エンチャント装備も売る、Plus＝+1 以上も売る。
+		--   入切は押すたびに保存（前回の入切：SetListPrefs）。保護中・装備中は売らない
 		if overlay == "bulk" and isGear then
-			local maxR = bulkMax or prefs.bulkSellMaxRarity
-			local uids, total = Stock.bulkPlan(view, tab, maxR, master, deps)
-			local scrim, content = sheet(body, "BulkSheet", UDim2.fromOffset(720, 440), function()
+			local mask = prefs.bulkSellRarityMask
+			local filter = {
+				rarityOn = function(r: number): boolean
+					return ListPrefs.rarityOn(mask, r)
+				end,
+				enchanted = prefs.bulkSellEnchanted,
+				plus = prefs.bulkSellPlus,
+			}
+			local uids, total = Stock.bulkPlan(view, tab, filter, master, deps)
+			local _, content = sheet(body, "BulkSheet", UDim2.fromOffset(820, 470), function()
 				overlay = nil
 				render()
 			end)
 			new("UIListLayout", {
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
-				Padding = UDim.new(0, 14),
+				Padding = UDim.new(0, 12),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Parent = content,
 			})
-			local steps = WarehouseCommon.raritySteps(maxR, 640, function(r)
+			local function save(cmd: any)
 				if busy then
 					return
 				end
-				bulkMax = r
-				send({ type = "SetListPrefs", bulkSellMaxRarity = r }) -- 前回の上限として保存（D-231 ⑮）
+				cmd.type = "SetListPrefs"
+				send(cmd)
 				render()
-			end)
-			steps.LayoutOrder = 1
-			steps.Parent = content
-			-- 売らないもの（修飾語・装備中・保護）は固定の印で見せる
-			local keeps: Frame = new("Frame", {
-				Name = "Keeps",
-				LayoutOrder = 2,
-				Size = UDim2.new(1, 0, 0, 44),
+			end
+			-- 1段目：レアリティ（種類ごとの入切。入はその色の文字と縁、切は暗い文字）
+			local rarRow: Frame = new("Frame", {
+				Name = "Rarities",
+				LayoutOrder = 1,
+				Size = UDim2.new(1, 0, 0, 66),
 				BackgroundTransparency = 1,
 				ZIndex = 32,
 				[CHILDREN] = {
 					new("UIListLayout", {
 						FillDirection = Enum.FillDirection.Horizontal,
 						HorizontalAlignment = Enum.HorizontalAlignment.Center,
-						Padding = UDim.new(0, 10),
+						Padding = UDim.new(0, 6),
 						SortOrder = Enum.SortOrder.LayoutOrder,
 					}),
 				},
 				Parent = content,
 			})
-			for i, icon in { I.modifier, "♟", I.pin } do
-				local k = WarehouseCommon.pill(I.warehouse, icon, 25)
-				k.LayoutOrder = i
-				k.ZIndex = 33
-				k.Parent = keeps
+			local n = master.rarityCount
+			local w = math.floor((780 - 6 * (n - 1)) / n)
+			for r = 1, n do
+				local on = ListPrefs.rarityOn(mask, r)
+				local rr = master.raw.Rarities[r]
+				local b: TextButton = new("TextButton", {
+					Name = "Rarity" .. r,
+					LayoutOrder = r,
+					Text = if rr then rr.nameEn else tostring(r),
+					TextSize = 21,
+					FontFace = Tokens.font.display,
+					-- 入＝暗い地にその色の文字と縁。切＝沈んだ明るい地に薄い文字・縁なし（Common の灰色でも入切が分かるように）
+					TextColor3 = if on then ChestCommon.rarityColor(r) else C.inkMid,
+					TextTransparency = if on then 0 else 0.35,
+					AutoButtonColor = false,
+					Size = UDim2.fromOffset(w, 66),
+					BackgroundColor3 = if on then C.ch10 else C.ch50,
+					BackgroundTransparency = if on then 0 else 0.45,
+					ZIndex = 33,
+					[CHILDREN] = {
+						Components.corner(14),
+						if on then Components.stroke(ChestCommon.rarityColor(r), 3) else nil,
+					},
+					Parent = rarRow,
+				})
+				b.Activated:Connect(function()
+					save({ bulkSellRarityMask = bit32.bxor(mask, bit32.lshift(1, r - 1)) })
+				end)
 			end
-			-- 対象の数（重ねた絵の代わりに数）
-			local n = WarehouseCommon.pill(I[tab], "×" .. #uids, 30)
-			n.LayoutOrder = 3
-			n.ZIndex = 33
-			n.Parent = content
+			-- 2段目：Enchanted と Plus の入切（語＋スイッチ）
+			local opts: Frame = new("Frame", {
+				Name = "Options",
+				LayoutOrder = 2,
+				Size = UDim2.new(1, 0, 0, 66),
+				BackgroundTransparency = 1,
+				ZIndex = 32,
+				[CHILDREN] = {
+					new("UIListLayout", {
+						FillDirection = Enum.FillDirection.Horizontal,
+						HorizontalAlignment = Enum.HorizontalAlignment.Center,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						Padding = UDim.new(0, 36),
+						SortOrder = Enum.SortOrder.LayoutOrder,
+					}),
+				},
+				Parent = content,
+			})
+			local function option(order: number, word: string, on: boolean, cmd: any)
+				local f: Frame = new("Frame", {
+					Name = "Opt" .. order,
+					LayoutOrder = order,
+					Size = UDim2.fromOffset(0, 66),
+					AutomaticSize = Enum.AutomaticSize.X,
+					BackgroundTransparency = 1,
+					ZIndex = 32,
+					[CHILDREN] = {
+						new("UIListLayout", {
+							FillDirection = Enum.FillDirection.Horizontal,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							Padding = UDim.new(0, 10),
+							SortOrder = Enum.SortOrder.LayoutOrder,
+						}),
+					},
+					Parent = opts,
+				})
+				local t = Components.text({ text = word, size = 23, color = C.inkDark, font = Tokens.font.display })
+				t.LayoutOrder = 1
+				t.ZIndex = 33
+				t.Parent = f
+				local sw = WarehouseCommon.switch("Switch", on, function()
+					save(cmd)
+				end)
+				sw.LayoutOrder = 2
+				sw.Parent = f
+			end
+			option(1, Words.enchanted, prefs.bulkSellEnchanted, { bulkSellEnchanted = not prefs.bulkSellEnchanted })
+			option(2, Words.plusGear, prefs.bulkSellPlus, { bulkSellPlus = not prefs.bulkSellPlus })
+			-- 保護中・装備中は売らない（固定の札）
+			local keep = WarehouseCommon.pill(I.pin, Words.reason.keepLocked, 21)
+			keep.LayoutOrder = 3
+			keep.ZIndex = 33
+			keep.Parent = content
+			-- 対象の数と Sell
+			local count = WarehouseCommon.pill(I[tab], "×" .. #uids, 30)
+			count.LayoutOrder = 4
+			count.ZIndex = 33
+			count.Parent = content
 			local sell = Components.button({
 				kind = if #uids > 0 then "gold" else "disabled",
 				width = 320,
@@ -897,9 +946,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					sellUids(uids)
 				end,
 			})
-			sell.LayoutOrder = 4
+			sell.LayoutOrder = 5
 			sell.Parent = content
-			local _ = scrim
 		end
 	end
 

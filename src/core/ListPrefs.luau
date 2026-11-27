@@ -1,5 +1,5 @@
 --!strict
--- 一覧の並べ方と一括売却の上限（D-117・D-119・D-231 ⑮。05章 SetListPrefs）
+-- 一覧の並べ方と一括売却の入切（D-117・D-119・D-231 ⑮・D-303。05章 SetListPrefs）
 --   前回選んだものをサーバーに保存する（設定と一緒に保存：D-117）。保存がなければ StarterSet.listPrefs の初期値。
 --   ListPrefs.ADV_SORTS / WH_SORTS  並べ替えの種類（冒険者の一覧 S-40・倉庫 S-50）
 --   ListPrefs.get   今の並べ方（保存と初期値を合わせたもの）
@@ -16,15 +16,38 @@ local function has(list: { string }, v: any): boolean
 	return table.find(list, v) ~= nil
 end
 
+-- レアリティの入切を1つの数にする（rank r の入＝ 2^(r-1) の位）
+function ListPrefs.maskOf(ranks: { number }): number
+	local m = 0
+	for _, r in ranks do
+		m = bit32.bor(m, bit32.lshift(1, r - 1))
+	end
+	return m
+end
+
+-- その rank が入か
+function ListPrefs.rarityOn(mask: number, rank: number): boolean
+	return bit32.band(mask, bit32.lshift(1, rank - 1)) ~= 0
+end
+
 function ListPrefs.get(state: any, master: any): any
 	local d = master.raw.StarterSet.listPrefs
 	local s = (state.settings and state.settings.listPrefs) or {}
+	-- 一括売却のレアリティの入切（D-303）。前の版の「上限のレアリティ」だけが保存されていれば、上限以下を入にする
+	local mask = ListPrefs.maskOf(d.bulkSellRarities)
+	if type(s.bulkSellRarityMask) == "number" then
+		mask = s.bulkSellRarityMask
+	elseif type(s.bulkSellMaxRarity) == "number" then
+		mask = bit32.lshift(1, s.bulkSellMaxRarity) - 1
+	end
 	return {
 		advSort = if has(ListPrefs.ADV_SORTS, s.advSort) then s.advSort else d.advSort,
 		advDesc = if type(s.advDesc) == "boolean" then s.advDesc else d.advDesc,
 		whSort = if has(ListPrefs.WH_SORTS, s.whSort) then s.whSort else d.whSort,
 		whDesc = if type(s.whDesc) == "boolean" then s.whDesc else d.whDesc,
-		bulkSellMaxRarity = if type(s.bulkSellMaxRarity) == "number" then s.bulkSellMaxRarity else d.bulkSellMaxRarity,
+		bulkSellRarityMask = mask,
+		bulkSellEnchanted = if type(s.bulkSellEnchanted) == "boolean" then s.bulkSellEnchanted else d.bulkSellEnchanted,
+		bulkSellPlus = if type(s.bulkSellPlus) == "boolean" then s.bulkSellPlus else d.bulkSellPlus,
 	}
 end
 
@@ -36,12 +59,16 @@ function ListPrefs.set(state: any, cmd: any, master: any): string?
 	if cmd.whSort ~= nil and not has(ListPrefs.WH_SORTS, cmd.whSort) then
 		return "INVALID_SORT"
 	end
-	local r = cmd.bulkSellMaxRarity
-	if r ~= nil and (type(r) ~= "number" or r ~= math.floor(r) or r < 1 or r > master.rarityCount) then
+	local m = cmd.bulkSellRarityMask
+	if
+		m ~= nil and (type(m) ~= "number" or m ~= math.floor(m) or m < 0 or m >= bit32.lshift(1, master.rarityCount))
+	then
 		return "INVALID_RARITY"
 	end
 	local cur = ListPrefs.get(state, master)
-	for _, key in { "advSort", "advDesc", "whSort", "whDesc", "bulkSellMaxRarity" } do
+	for _, key in
+		{ "advSort", "advDesc", "whSort", "whDesc", "bulkSellRarityMask", "bulkSellEnchanted", "bulkSellPlus" }
+	do
 		if cmd[key] ~= nil then
 			cur[key] = cmd[key]
 		end

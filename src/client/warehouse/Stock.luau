@@ -3,7 +3,8 @@
 --   - 一覧は倉庫の品だけ（装備中の品は出さない）。枠（武器・防具・補助）ごと。
 --   - 並べ替え：rarity（レアリティ→グレード→性能）・power（一括売却の比べる値。補助は売却額）・sell（売却額）・new（新しい順）。
 --     desc＝高い順（新しい順）。同じなら新しい品を先に。
---   - 条件の一括売却：今の枠の、上限のレアリティ以下で、修飾語なし・保護なし・装備中でない品（D-120・D-231 ⑮）。
+--   - 一括売却（Bulk Sell）：今の枠の、入にしたレアリティの品。エンチャント装備（修飾語つき）は「エンチャントも売る」が入のときだけ、
+--     プラス（+1 以上）は「プラスも売る」が入のときだけ。保護中・装備中は売らない（D-120・D-231 ⑮・D-303）。
 --   - core の関数は呼び出し側から deps で受け取る（Roblox と Lune で require の道が違うため）。
 
 export type Deps = {
@@ -71,15 +72,22 @@ function Stock.list(state: any, slot: string, prefs: any, master: any, deps: Dep
 	return out
 end
 
--- 条件の一括売却の対象（今の枠、上限のレアリティ以下、修飾語・保護・装備中を除く）と合計額
-function Stock.bulkPlan(state: any, slot: string, maxRarity: number, master: any, deps: Deps): ({ string }, number)
+export type BulkFilter = {
+	rarityOn: (rank: number) -> boolean, -- そのレアリティを売るか
+	enchanted: boolean, -- エンチャント装備も売るか
+	plus: boolean, -- プラス（+1 以上）も売るか
+}
+
+-- 一括売却の対象（今の枠、入切に合う品。保護中・装備中を除く）と合計額（D-303）
+function Stock.bulkPlan(state: any, slot: string, filter: BulkFilter, master: any, deps: Deps): ({ string }, number)
 	local out, total = {}, 0
 	for uid, item in state.equipment do
 		if
 			item.equippedBy == nil
 			and not item.locked
-			and item.modifierId == nil
-			and item.rarity <= maxRarity
+			and (filter.enchanted or item.modifierId == nil)
+			and (filter.plus or (item.grade or 0) == 0)
+			and filter.rarityOn(item.rarity)
 			and slotOf(item, master) == slot
 		then
 			table.insert(out, uid)

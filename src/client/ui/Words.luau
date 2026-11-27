@@ -126,6 +126,11 @@ Words.leftCount = "%d left" -- 開封の Next の残りの数（点を並べな�
 -- 記号の補い（D-288。13歳のプレイテストで ▲・的・レアリティの形が分からなかった）
 Words.getsHitMore = "Gets hit more" -- 編成の面の的の凡例：小さい的 ▶ 大きい的（D-284・D-288）
 
+-- 倉庫の Bulk Sell（D-303）
+Words.enchanted = "Enchanted" -- エンチャント装備（修飾語つき）も売る
+Words.plusGear = "Plus (+1~)" -- プラス（+1 以上）も売る
+Words.reason.keepLocked = "Locked items stay" -- 保護中は売らない
+
 -- 獲得の画面（D-286・D-287）
 Words.title.rewards = "Rewards" -- クエストの報酬を受け取ったときの題
 

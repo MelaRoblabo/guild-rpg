@@ -66,9 +66,14 @@ return function(t)
 		end)
 	end)
 
-	describe("D-120 条件の一括売却（Stock.bulkPlan）", function()
+	describe("D-120 D-303 一括売却（Stock.bulkPlan）", function()
+		local function upTo(n: number)
+			return function(r: number): boolean
+				return r <= n
+			end
+		end
 		it(
-			"D-231 ⑮ 上限以下だけ。修飾語・保護・装備中は売らない。合計は売却額の和",
+			"D-303 入にしたレアリティだけ。エンチャント装備は売らない設定なら売らない。保護・装備中は売らない。合計は売却額の和",
 			function()
 				local s = state()
 				local a = add(s, { rarity = 2 })
@@ -77,7 +82,8 @@ return function(t)
 				local modded = add(s, { rarity = 1, modifierId = "mod_swift", modifierValue = 2 })
 				local locked = add(s, { rarity = 1 })
 				s.equipment[locked].locked = true
-				local uids, total = Stock.bulkPlan(s, "weapon", 3, master, deps)
+				local uids, total =
+					Stock.bulkPlan(s, "weapon", { rarityOn = upTo(3), enchanted = false, plus = true }, master, deps)
 				expect(table.find(uids, a) ~= nil).toBe(true)
 				expect(table.find(uids, b) ~= nil).toBe(true)
 				expect(table.find(uids, over)).toBe(nil)
@@ -96,6 +102,38 @@ return function(t)
 				expect(r.ok).toBe(true)
 			end
 		)
+		it(
+			"D-303 レアリティは上限でなく種類ごと（Uncommon だけ入なら Common は売らない）",
+			function()
+				local s = state()
+				local common = add(s, { rarity = 1 })
+				local unc = add(s, { rarity = 2 })
+				local uids = Stock.bulkPlan(s, "weapon", {
+					rarityOn = function(r: number): boolean
+						return r == 2
+					end,
+					enchanted = true,
+					plus = true,
+				}, master, deps)
+				expect(table.find(uids, unc) ~= nil).toBe(true)
+				expect(table.find(uids, common)).toBe(nil)
+			end
+		)
+		it("D-303 エンチャント装備・プラスは、それぞれ入のときだけ売る", function()
+			local s = state()
+			local plain = add(s, { rarity = 1 })
+			local modded = add(s, { rarity = 1, modifierId = "mod_swift", modifierValue = 2 })
+			local plus = add(s, { rarity = 1, grade = 2 })
+			local function has(f: any, uid: string): boolean
+				return table.find((Stock.bulkPlan(s, "weapon", f, master, deps)), uid) ~= nil
+			end
+			local on = upTo(6)
+			expect(has({ rarityOn = on, enchanted = false, plus = false }, plain)).toBe(true)
+			expect(has({ rarityOn = on, enchanted = false, plus = false }, modded)).toBe(false)
+			expect(has({ rarityOn = on, enchanted = false, plus = false }, plus)).toBe(false)
+			expect(has({ rarityOn = on, enchanted = true, plus = false }, modded)).toBe(true)
+			expect(has({ rarityOn = on, enchanted = false, plus = true }, plus)).toBe(true)
+		end)
 	end)
 
 	describe("D-167 アイテムのタブ（Stock.items）", function()

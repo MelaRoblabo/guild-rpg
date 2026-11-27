@@ -82,7 +82,9 @@ Protocol.CLIENT_COMMANDS = {
 		advDesc = bool(true),
 		whSort = enum(ListPrefs.WH_SORTS, true),
 		whDesc = bool(true),
-		bulkSellMaxRarity = int(1, 100, true),
+		bulkSellRarityMask = int(0, 2 ^ 20, true), -- D-303：一括売却で売るレアリティ（rank r の入＝ 2^(r-1) の位）
+		bulkSellEnchanted = bool(true), -- D-303：エンチャント装備も売るか
+		bulkSellPlus = bool(true), -- D-303：プラス（+1 以上）も売るか
 	},
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
 	ClaimInbox = {}, -- D-164

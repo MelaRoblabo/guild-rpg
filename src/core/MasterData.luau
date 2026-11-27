@@ -868,12 +868,16 @@ local function validateLootAndStarter(c: Checker, d: any)
 		if table.find(ListPrefs.WH_SORTS, LP.whSort) == nil then
 			c:error("StarterSet.listPrefs.whSort", "並べ替えの種類が不正")
 		end
-		for _, key in { "advDesc", "whDesc" } do
+		for _, key in { "advDesc", "whDesc", "bulkSellEnchanted", "bulkSellPlus" } do
 			if type(LP[key]) ~= "boolean" then
 				c:error(`StarterSet.listPrefs.{key}`, "真偽値が必要")
 			end
 		end
-		c:integer("StarterSet.listPrefs.bulkSellMaxRarity", LP.bulkSellMaxRarity, 1, rarityCount(d))
+		if c:array("StarterSet.listPrefs.bulkSellRarities", LP.bulkSellRarities) then
+			for i, r in LP.bulkSellRarities do
+				c:integer(`StarterSet.listPrefs.bulkSellRarities[{i}]`, r, 1, rarityCount(d))
+			end
+		end
 	end
 	local jobIds, giftIds, equipIds = idSet(d.Jobs), idSet(d.Gifts), idSet(d.EquipmentBases)
 	if c:array("StarterSet.adventurers", S.adventurers) then

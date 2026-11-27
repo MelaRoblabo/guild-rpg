@@ -26,8 +26,8 @@
 | レアリティ | rarity | 1〜（リリース時6＝ミシック。D-085） |
 | 基本アイテム | equipmentBase | |
 | 装備個体 | equipmentItem | uid を持つ |
-| 修飾語 | modifier | |
-| グレード | grade | 0〜3 |
+| エンチャント（旧称：修飾語） | modifier | 修飾語の付いた装備は「エンチャント装備」（英語 Enchanted）。一覧ではマスの背景の色で示す（D-303） |
+| グレード（プラス） | grade | 0〜3。画面では「+1」などと出すので、プラス（+1 以上の装備）とも呼ぶ（D-303） |
 | 個体補正 | personalBonus | 上限 +50%（D-070） |
 | 面接 | interview / hireSession | |
 | ステータススロット | statSlot | |
@@ -65,7 +65,7 @@
 | 専用ギフト | exclusive | Gifts の印、D-165 |
 | 宝箱の山 | chestPile / pileKey | 通常は dungeonId、特別は special:xxx、D-166 |
 | 特別な宝箱 | specialChest | D-166 |
-| 一括売却 | BulkSell | D-167 |
+| 一括売却 | BulkSell | D-167。倉庫の Bulk Sell はレアリティ・エンチャント・プラスの入切で選んだ品を Sell でまとめて売る（D-303） |
 | 日・週の番号 | dayIndex / weekIndex | UTC 0時、週は月曜、D-168 |
 | 基準のダンジョン | baseDungeon | 踏破した一番深いダンジョン。未踏破なら古い墓地（D-187）。特別な宝箱・レアダンジョン・レイド・商人・報酬のゴールドで使う |
 | 報酬のゴールド | rewardGold / rewardGoldBase / goldMult | 基準のダンジョンの rewardGoldBase × 報酬ごとの係数（D-190、06章 §22） |
