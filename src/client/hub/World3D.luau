@@ -6,6 +6,7 @@
 --     見本は ReplicatedStorage.MapModels.PartyCart（Studio で置いた駒。台座の底の真ん中が基準点、馬は +X）。
 --     ギルド・ダンジョン・商人・レイドボスの模型に触れている間は出さない（模型にめり込むため：D-277）。
 --   - 中でパーティが探索中のダンジョンは、模型がボードゲームの駒のように小さく跳ねる。
+--   - 今日の日替わりのダンジョンは、上空に金の太陽のメダルが浮かび、全体から金の光の粒が立ちのぼる（D-305：DailyWorld）。
 --   - ギルド・ダンジョンの中のパーティは、その物の上に BillboardGui でリーダーのアイコン（D-270 ⑥・D-271）。
 --   - ゲームパッドのときは画面の中央に照準。重なった物の縁を光らせて名前の札を出し、A で開く（D-273 ④）。
 --   - タップした物（ダンジョン・ギルド・馬車）は handlers に渡す。画面の変更はすべてこの端末の中だけ（サーバーへは送らない）。
@@ -23,6 +24,7 @@ local Create = require("../ui/Create")
 local HubState = require("./HubState")
 local MapAmbience = require("./MapAmbience")
 local MapCamera = require("./MapCamera")
+local DailyWorld = require("./DailyWorld")
 local EventWorld = require("./EventWorld")
 local PartyIcon = require("../ui/PartyIcon")
 local Root = require("../ui/Root")
@@ -393,7 +395,8 @@ function World3D.mount(h: Handlers)
 	}) :: ScreenGui
 	RunService.RenderStepped:Connect(World3D.step)
 	RunService.RenderStepped:Connect(updateAim)
-	-- 旅の商人（D-274）・レイドボス（D-275）：ReplicatedStorage.MapModels の模型を見本に、出ている間だけ場所に置く
+	DailyWorld.mount() -- 日替わりのダンジョンの目印（D-305）
+	-- 旅の商人（D-274）・レイドボス（D-275）・レアダンジョン（D-304）：ReplicatedStorage.MapModels の模型を見本に、出ている間だけ場所に置く
 	EventWorld.mount(
 		World3D.placeOf,
 		topY,
@@ -871,6 +874,16 @@ function World3D.refresh(view: any)
 			end
 		end
 	end
+	-- 日替わりのダンジョン（D-305）：今日の特性が付いていて、地図に出ているもの
+	local daily: { [string]: DailyWorld.Shown } = {}
+	for _, row in Game.query.dailyTraits(Session.now(), master).today do
+		local obj = dungeonObjs[row.dungeonId]
+		if obj and not hidden[obj] then
+			local minV, maxV = boundsOf(obj)
+			daily[row.dungeonId] = { minV = minV, maxV = maxV }
+		end
+	end
+	DailyWorld.refresh(daily)
 	EventWorld.refresh(view)
 end
 
