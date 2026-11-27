@@ -58,12 +58,25 @@ local questBadge: TextLabel -- 受け取れるクエストの数（D-286）
 ---------------------------------------------------------------------------
 -- 3D マップ（D-270）
 
+-- マップの横に出す面（パーティの面・ダンジョンの面・行き先の一覧）だけを上から閉じる。
+-- 別の物を選んだとき、前の面（古い行き先の一覧など）を下に残さないため。ログインの流れ（カレンダーなど）は閉じない
+local MAP_PANELS = { PartyPanel = true, DungeonPanel = true, DungeonPick = true }
+local function closeMapPanels()
+	while true do
+		local id = Nav.topId()
+		if id == nil or not MAP_PANELS[id] then
+			return
+		end
+		Nav.close()
+	end
+end
+
 -- パーティを選ぶ：パーティの面を開く（面がカメラをそのパーティへ寄せて旋回させる：D-270 ⑤）
 local function openParty(partyIndex: number)
 	HubState.selected = partyIndex
 	PickMode.stop() -- 行き先を選ぶのをやめる
 	-- 前に選んだパーティの面・行き先の一覧（DungeonPick）を下に残さない（古い一覧が残っていた）
-	Nav.home()
+	closeMapPanels()
 	Nav.open("PartyPanel", { partyIndex = partyIndex })
 end
 
@@ -119,7 +132,7 @@ end
 local function mount3D()
 	World3D.mount({
 		onDungeon = function(id: string)
-			Nav.home() -- 前の面（パーティの面・行き先の一覧）を下に残さない
+			closeMapPanels() -- 前の面（パーティの面・行き先の一覧）を下に残さない
 			Nav.open("DungeonPanel", { dungeonId = id }) -- 面がカメラをそのダンジョンへ寄せる
 		end,
 		onGuild = function()
@@ -417,7 +430,8 @@ local function buildEdges(parent: Frame)
 	quest.Activated:Connect(function()
 		Nav.open("Quests") -- D-233（M8-6）
 	end)
-	-- 受け取れるクエストの数の札（D-286）。並びの中に入れないよう、語の札の右上に重ねる
+	-- 受け取れるクエストの数の札（D-286）。並びの中に入れず、大きさの決まったアイコンに付けてボタンの左上の角に重ねる
+	-- （語の札に付けると、札の自動の幅に札まで入って語がずれた）
 	questBadge = new("TextLabel", {
 		Name = "Claimable",
 		Text = "",
@@ -426,12 +440,12 @@ local function buildEdges(parent: Frame)
 		TextColor3 = C.inkWhite,
 		BackgroundColor3 = C.notice,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, 22, 0, -14),
+		Position = UDim2.fromOffset(-14, -14),
 		Size = UDim2.fromOffset(32, 32),
 		Visible = false,
 		ZIndex = 25,
 		[CHILDREN] = { Components.corner(16), Components.stroke(C.ch75, 2) },
-		Parent = quest:FindFirstChild("Word"),
+		Parent = quest:FindFirstChild("Icon") or quest:FindFirstChild("Word"),
 	})
 	local gear = edgeButton("⚙", Words.settings, "settings")
 	gear.LayoutOrder = 2

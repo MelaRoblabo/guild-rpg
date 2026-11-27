@@ -187,8 +187,11 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 					Size = UDim2.new(1, 0, 0, if claimable then 86 else 76),
 					BackgroundColor3 = if sunk then C.ch68 else C.ch75,
 					BackgroundTransparency = if sunk or locked then 0.35 else 0,
-					[CHILDREN] = if claimable then { Components.stroke(C.selAmber, 3) } else nil,
-					[CHILDREN] = { Components.corner(8), Components.padding(6, 10, 7, 14) },
+					[CHILDREN] = {
+						Components.corner(8),
+						Components.padding(6, 10, 7, 14),
+						if claimable then Components.stroke(C.selAmber, 3) else nil, -- 受け取れる行は金の縁（D-286）
+					},
 					Parent = b,
 				})
 				local word = Components.text({

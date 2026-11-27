@@ -95,6 +95,12 @@ function Nav.depth(): number
 	return stack:depth()
 end
 
+-- いちばん上の画面の id（なければ nil）
+function Nav.topId(): string?
+	local top = stack:top()
+	return if top then top.id else nil
+end
+
 -- いちばん上の画面が、下（3D マップ）へ入力を通す面か（パーティ・ダンジョンの面：D-270）
 function Nav.topPassThrough(): boolean
 	local top = layers[#layers]

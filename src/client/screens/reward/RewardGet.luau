@@ -89,7 +89,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if t.kind == "gold" then
 			icon, color, prefix = Components.icon.coin, C.coinGold, "+"
 		elseif t.kind == "chest" then
-			icon, color, prefix = "@chest", C.bronzeHi, "×"
+			-- 閉じた宝箱の絵（レアリティを表さない一番下の箱：D-087）。記号だと羊皮紙の上で薄かった
+			icon, image, color, prefix = "@chest", Art.chest(1, false), C.inkDark, "×"
 		else
 			local id = t.id or ""
 			icon, image, color, prefix = (ITEM_ICON :: any)[id] or "◈", Art.item(id), C.inkLight, "×"
