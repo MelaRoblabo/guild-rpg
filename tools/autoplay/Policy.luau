@@ -58,8 +58,8 @@ end
 
 -- 報酬の入手先を数えるための聞き手（tools/autoplay/Ledger.luau）。listener(state, cmd, result, extra)
 --   extra：ClaimInbox は受け取る前の受け取り箱、Sell / BulkSell は売る前の売却額（uid → ゴールド）
-local listener: ((any, any, any, any) -> ())? = nil
-function Policy.setListener(fn: ((any, any, any, any) -> ())?)
+local listener: ((any, any, any, any, number?) -> ())? = nil
+function Policy.setListener(fn: ((any, any, any, any, number?) -> ())?)
 	listener = fn
 end
 
@@ -80,7 +80,7 @@ local function exec(state: any, cmd: any, ctx: Ctx): any
 	end
 	local r = Game.execute(state, cmd, ctx)
 	if listener and r.ok then
-		(listener :: any)(state, cmd, r, extra)
+		(listener :: any)(state, cmd, r, extra, ctx.now) -- 5つ目は時刻（MX の出来事の記録用）
 	end
 	return r
 end

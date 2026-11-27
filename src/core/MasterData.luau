@@ -1599,6 +1599,47 @@ local function validateBalanceTargets(c: Checker, d: any)
 	end
 end
 
+-- 体験スコアの表（MX。D-301、src/data/ExperienceScores.luau）。ゲームの動きには使わない
+local function validateExperienceScores(c: Checker, d: any)
+	local es = d.ExperienceScores
+	if type(es) ~= "table" then
+		c:error("ExperienceScores", "テーブルが必要")
+		return
+	end
+	if c:array("ExperienceScores.profiles", es.profiles) then
+		for i, prof in es.profiles do
+			oneOf(c, `ExperienceScores.profiles[{i}]`, prof, BALANCE_PROFILES)
+		end
+	end
+	if not c:array("ExperienceScores.categories", es.categories) then
+		return
+	end
+	local ids: { [string]: boolean } = {}
+	for i, cat in es.categories do
+		local p = `ExperienceScores.categories[{i}]`
+		if type(cat.id) ~= "string" or ids[cat.id] then
+			c:error(p .. ".id", "重複しない id が必要")
+		else
+			ids[cat.id] = true
+		end
+		if type(cat.name) ~= "string" or cat.name == "" then
+			c:error(p .. ".name", "名前が必要")
+		end
+		c:number(p .. ".weight", cat.weight, 0)
+		if c:array(p .. ".items", cat.items) then
+			for k, item in cat.items do
+				local q = `{p}.items[{k}]`
+				if type(item.metric) ~= "string" or item.metric == "" then
+					c:error(q .. ".metric", "指標の名前が必要")
+				end
+				if c:number(q .. ".good", item.good) and c:number(q .. ".bad", item.bad) and item.good == item.bad then
+					c:error(q, "good と bad が同じ")
+				end
+			end
+		end
+	end
+end
+
 local function byId(rows: any): { [string]: any }
 	local m = {}
 	if type(rows) == "table" then
@@ -1688,6 +1729,7 @@ function MasterData.validate(data: any): { Issue }
 	validateMapEvents(c, data)
 	validateEnglishNames(c, data)
 	validateBalanceTargets(c, data)
+	validateExperienceScores(c, data)
 	return c.issues
 end
 
@@ -1802,6 +1844,7 @@ function MasterData.load(data: any): any
 		mapEventKinds = byId(data.MapEvents.kinds),
 		mapEventPlaces = data.MapEvents.places,
 		balanceTargets = data.BalanceTargets, -- ツール用（MB）
+		experienceScores = data.ExperienceScores, -- ツール用（MX、D-301）
 	})
 end
 

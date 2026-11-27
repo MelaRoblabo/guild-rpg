@@ -143,6 +143,34 @@ Metrics.autoplay = {
 	raidPartiesNeeded = raidPartiesNeeded,
 }
 
+-- 体験の指標（MX。tools/balance/Experience.luau が出来事の記録から出す。r.experience に入っている）
+Metrics.EXPERIENCE = {
+	"firstChestSec",
+	"firstUpgradeSec",
+	"firstSessionBig",
+	"rewardGapP90Sec",
+	"longestGapMedianSec",
+	"sessionsWithBigShare",
+	"noveltyDroughtDays",
+	"noveltyDroughtShare",
+	"noveltyTotal",
+	"noveltyFirstWeek",
+	"flatDaysLongest",
+	"flatDaysShare",
+	"loginPayoffShare",
+	"loginPayoffChests",
+	"dailyQuestsPerDay",
+	"commandsPerHour",
+	"noveltyLateHalf",
+	"bigPerSessionLate",
+	"chestsPerOpenMedian",
+}
+for _, name in Metrics.EXPERIENCE do
+	Metrics.autoplay[name] = function(r: any): any
+		return r.experience and r.experience[name]
+	end
+end
+
 -- 目標の表で使っている autoplay の指標をすべて計算する。表にない指標名はエラー
 function Metrics.computeAutoplay(r: any, names: { string }): { [string]: any }
 	local out = {}

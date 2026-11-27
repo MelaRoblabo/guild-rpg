@@ -28,4 +28,5 @@ return {
 	MapEvents = require("@self/MapEvents"),
 	Images = require("@self/Images"),
 	BalanceTargets = require("@self/BalanceTargets"), -- バランスの目標（ツール用。MB）
+	ExperienceScores = require("@self/ExperienceScores"), -- 体験スコアの線（ツール用。MX、D-301）
 }

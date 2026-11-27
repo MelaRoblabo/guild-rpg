@@ -96,8 +96,21 @@ function Days.run(opts: any, master: any): any
 	local state = Game.newState(master, opts.seed, firstLogin)
 	local rng = Rng.new(opts.seed * 31337)
 	local ledger = Ledger.new(master)
-	Policy.setListener(function(st, cmd, r, extra)
+	-- 出来事の記録（MX。体験の時刻表とスコア用）：opts.trace(出来事, オンラインか) を呼ぶだけで、行動は変えない
+	local trace: ((any, boolean) -> ())? = opts.trace
+	local function feed(evs: { any }, isOnline: boolean)
+		if trace then
+			for _, ev in evs do
+				trace(ev, isOnline)
+			end
+		end
+	end
+	Policy.setListener(function(st, cmd, r, extra, now)
 		Ledger.onCommand(ledger, st, cmd, r, extra)
+		if trace and r and r.ok then
+			trace({ type = "Command", command = cmd.type, at = now, cmd = cmd }, true)
+			feed(r.events or {}, true)
+		end
 	end)
 	local stats = { rebirths = 0, rebirthRerolls = 0, maxRebirth = 0, hired = 0, trainedLevels = 0, timeline = {} }
 	local function ctx(t: number, online: boolean): any
@@ -134,6 +147,7 @@ function Days.run(opts: any, master: any): any
 		ledger.value.online.exp += Ledger.expGained(state, snap, expToNext)
 		Ledger.onAdvance(ledger, evs)
 		watchEvents(evs)
+		feed(evs, true)
 		return evs
 	end
 
@@ -225,12 +239,16 @@ function Days.run(opts: any, master: any): any
 				ledger.value.online.exp += Ledger.expGained(state, snap, expToNext)
 				Ledger.onAdvance(ledger, evs)
 				watchEvents(evs)
+				feed(evs, false)
 				local away = loginAt - logoutAt
 				time.offline += away
 				time.offlineActive += math.min(away, K.offlineMaxSeconds)
 				dayOffline += away
 			end
 			-- ログイン：その日の最初のオンラインの advance でログインボーナス・クエストの入れ替え（D-155, D-153）
+			if trace then
+				trace({ type = "Login", at = loginAt, gold = state.gold }, true)
+			end
 			stepOnline(loginAt)
 			Policy.onLogin(state, ctx(loginAt, true))
 			Policy.manage(state, ctx(loginAt, true), rng, stats)
@@ -255,8 +273,9 @@ function Days.run(opts: any, master: any): any
 				else
 					Policy.glance(state, ctx(now, true), rng, stats)
 				end
-				if state.expansions.partySlots ~= before then
-					note(now, `パーティ枠 → {state.expansions.partySlots}`)
+				-- 一度に2つ増えても1つずつ記録する（途中の目安が抜けないように）
+				for n = before + 1, state.expansions.partySlots do
+					note(now, `パーティ枠 → {n}`)
 				end
 				checkMilestones(now)
 				if milestones["最大の育成"] then
@@ -266,6 +285,9 @@ function Days.run(opts: any, master: any): any
 			-- ログアウト：自動再派遣を付け、最後に保存した時刻を書く（サーバーの保存の代わり：D-161, D-193）
 			local outAt = math.min(now, endAt)
 			Policy.onLogout(state, ctx(outAt, true))
+			if trace then
+				trace({ type = "Logout", at = outAt }, true)
+			end
 			state.lastSavedAt = outAt
 			logoutAt = outAt
 			time.online += outAt - loginAt

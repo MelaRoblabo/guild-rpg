@@ -4,6 +4,9 @@ local Data = require("../src/data")
 local Judge = require("../tools/balance/Judge")
 local Metrics = require("../tools/balance/Metrics")
 local Overrides = require("../tools/balance/Overrides")
+local Experience = require("../tools/balance/Experience")
+local MasterData = require("../src/core/MasterData")
+local Score = require("../tools/balance/Score")
 
 local SIM_METRICS = { stageClearRate = true, stageMedianSeconds = true, earlyUnlockClearRate = true }
 
@@ -116,5 +119,74 @@ return function(suite)
 				Overrides.apply(d, { Overrides.parse("Constants.noSuchValue=1") })
 			end).toThrow("見つからない")
 		end)
+	end)
+	describe("体験スコア（D-301）", function()
+		it("D-301 スコアの表の指標はすべて体験の指標として計算できる", function()
+			for _, m in Score.metrics(Data.ExperienceScores) do
+				expect(table.find(Metrics.EXPERIENCE, m) ~= nil).toBe(true)
+			end
+		end)
+		it(
+			"D-301 良い線で100点・悪い線で0点・その間は直線（小さいほど良い指標も）",
+			function()
+				expect(Score.item(60, 60, 180)).toBe(100)
+				expect(Score.item(180, 60, 180)).toBe(0)
+				expect(Score.item(120, 60, 180)).toBe(50)
+				expect(Score.item(30, 60, 180)).toBe(100)
+				expect(Score.item(0.4, 0.6, 0.2)).toBeCloseTo(50, 1e-9)
+				expect(Score.item(nil, 1, 0)).toBe(nil)
+			end
+		)
+		it("D-301 分類は指標の平均、総合は分類の重みつき平均", function()
+			local es = {
+				categories = {
+					{
+						id = "a",
+						weight = 1,
+						items = { { metric = "x", good = 10, bad = 0 }, { metric = "y", good = 10, bad = 0 } },
+					},
+					{ id = "b", weight = 3, items = { { metric = "z", good = 10, bad = 0 } } },
+				},
+			}
+			local s = Score.profile(es, { x = 10, y = 0, z = 10 })
+			expect(s.categories.a).toBe(50)
+			expect(s.categories.b).toBe(100)
+			expect(s.total).toBe(87.5)
+		end)
+		it("D-301 スコアの表の検証：good と bad が同じ・未知の型は失敗", function()
+			local d = clone(Data)
+			d.ExperienceScores.profiles = { "casual" }
+			d.ExperienceScores.categories[1].items[1].bad = d.ExperienceScores.categories[1].items[1].good
+			local paths = {}
+			for _, e in MasterData.validate(d) do
+				if e.level == "error" then
+					paths[e.path] = true
+				end
+			end
+			expect(paths["ExperienceScores.profiles[1]"]).toBe(true)
+			expect(paths["ExperienceScores.categories[1].items[1]"]).toBe(true)
+		end)
+		it(
+			"D-301 出来事の数え方：留守の出来事は次のログインに数え、初めてのレアリティは節目",
+			function()
+				local c = Experience.new()
+				local on = Experience.collector(c)
+				on({ type = "Login", at = 0 }, true)
+				on({ type = "ChestsOpened", at = 30, opened = 1, normal = { { rank = 1 } }, special = {} }, true)
+				on({ type = "LevelUp", at = 40 }, true)
+				on({ type = "Logout", at = 100 }, true)
+				on({ type = "DungeonUnlocked", at = 500, dungeonId = "dng_ruins" }, false)
+				on({ type = "Login", at = 1000 }, true)
+				on({ type = "Logout", at = 1100 }, true)
+				expect(#c.sessions[1].moments).toBe(2)
+				expect(c.sessions[1].moments[1].kind).toBe("big")
+				expect(#c.sessions[2].moments).toBe(1)
+				expect(c.sessions[2].moments[1].at).toBe(1000)
+				expect(c.seen["dungeon:dng_ruins"]).toBe(true)
+				local m = Experience.finish(c, 1100, 10)
+				expect(m.sessionsWithBigShare).toBe(1)
+				expect(m.firstChestSec).toBe(30)
+			end
+		)
 	end)
 end

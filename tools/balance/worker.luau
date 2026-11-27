@@ -11,6 +11,7 @@ local serde = require("@lune/serde")
 local Data = require("../../src/data")
 local MasterData = require("../../src/core/MasterData")
 local Days = require("../autoplay/Days")
+local Experience = require("./Experience")
 local Policy = require("../autoplay/Policy")
 local Schedule = require("../autoplay/Schedule")
 local Metrics = require("./Metrics")
@@ -39,6 +40,8 @@ do
 			table.insert(opts.sets, Overrides.parse(v))
 		elseif k == "--out" then
 			opts.out = v
+		elseif k == "--timeline-out" then
+			opts.timelineOut = v
 		else
 			error(`未知の引数: {k}`)
 		end
@@ -53,8 +56,16 @@ Policy.use(opts.policy)
 Policy.configure(Schedule.behavior)
 
 local started = os.clock()
+-- 体験の指標（MX）：出来事を記録する
+local exp = Experience.new()
+opts.trace = Experience.collector(exp)
 local r = Days.run(opts, master)
+local endAt = r.reachedAt or (r.firstLogin + r.finishedDays * 86400)
+r.experience = Experience.finish(exp, endAt, r.onlinePerDay)
 local metrics = Metrics.computeAutoplay(r, opts.metrics)
+if opts.timelineOut then
+	fs.writeFile(opts.timelineOut, serde.encode("json", Experience.timeline(exp), true))
+end
 fs.writeFile(
 	opts.out,
 	serde.encode("json", {

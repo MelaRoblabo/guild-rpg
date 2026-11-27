@@ -9,6 +9,8 @@
 --   lune run tools/balance -- --targets bal_days_to_max_growth,bal_share_tools
 --   lune run tools/balance -- --set Constants.expCycleMult.5=4.2 --set Dungeons.dng_ruins.unlockGold=500
 --   lune run tools/balance -- --save-baseline           この結果を基準として保存（上書きがあるときは保存しない）
+--   lune run tools/balance -- --label "後半の新しさ案1"  体験スコア（D-301）を名前つきで履歴に残す（out/balance/history.html に折れ線）
+--   lune run tools/balance -- --no-experience           体験スコアを回さない
 --   lune run tools/balance -- --quick                   動くかだけ確かめる（core・seed 1・3日・sim 50回。判定はしない）
 -- 結果は out/balance/<日時>.md と .json。
 
@@ -22,6 +24,8 @@ local MasterData = require("../src/core/MasterData")
 local Judge = require("@self/Judge")
 local Overrides = require("@self/Overrides")
 local Settings = require("@self/Settings")
+local History = require("@self/History")
+local Score = require("@self/Score")
 local SimMetrics = require("@self/SimMetrics")
 
 -- 引数 ------------------------------------------------------------------------
@@ -62,6 +66,12 @@ do
 			continue
 		elseif k == "--quiet" then
 			opts.quiet = true
+			i += 1
+			continue
+		elseif k == "--label" then
+			opts.label = v
+		elseif k == "--no-experience" then
+			opts.noExperience = true
 			i += 1
 			continue
 		else
@@ -128,6 +138,29 @@ for _, t in targets do
 		end
 	elseif not table.find(simMetricNames, t.metric) then
 		table.insert(simMetricNames, t.metric)
+	end
+end
+-- 体験スコア（MX。D-301）：スコアの表の型の自動プレイ（友達なし）に体験の指標を足す。
+-- その型を回す目標がなければ、体験スコアのためだけに回す（--only sim のときは回さない）
+local ES = master.experienceScores
+local expMetrics = Score.metrics(ES)
+if opts.only ~= "sim" and not opts.noExperience then
+	for _, prof in ES.profiles do
+		if opts.profiles and not table.find(opts.profiles, prof) then
+			continue
+		end
+		local key = `{prof}/f0`
+		local g = groups[key]
+		if g == nil then
+			g = { key = key, profile = prof, friends = 0, metrics = {}, days = 0 }
+			groups[key] = g
+			table.insert(groupOrder, key)
+		end
+		for _, m in expMetrics do
+			if not table.find(g.metrics, m) then
+				table.insert(g.metrics, m)
+			end
+		end
 	end
 end
 -- 日数：暦日数の目標 × 倍率（届かなければ未到達）
@@ -293,12 +326,67 @@ local md = Judge.render(judged, {
 	sets = opts.setTexts,
 	elapsed = os.clock() - started,
 })
+-- 体験スコア（D-301）：型ごとに seed の平均 → 点数。履歴の最後と比べる
+local scores: { [string]: any } = {}
+local expMeans: { [string]: any } = {}
+for _, prof in ES.profiles do
+	local list = results[`{prof}/f0`]
+	if list and #list > 0 then
+		local means = {}
+		for _, m in expMetrics do
+			local values = {}
+			for _, r in list do
+				table.insert(values, r[m] or false)
+			end
+			means[m] = Judge.aggregate(values, seeds).mean
+		end
+		expMeans[prof] = means
+		scores[prof] = Score.profile(ES, means)
+	end
+end
+local history = History.load()
+md ..= Score.render(ES, scores, expMeans, history[#history])
+
+local balanceCounts = { pass = 0, fail = 0, warn = 0 }
+for _, r in judged do
+	if balanceCounts[r.status] then
+		balanceCounts[r.status] += 1
+	end
+end
 local base = `out/balance/{stamp}`
 fs.writeFile(base .. ".md", md)
 fs.writeFile(
 	base .. ".json",
-	serde.encode("json", { commit = commit, sets = opts.setTexts, seeds = seeds, values = aggregated }, true)
+	serde.encode(
+		"json",
+		{ commit = commit, sets = opts.setTexts, seeds = seeds, values = aggregated, scores = scores },
+		true
+	)
 )
+-- 履歴（--label）：名前つきで点数とバランスの成績を残し、折れ線の HTML を作り直す
+if opts.label then
+	if opts.quick then
+		print("履歴には残さない（--quick）")
+	elseif next(scores) == nil then
+		print("履歴には残さない（体験スコアを回していない）")
+	else
+		History.append({
+			label = opts.label,
+			date = os.date("%Y-%m-%d %H:%M"),
+			commit = commit .. (if dirty then "+" else ""),
+			sets = opts.setTexts,
+			seeds = seeds,
+			scores = scores,
+			balance = balanceCounts,
+		})
+		history = History.load()
+		print(`履歴に残した: {History.PATH}（{opts.label}）`)
+	end
+end
+if #history > 0 then
+	fs.writeFile("out/balance/history.html", History.html(ES, history))
+	print("履歴の折れ線: out/balance/history.html")
+end
 if not opts.quiet then
 	print(md)
 end
