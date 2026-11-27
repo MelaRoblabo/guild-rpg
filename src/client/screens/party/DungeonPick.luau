@@ -7,6 +7,9 @@
 --   - 金の Go は前回の行き先（D-228）の行だけ。ほかの行は茶（金はメイン1つ：D-222）。前回がなく行き先が1つなら、その行を金に。
 --   - 初回の誘導（D-244 ①）：パーティの面の Go に続けて、金の行の Go を光らせる。
 --   - 出発したら面を全部閉じ、カメラは出た馬車を追う（パーティの面の Go と同じ）。
+--   - マップイベント（D-309）：今出ているレイドボス・レアダンジョン・旅の商人に、このパーティが行けるなら一番上に1行。
+--     絵は種類ごとの絵（Art.eventBackground）、名前は Raid Boss／Rare Dungeon／Merchant、時間は締め切りまで（Leaves in）。
+--     Go＝DispatchEvent。締め切ったら（3分間が過ぎた・出発済み・商人に別のパーティを送った）一覧から消す。
 
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
 local ExclusiveGift = require("@game/ReplicatedStorage/Core/ExclusiveGift")
@@ -58,6 +61,40 @@ local function clock(seconds: number): string
 end
 
 -- 今行けるダンジョン（解放済み。浅い順）
+local EVENT_WORD = { rareDungeon = "rareDungeon", raid = "raidBoss", merchant = "merchant" } -- Words の鍵
+local EVENT_RIM = { rareDungeon = "specialPurple", raid = "warnDark", merchant = "coinGold" } -- 行の縁の色（Tokens.color の鍵）
+
+-- 今出ていて、このパーティが行けるマップイベント（D-309）。{ kind, slot, closesIn } か nil
+local function openEvent(view: any, partyIndex: number): any?
+	local cur = Game.query.mapEvent(Session.now(), master, view).current
+	if cur == nil or not cur.open or EVENT_WORD[cur.kind] == nil then
+		return nil
+	end
+	local slot = cur.eventSlot
+	if cur.kind == "rareDungeon" then
+		if table.find(Game.query.rareDungeon(view, slot, master).joined, partyIndex) then
+			return nil
+		end
+	elseif cur.kind == "raid" then
+		local r = view.raid
+		if r and r.eventSlot == slot and table.find(r.parties or {}, partyIndex) then
+			return nil
+		end
+	else
+		-- 1つの商人に1パーティだけ（D-274）。もう送っていれば出さない
+		local waiting = false
+		for _, p in Game.query.merchantPresence(view, Session.now(), master) do
+			if p.eventSlot == slot and p.phase == "open" then
+				waiting = true
+			end
+		end
+		if not waiting then
+			return nil
+		end
+	end
+	return { kind = cur.kind, slot = slot, closesIn = cur.closesIn or 0 }
+end
+
 local function openDungeons(view: any): { any }
 	local out = {}
 	for _, d in master.dungeonList do
@@ -108,7 +145,14 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		for _, d in list do
 			table.insert(ids, d.id)
 		end
-		local key = table.concat(ids, ",") .. "|" .. tostring(last) .. "|" .. slots
+		local ev = openEvent(view, partyIndex)
+		local key = table.concat(ids, ",")
+			.. "|"
+			.. tostring(last)
+			.. "|"
+			.. slots
+			.. "|"
+			.. (if ev then ev.kind .. ev.slot else "")
 		if key == lastKey then
 			return
 		end
@@ -124,7 +168,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			mainId = list[1].id
 		end
 
-		local shown = math.min(#list, MAX_ROWS)
+		local shown = math.min(#list + (if ev then 1 else 0), MAX_ROWS)
 		local listH = shown * ROW_H + math.max(shown - 1, 0) * ROW_GAP
 		local panel, content = Components.panel({
 			size = UDim2.fromOffset(PANEL_W, Tokens.spacing.panelPadPlaque + listH + 14 + 2 * Tokens.spacing.frame),
@@ -159,6 +203,76 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		})
 
 		local mainGo: Frame? = nil
+		-- マップイベントの行（D-309）：一番上
+		if ev then
+			local r: Frame = new("Frame", {
+				Name = "Row_event",
+				LayoutOrder = 0,
+				Size = UDim2.new(1, -8, 0, ROW_H),
+				BackgroundColor3 = C.ch75,
+				[CHILDREN] = {
+					Components.corner(8),
+					Components.stroke((C :: any)[EVENT_RIM[ev.kind]] or C.bronze, 3),
+				},
+				Parent = scroll,
+			})
+			local art: Frame = new("Frame", {
+				Name = "Art",
+				Position = UDim2.fromOffset(8, 8),
+				Size = UDim2.fromOffset(ART_W, ROW_H - 16),
+				BackgroundColor3 = C.ch13,
+				ClipsDescendants = true,
+				[CHILDREN] = { Components.corner(6) },
+				Parent = r,
+			})
+			Art.put(art, Art.eventBackground(ev.kind), { scaleType = Enum.ScaleType.Crop })
+			local name = Components.text({
+				text = (Words :: any)[EVENT_WORD[ev.kind]],
+				size = Tokens.text.label,
+				color = C.inkDark,
+				font = Tokens.font.display,
+				xAlign = Enum.TextXAlignment.Left,
+			})
+			name.AutomaticSize = Enum.AutomaticSize.None
+			name.Size = UDim2.new(1, -(TEXT_X + 122), 0, 30)
+			name.Position = UDim2.fromOffset(TEXT_X, 12)
+			name.TextTruncate = Enum.TextTruncate.AtEnd
+			name.Parent = r
+			-- 締め切りまで（下の時計の処理で毎秒書き換える）
+			local timePill = WarehouseCommon.pill("@time", Words.leavesIn .. " " .. clock(ev.closesIn), 21)
+			timePill.Name = "EventTimer"
+			timePill.AnchorPoint = Vector2.new(0, 1)
+			timePill.Position = UDim2.new(0, TEXT_X, 1, -12)
+			timePill.Parent = r
+			local go = Components.button({
+				kind = "brown",
+				width = 100,
+				height = 66,
+				icon = "▶",
+				label = Words.go,
+				name = "Go",
+				onClick = function()
+					if busy then
+						return
+					end
+					busy = true
+					local res =
+						Session.sendAndWait({ type = "DispatchEvent", partyIndex = partyIndex, eventSlot = ev.slot })
+					busy = false
+					if res and res.ok then
+						HubState.selected = partyIndex
+						HubState.following = true -- 出た馬車をカメラが追う
+						api.home()
+					else
+						lastKey = ""
+						render()
+					end
+				end,
+			})
+			go.AnchorPoint = Vector2.new(1, 0.5)
+			go.Position = UDim2.new(1, -10, 0.5, 0)
+			go.Parent = r
+		end
 		for i, d in list do
 			local isMain = d.id == mainId
 			local r: Frame = new("Frame", {
@@ -248,6 +362,27 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	end
 
 	render()
+	-- マップイベントの行の時計（D-309）：毎秒書き換え、締め切ったら一覧を作り直して消す
+	task.spawn(function()
+		while not closed do
+			task.wait(0.25)
+			if closed or busy then
+				continue
+			end
+			render() -- 出ている・行けるが変わったときだけ作り直す（key を比べる）
+			local view = Session.view
+			local ev = if view then openEvent(view, partyIndex) else nil
+			local pill = body:FindFirstChild("EventTimer", true)
+			if ev and pill then
+				for _, c in pill:GetDescendants() do
+					if c:IsA("TextLabel") and string.sub(c.Text, 1, #Words.leavesIn) == Words.leavesIn then
+						c.Text = Words.leavesIn .. " " .. clock(ev.closesIn)
+						c.TextColor3 = if ev.closesIn <= master.K.mapEventEndingSeconds then C.warn else C.inkLight
+					end
+				end
+			end
+		end
+	end)
 	local conn = Session.changed:connect(function(view: any)
 		if busy or closed then
 			return

@@ -34,6 +34,11 @@ function Art.rareDungeonBackground(): string?
 	return if images.eventBackgrounds then images.eventBackgrounds.rareDungeon else nil
 end
 
+-- マップイベントの絵（kind：rareDungeon・raid・merchant。D-304・D-309）
+function Art.eventBackground(kind: string): string?
+	return if images.eventBackgrounds then images.eventBackgrounds[kind] else nil
+end
+
 function Art.gift(giftId: string?): string?
 	return if giftId and images.gifts then images.gifts[giftId] else nil
 end

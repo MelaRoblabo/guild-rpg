@@ -182,11 +182,11 @@ local function mount3D()
 				and cur.open
 			then
 				PickMode.stop()
-				-- レアダンジョンは通常のダンジョンと同じ面（D-307）、レイドボスは出発の面
+				-- レアダンジョン・レイドボスは通常のダンジョンと同じ面（D-307・D-309）
 				if cur.kind == "rareDungeon" then
 					Nav.open("DungeonPanel", { rareSlot = slot })
 				else
-					Nav.open("EventDepart", { slot = slot })
+					Nav.open("DungeonPanel", { raidSlot = slot })
 				end
 			end
 		end,

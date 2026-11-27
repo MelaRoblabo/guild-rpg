@@ -84,6 +84,8 @@ local Words = {
 		atkPctMagic = "Magic ATK +%s%%",
 		travelMult = "Travel −%s%%",
 	},
+	boss = "Boss", -- レイドの面のボスの HP の行（D-309）
+	joined = "Joined", -- レイドの面の出発したパーティの行（D-309）
 	clear = "Clear!", -- ダンジョンを踏破して出るとき（D-307）
 	fail = "Fail...", -- 途中で撤退して出るとき（D-307）
 	unlock = "Unlock", -- ゴールドでダンジョンを先に解放する（D-279）

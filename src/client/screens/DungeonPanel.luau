@@ -14,6 +14,8 @@
 --   レアダンジョン（D-307）：地図の水晶の祠を触ると、② と同じ形で開く（params.rareSlot）。題は Rare Dungeon、絵は専用の背景、
 --     攻略ヒントは強さの基準のダンジョン（D-187）。絵の左上に締め切りまでの時計。Go → 待機中のパーティ（出発済みは除く）→ DispatchEvent。
 --     締め切ったら閉じる。
+--   レイドボス（D-309）：地図のレイドボスを触ると、同じ形で開く（params.raidSlot）。題は Raid Boss、絵はレイドの絵。
+--     攻略ヒントの代わりに、Boss＝ボスの HP の残りの棒、Joined＝出発したパーティのリーダーの顔。Go → 待機中のパーティ → DispatchEvent。
 --   日替わり（D-307）：今日の特性が付いているダンジョンは、絵の右下に太陽と効果（Chests ×1.5 など）を出す。レアダンジョンには出さない（D-187）。
 
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
@@ -185,12 +187,17 @@ end
 
 local function build(params: any?, api: Nav.Api): Nav.Built
 	local rareSlot = (params :: any).rareSlot :: number?
+	local raidSlot = (params :: any).raidSlot :: number?
+	local eventSlot = rareSlot or raidSlot -- マップイベントの面（D-307・D-309）
+	local eventKind: string? = if rareSlot then "rareDungeon" elseif raidSlot then "raid" else nil
 	local dungeonId = ((params :: any).dungeonId or "") :: string
-	if rareSlot then
-		-- レアダンジョン（D-307）：攻略ヒントは強さの基準のダンジョン（D-187）
+	if eventSlot then
+		-- レアダンジョン（D-307）：攻略ヒントは強さの基準のダンジョン（D-187）。レイドも同じダンジョンを表示用に持つ
 		local v = Session.view
-		dungeonId = if v then Game.query.rareDungeon(v, rareSlot, master).dungeonId else ""
+		dungeonId = if v then Game.query.rareDungeon(v, eventSlot, master).dungeonId else ""
 	end
+	-- レイドのボスの HP は seed から作るのでサーバーに聞く（D-152）。出発したパーティのダメージは要約の raid にある
+	local raidQuery: any = nil
 	local d = master.dungeons[dungeonId]
 	local band = Root.bandBottom()
 	local frame: Frame = new("Frame", {
@@ -218,8 +225,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local choosing = false -- Go の後に出す待機のパーティの一覧（D-272）
 	local render: () -> ()
 	-- ダンジョンを選んだときは、カメラがそのダンジョンへ寄って旋回する（メニューから開いたときも：D-270 ⑤）
-	if rareSlot then
-		World3D.focusEvent("rareDungeon", rareSlot)
+	if eventKind and eventSlot then
+		World3D.focusEvent(eventKind, eventSlot)
 	else
 		World3D.focusDungeon(dungeonId)
 	end
@@ -230,15 +237,24 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if view == nil or d == nil then
 			return
 		end
-		local unlocked = rareSlot ~= nil or (view.unlockedDungeons and view.unlockedDungeons[dungeonId] == true)
+		local unlocked = eventSlot ~= nil or (view.unlockedDungeons and view.unlockedDungeons[dungeonId] == true)
 		local fromParty = PickMode.partyIndex
-		if rareSlot or (fromParty and HubState.status(view, fromParty).state ~= "waiting") then
+		if eventSlot or (fromParty and HubState.status(view, fromParty).state ~= "waiting") then
 			fromParty = nil
 		end
 		-- レアダンジョンに出発済みのパーティ（1パーティ1回まで：D-152）
 		local joined: { [number]: boolean } = {}
 		if rareSlot then
 			for _, i in Game.query.rareDungeon(view, rareSlot, master).joined do
+				joined[i] = true
+			end
+		end
+		-- レイド：出発したパーティとボスの HP（要約の raid がその時間帯のものならそれ、なければ問い合わせ）
+		local raidInfo: any = nil
+		if raidSlot then
+			local live = view.raid
+			raidInfo = if live and live.eventSlot == raidSlot then live else raidQuery
+			for _, i in (raidInfo and raidInfo.parties) or {} do
 				joined[i] = true
 			end
 		end
@@ -260,6 +276,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			position = UDim2.fromOffset(PANEL_X, band + 44),
 			title = if rareSlot
 				then Words.rareDungeon
+				elseif raidSlot then Words.raidBoss
 				elseif mode == "locked" then { roman(d), d.nameEn, "@locked" }
 				else roman(d) .. "  " .. d.nameEn,
 		})
@@ -273,8 +290,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = content })
 
 		-- 中の背景の絵（D-282）
-		local art = artFrame(content, d, mode == "locked", if rareSlot then Art.rareDungeonBackground() else nil)
-		if rareSlot then
+		local art = artFrame(content, d, mode == "locked", if eventKind then Art.eventBackground(eventKind) else nil)
+		if eventSlot then
 			-- 左上：締め切りまでの時計（下の時計の処理で書き換える）
 			local timer = Components.chip("@time", "", C.bronzeHi)
 			timer.Name = "Timer"
@@ -322,7 +339,33 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			t.TextXAlignment = Enum.TextXAlignment.Left
 			t.Parent = r
 		end
+		if raidSlot then
+			-- レイド（D-309）：ボスの HP の残りと、出発したパーティ
+			local rb = row(hint, 1, 46)
+			heading(rb, Words.boss)
+			local hp = if raidInfo then math.max(1, raidInfo.hp or 1) else 1
+			local remain = if raidInfo then math.max(0, hp - (raidInfo.damage or 0)) else hp
+			local track = bar(rb, 1, remain / hp, 250, 26)
+			local fill = track:FindFirstChild("Fill") :: Frame?
+			if fill then
+				fill.BackgroundColor3 = C.dangerRed
+			end
+			local rj = row(hint, 2, 46)
+			heading(rj, Words.joined)
+			local n = 0
+			for i in joined do
+				n += 1
+				local face = PartyIcon.make(34)
+				face.LayoutOrder = i
+				face.Parent = rj
+				PartyIcon.set(face, view, i)
+			end
+			if n == 0 then
+				label(rj, 1, "—", 23, C.ch45)
+			end
+		end
 		local r2 = row(hint, 1, 46)
+		r2.Visible = raidSlot == nil
 		heading(r2, Words.foes)
 		for i, rc in Hint.races(d, master) do
 			local t = WarehouseCommon.pill("", rc.word, 21)
@@ -338,6 +381,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			t.Parent = r2
 		end
 		local r3 = row(hint, 2, 46)
+		r3.Visible = raidSlot == nil
 		heading(r3, Words.traps)
 		label(r3, 1, "⚠", 25)
 		local trap = WarehouseCommon.pill("", tostring(d.trapLevel), 23)
@@ -502,8 +546,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						end
 						busy = true
 						local r = Session.sendAndWait(
-							if rareSlot
-								then { type = "DispatchEvent", partyIndex = w.index, eventSlot = rareSlot }
+							if eventSlot
+								then { type = "DispatchEvent", partyIndex = w.index, eventSlot = eventSlot }
 								else { type = "Dispatch", partyIndex = w.index, dungeonId = dungeonId }
 						)
 						busy = false
@@ -615,6 +659,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local parts = {
 			tostring(view.unlockedDungeons and view.unlockedDungeons[dungeonId]),
 			if rareSlot then table.concat(Game.query.rareDungeon(view, rareSlot, master).joined, ",") else "",
+			if raidSlot
+					and view.raid
+					and view.raid.eventSlot == raidSlot
+				then table.concat(view.raid.parties or {}, ",") .. ":" .. tostring(view.raid.damage)
+				else tostring(raidQuery ~= nil),
 			tostring(view.unlockedDungeons and d and d.unlockAfterClear and view.unlockedDungeons[d.unlockAfterClear]),
 			tostring(view.gold),
 			tostring(PickMode.partyIndex),
@@ -641,12 +690,23 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	end)
 	-- レアダンジョン：左上の時計を書き換え、締め切ったら閉じる（D-307）
 	local alive = true
-	if rareSlot then
+	if raidSlot then
+		task.spawn(function()
+			raidQuery = Session.query({ kind = "raid", eventSlot = raidSlot })
+			if alive and not busy then
+				render()
+				if Session.view then
+					lastKey = keyOf(Session.view)
+				end
+			end
+		end)
+	end
+	if eventSlot then
 		task.spawn(function()
 			while alive do
 				local view = Session.view
 				local cur = if view then Game.query.mapEvent(Session.now(), master, view).current else nil
-				if cur == nil or not cur.open or cur.kind ~= "rareDungeon" or cur.eventSlot ~= rareSlot then
+				if cur == nil or not cur.open or cur.kind ~= eventKind or cur.eventSlot ~= eventSlot then
 					api.close()
 					return
 				end
