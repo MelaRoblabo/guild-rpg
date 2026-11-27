@@ -72,6 +72,10 @@ local ERRORS = {
 	TRAINING_CAP = "トレーニングで上げられる上限です（トレーニング場の改修か、ダンジョンで育ててください）",
 	INVALID_COUNT = "回数は1以上の整数です",
 	INBOX_EMPTY = "受け取り箱は空です",
+	QUEST_NOT_FOUND = "そのクエストはありません",
+	QUEST_NOT_DONE = "そのクエストはまだ達成していません",
+	QUEST_ALREADY_CLAIMED = "そのクエストの報酬は受け取り済みです",
+	HAUL_EMPTY = "そのパーティの獲得の記録はありません",
 	NO_FRIEND = "同じサーバーに友達がいません（友達を誘いましょう）",
 	FRIEND_NOT_READY = "まだ押せません（一定時間ごとに押せます）",
 	DAILY_LIMIT = "今日はもう押せません（1日の上限）",
@@ -839,14 +843,21 @@ function Text.events(events: { any }, save: any, master: any): string
 			table.insert(
 				lines,
 				t
-					.. `クエスト達成：{QUEST_KIND_NAME[row and row.kind or ""] or e.questId}（報酬は受け取り箱へ）`
+					.. `クエスト達成：{QUEST_KIND_NAME[row and row.kind or ""] or e.questId}（qclaim で受け取る）`
 			)
 		elseif e.type == "QuestBonus" then
 			table.insert(
 				lines,
 				t
-					.. `{if e.period == "daily" then "今日" else "今週"}のクエストを全部達成！ボーナスは受け取り箱へ`
+					.. `{if e.period == "daily" then "今日" else "今週"}のクエストを全部達成！ボーナスは qbonus で受け取る`
 			)
+		elseif e.type == "QuestClaimed" or e.type == "QuestBonusClaimed" then
+			local r = e.rewards or {}
+			local n = 0
+			for _, c in r.chests or {} do
+				n += c.count
+			end
+			table.insert(lines, t .. `クエストの報酬を受け取った：{r.gold or 0}G・宝箱 {n} 個`)
 		elseif e.type == "LoginBonus" then
 			table.insert(
 				lines,

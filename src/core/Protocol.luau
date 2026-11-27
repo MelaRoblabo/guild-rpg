@@ -86,6 +86,9 @@ Protocol.CLIENT_COMMANDS = {
 	},
 	Train = { adventurerUid = str(ID), sessions = int(1, 100000) },
 	ClaimInbox = {}, -- D-164
+	ClaimQuest = { period = enum({ "daily", "weekly" }), questId = str(ID) }, -- D-286。クエストの報酬をその場で受け取る
+	ClaimQuestBonus = { period = enum({ "daily", "weekly" }) }, -- D-286
+	AckHaul = { partyIndex = int(1, 20) }, -- D-287。帰還の獲得の吹き出しを押した
 	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）
 	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
 	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179

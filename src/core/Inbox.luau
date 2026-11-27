@@ -2,6 +2,7 @@
 -- 受け取り箱（D-164, D-176、docs/system/03_state_model.md InboxEntry、05章 ClaimInbox）
 -- クエスト・プレイ時間・ログインボーナス（のちにレイド・紹介）の報酬の受け取り口。
 --   Inbox.push   報酬（マスターデータの rewards の形）を受け取り箱に1件入れる。宝箱のランクはここで決める（D-166）
+--   Inbox.grant  受け取り箱を通さずにその場で渡す（クエスト：D-286）
 --   Inbox.claim  受け取れるものを全部受け取る。受け取れないもの（所属枠がいっぱいのユニークなど）は残す。期限はない（D-176）
 -- 状態を持たない（関数の集合）。乱数は呼び出し側から受け取る。
 
@@ -104,6 +105,22 @@ function Inbox.push(
 	state.nextUid += 1
 	table.insert(state.inbox, entry)
 	return entry
+end
+
+-- 受け取り箱を通さずに、その場で渡す（クエストの受け取り：D-286）。spec はマスターデータの rewards の形。
+-- ゴールド・アイテム・宝箱（宝箱の山へ）を入れ、渡した中身（resolve の形：gold・items・chests）を返す
+function Inbox.grant(state: any, spec: any?, takeRng: () -> Rng.Rng, master: any): any
+	local r = resolve(state, spec or {}, takeRng, master)
+	if r.gold then
+		state.gold += r.gold
+	end
+	for itemId, n in r.items or {} do
+		Inventory.gainItem(state, itemId, n, master)
+	end
+	for _, c in r.chests or {} do
+		Chest.add(state, c.pileKey, c.rank, c.count)
+	end
+	return r
 end
 
 -- まとめて受け取る（D-164, D-176）。受け取れたものの合計と、残った件数を返す

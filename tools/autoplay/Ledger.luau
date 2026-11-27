@@ -165,7 +165,15 @@ function Ledger.onCommand(L: any, _state: any, cmd: any, result: any, extra: any
 		return
 	end
 	for _, ev in result.events or {} do
-		if ev.type == "FriendReward" then
+		if ev.type == "QuestClaimed" or ev.type == "QuestBonusClaimed" then
+			-- クエストはその場で受け取る（D-286）
+			local r = ev.rewards or {}
+			add(L, "gold", "quest", r.gold or 0)
+			addItems(L, r.items, "quest")
+			for _, c in r.chests or {} do
+				add(L, "chests", "quest", c.count)
+			end
+		elseif ev.type == "FriendReward" then
 			add(L, "gold", "friend", ev.gold)
 		elseif ev.type == "ChestsOpened" then
 			for _, list in { ev.normal, ev.special } do

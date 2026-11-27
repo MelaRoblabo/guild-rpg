@@ -234,8 +234,25 @@ local function autoRepeatBlocker(state: any): string?
 	return nil
 end
 
--- 帰還処理：報酬を状態に反映する
-local function collect(state: any, e: any, master: any, events: { any })
+-- 帰還の獲得をパーティに積む（D-287）。オンライン中の帰還だけ。自動再派遣の間は積み続け、
+-- プレイヤーがギルドで待つパーティの宝箱の吹き出しを押す（AckHaul）まで残す。中身は見せるための記録で、報酬はもう入っている
+local function addHaul(state: any, e: any, gold: number, chests: number, pileKey: string)
+	local p = state.parties[e.partyIndex]
+	if p == nil then
+		return
+	end
+	local h = p.haul or { runs = 0, gold = 0, chests = {}, dungeonId = e.dungeonId }
+	h.runs += 1
+	h.gold += gold
+	h.dungeonId = e.dungeonId
+	if chests > 0 then
+		h.chests[pileKey] = (h.chests[pileKey] or 0) + chests
+	end
+	p.haul = h
+end
+
+-- 帰還処理：報酬を状態に反映する。online はオンライン中の時間経過での帰還（帰還の獲得を積む：D-287）
+local function collect(state: any, e: any, master: any, events: { any }, online: boolean?)
 	if e.merchant then
 		-- 商人からの帰還（D-274）：買った品はその場で倉庫に入れた。ここでは帰るだけ
 		state.expeditions[e.uid] = nil
@@ -304,6 +321,9 @@ local function collect(state: any, e: any, master: any, events: { any })
 	end
 	Guild.addExp(state, guildExp, master, events, e.returnAt)
 
+	if online then
+		addHaul(state, e, r.gold + itemsSoldGold, #r.chests, pileKey)
+	end
 	state.expeditions[e.uid] = nil
 	bump(state, if log.result == "clear" then "clears" else "retreats")
 	bump(state, "chestsGained", #r.chests)
@@ -429,7 +449,7 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 		if nextE == nil then
 			break
 		end
-		collect(state, nextE, master, events)
+		collect(state, nextE, master, events, true)
 		-- クエストの「踏破」はオンライン中の帰還で数える（留守番の探索は数えない：D-153, D-161）
 		-- レアダンジョンの踏破は数え、レイドは数えない（D-191）
 		if nextE.log.result == "clear" and not nextE.offline and not nextE.raidDamage then
@@ -459,7 +479,7 @@ local function advanceOnline(state: any, ctx: Ctx, events: { any })
 			end
 		end
 	end
-	Quest.refresh(state, ctx.now, master) -- D-153：日・週が変わったら入れ替える（引き直しなし）
+	Quest.refresh(state, ctx.now, master, take) -- D-153：日・週が変わったら入れ替える（引き直しなし）。受け取り残しは受け取り箱へ（D-286）
 	Login.advance(state, ctx.now, master, take, events) -- D-155：その日の最初のオンラインの advance で1日分
 	-- プレイ時間：前回の advance からのオンラインの経過秒を足す（D-154。留守番の時間は数えない）
 	Playtime.advance(state, t0, ctx.now, master, take, events)
@@ -1681,6 +1701,45 @@ handlers.LeaveMerchant = function(state, cmd, ctx)
 	}
 end
 
+-- クエストの報酬をその場で受け取る（D-286）。受け取り箱を通さない
+handlers.ClaimQuest = function(state, cmd, ctx)
+	local got, err = Quest.claim(state, cmd.period, cmd.questId, ctx.master, rngTaker(state))
+	if got == nil then
+		return fail(err or "QUEST_NOT_FOUND")
+	end
+	return {
+		ok = true,
+		events = {
+			{ type = "QuestClaimed", at = ctx.now, period = cmd.period, questId = cmd.questId, rewards = got },
+		},
+	}
+end
+
+handlers.ClaimQuestBonus = function(state, cmd, ctx)
+	local got, err = Quest.claimBonus(state, cmd.period, ctx.master, rngTaker(state))
+	if got == nil then
+		return fail(err or "QUEST_NOT_FOUND")
+	end
+	return {
+		ok = true,
+		events = { { type = "QuestBonusClaimed", at = ctx.now, period = cmd.period, rewards = got } },
+	}
+end
+
+-- 帰還の獲得の吹き出しを押した（D-287）：積んだ記録を消す。報酬は帰還のときに入っている
+handlers.AckHaul = function(state, cmd, ctx)
+	local p = state.parties[cmd.partyIndex]
+	if not p then
+		return fail("PARTY_NOT_FOUND")
+	end
+	if p.haul == nil then
+		return fail("HAUL_EMPTY")
+	end
+	local h = p.haul
+	p.haul = nil
+	return { ok = true, events = { { type = "HaulAcked", at = ctx.now, partyIndex = cmd.partyIndex, haul = h } } }
+end
+
 -- 受け取り箱（05章 ClaimInbox、D-164, D-176）：受け取れるものだけ受け取り、残りは受け取り箱に残す（期限なし）
 handlers.ClaimInbox = function(state, _cmd, ctx)
 	if #state.inbox == 0 then
@@ -1907,9 +1966,10 @@ function Game.query.quests(state: any, master: any): any
 				target = e.target,
 				progress = e.progress,
 				done = e.done,
+				claimed = e.claimed == true, -- 受け取り済み（D-286）
 			})
 		end
-		out[period] = { entries = entries, bonusDone = book.bonusDone }
+		out[period] = { entries = entries, bonusDone = book.bonusDone, bonusClaimed = book.bonusClaimed == true }
 	end
 	return out
 end

@@ -130,10 +130,23 @@ local function openAll(state: any, ctx: Ctx)
 	end
 end
 
--- 受け取り箱をまとめて受け取る（D-164）
+-- 受け取り箱をまとめて受け取る（D-164）。達成したクエストとボーナスもここで受け取る（D-286：受け取り箱を通らない）
 local function claimInbox(state: any, ctx: Ctx)
 	if #state.inbox > 0 then
 		exec(state, { type = "ClaimInbox" }, ctx)
+	end
+	for _, period in { "daily", "weekly" } do
+		local book = state.quests and state.quests[period]
+		if book then
+			for _, entry in book.entries do
+				if entry.done and not entry.claimed then
+					exec(state, { type = "ClaimQuest", period = period, questId = entry.questId }, ctx)
+				end
+			end
+			if book.bonusDone and not book.bonusClaimed then
+				exec(state, { type = "ClaimQuestBonus", period = period }, ctx)
+			end
+		end
 	end
 end
 

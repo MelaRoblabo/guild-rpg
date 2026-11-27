@@ -8,7 +8,7 @@ local ExclusiveGift = require("./ExclusiveGift")
 
 local Migration = {}
 
-Migration.CURRENT = 13
+Migration.CURRENT = 14
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -178,6 +178,26 @@ local STEPS: { [number]: (any, any) -> () } = {
 	[12] = function(state)
 		state.restBonusSeconds = nil
 		state.version = 13
+	end,
+	-- v13 → v14：クエストはクエストの面で受け取る（D-286）。前の版で達成済みのお題は受け取り箱へ入れ済みなので、受け取り済みにする
+	[13] = function(state)
+		local q = state.quests
+		if type(q) == "table" then
+			for _, period in { "daily", "weekly" } do
+				local book = q[period]
+				if type(book) == "table" then
+					for _, entry in book.entries or {} do
+						if entry.done then
+							entry.claimed = true
+						end
+					end
+					if book.bonusDone then
+						book.bonusClaimed = true
+					end
+				end
+			end
+		end
+		state.version = 14
 	end,
 }
 

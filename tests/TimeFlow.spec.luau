@@ -686,7 +686,7 @@ return function(t)
 			s.version = 12
 			s.restBonusSeconds = 1234
 			Migration.migrate(s, master)
-			expect(s.version).toBe(13)
+			expect(s.version).toBe(Migration.CURRENT) -- 13 のあと v13 → 14（D-286）も通る
 			expect(s.restBonusSeconds).toBe(nil)
 		end)
 	end)

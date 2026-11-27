@@ -51,6 +51,9 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M5b | `Train` | adventurerUid, sessions | トレーニング。最大 sessions 回、1回ごとに費用を払って経験値を得る。上限レベルかゴールド切れで止まる（払った回数分だけ行う）。クエストの「トレーニング」は行った回数で数える（D-191） | TRAINING_CAP, NOT_ENOUGH_GOLD, ADVENTURER_ON_EXPEDITION, ADVENTURER_IN_REBIRTH, INVALID_COUNT | D-076, D-077 |
 | M7b | `BulkSell` | equipmentUids（開封結果に出た装備） | 開封結果のうち「今の装備より弱い」もの（06章 §17）を全部売る。修飾語つきも弱ければ売る（D-207）。保護中・装備中・商人で買ったもの・補助は対象外。確認は出さない（ボタンに売る数と合計額：`Game.query.bulkSellPreview`）。倉庫からの一括売却（D-120、確認あり）はこのコマンドではなく `Sell` で売る | NOTHING_TO_SELL | D-167, D-175, D-207 |
 | M7b | `ClaimInbox` | — | 受け取り箱の中身をまとめて受け取る（ゴールド・アイテム・宝箱の山・ユニーク）。受け取れないもの（所属枠・倉庫がいっぱいなど）は受け取り箱に残す（期限なし）。結果は `InboxClaimed`（gold・items・宝箱の山ごとの数・残った件数・blocked）と、加入したユニークごとの `UniqueJoined`。受け取れるものが無くても失敗にはしない | INBOX_EMPTY | D-164, D-176 |
+| M9 | `ClaimQuest` | period（"daily" / "weekly"）, questId | 達成したお題の報酬をその場で受け取る（受け取り箱を通さない）。結果は `QuestClaimed`（period・questId・rewards＝渡した gold・items・chests） | QUEST_NOT_FOUND, QUEST_NOT_DONE, QUEST_ALREADY_CLAIMED | D-286 |
+| M9 | `ClaimQuestBonus` | period | その期間のお題を全部達成したボーナスを受け取る。結果は `QuestBonusClaimed`（period・rewards） | QUEST_NOT_FOUND, QUEST_NOT_DONE, QUEST_ALREADY_CLAIMED | D-286 |
+| M9 | `AckHaul` | partyIndex | 帰還の獲得の吹き出しを押した：パーティの `haul` を消す（報酬は帰還のときに入っている）。結果は `HaulAcked`（partyIndex・haul） | PARTY_NOT_FOUND, HAUL_EMPTY | D-287 |
 | M7b | `ClaimFriendReward` | —（同じサーバーの友達の数はサーバーが数えて `ctx.friendCount` で渡す。クライアントからは受け取らない：M7b-5） | フレンドボタンの報酬（ゴールド。踏破した一番深いダンジョンに応じて増え、人数で少し増える・上限 friendRewardMaxFriends。式は06章 §20・§22、D-190）。受け取り箱には入れず、その場で渡す。結果は `FriendReward`（gold・friendCount・nextAt・todayCount） | NO_FRIEND, DAILY_LIMIT, FRIEND_NOT_READY | D-157 |
 | M7b | `GrantReferral` | role（"invitee" / "inviter"）, userId（招待した側なら招待された人）, deliveryId?（届け物の id） | 紹介の報酬（サーバー専用）を受け取り箱へ（source = "referral"、中身は referralRewards＝ステータススロットチケット）。両者とも招待された人が referralProgressCondition（転生回数の累計 `stats.rebirths`：D-195）に届いたときに渡す（D-192）。招待された側は1回だけで、`Friend.referralProgressReached(state, master)` が false なら PROGRESS_NOT_REACHED。招待した側の報酬は、相手が referralProgressCondition に届いたときに「届け物」として別の保存場所に置かれ、招待した側の次のログインで受け取り箱へ入れる（相手1人ごと・週の上限まで。他人のセーブを直接書き換えない）。受け取った届け物の id は `referral.claimedDeliveries` に記録し、同じ id は二度受け取らない。結果は `ReferralGranted`（role・userId・inboxUid。クライアントへ送るときは userId を除く：D-192） | ALREADY_CLAIMED, ALREADY_REWARDED, WEEKLY_LIMIT, INVALID_ROLE, INVALID_USER, PROGRESS_NOT_REACHED | D-157, D-180, D-192, D-195 |
 | M7b | `DispatchEvent` | partyIndex, eventSlot | マップイベント（レアダンジョン・レイドボス・旅の商人）へ派遣。旅の商人へは1つの商人に1パーティだけ（帰ってきた後も2組目は送れない）、片道は場所の距離だけで決まり、着いたら `LeaveMerchant` までとどまる。探索の回数には数えない（D-274）。出発できるのは出てから mapEventWindowSeconds の間。レアダンジョン・レイドとも1パーティ1回まで（帰ってきても同じ時間帯には出られない：D-187）。レアダンジョンには日替わりの特性を当てない（D-187）。レイドはダメージを出発時に計算する | EVENT_NOT_ACTIVE（まだの時間帯）, EVENT_WINDOW_CLOSED（3分間を過ぎた・過ぎた時間帯）, EVENT_ALREADY_JOINED（レアダンジョン・レイドとも同じ時間帯に1パーティ1回まで。商人は1つの商人に1パーティ）, PARTY_BUSY, PARTY_EMPTY, ADVENTURER_IN_REBIRTH | D-152, D-179, D-187, D-274 |
@@ -60,8 +63,9 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M9 | `GrantPurchase` | productId | Robux購入の付与（サーバー専用） | — | 10章 |
 
 - マップイベントのイベント：`EventDispatched`（kind・eventSlot・partyIndex。レアダンジョンは dungeonId・pileKey、レイドは damage・hp・arriveAt）、`RaidHit`（damage・total・hp・defeated）、`RaidDefeated`、`RaidReward`（inboxUid）、`RaidReturned`、`MerchantBought`（itemIndex・equipmentUid・price）。レアダンジョンからの帰還は `ExpeditionReturned` に eventSlot・pileKey が付く。
-- 受け取り箱へ入れたときのイベント：`QuestCompleted`（period・questId）、`QuestBonus`（period）、`LoginBonus`（day・cycle・uniqueId）、`PlaytimeReward`（minutes）。どれも `inboxUid` を持つ。
-- クエストの進み具合（D-153）は、オンライン中のコマンドの結果（探索の出発・開封・雇用・トレーニング・踏破・転生）で数える。探索回数はオンライン中の出発（Dispatch・自動再派遣・DispatchEvent）で数える（D-179）。トレーニングは行った回数、踏破はレアダンジョンの踏破も数えレイドは数えない（D-191）。留守番の探索（`offline = true`）は数えない（D-161）。達成したらその報酬を受け取り箱へ入れる（D-164）。
+- 受け取り箱へ入れたときのイベント：`LoginBonus`（day・cycle・uniqueId）、`PlaytimeReward`（minutes）。どれも `inboxUid` を持つ。
+- クエストの達成：`QuestCompleted`（period・questId）、`QuestBonus`（period）。報酬は渡さない（受け取れる印だけ：D-286）。
+- クエストの進み具合（D-153）は、オンライン中のコマンドの結果（探索の出発・開封・雇用・トレーニング・踏破・転生）で数える。探索回数はオンライン中の出発（Dispatch・自動再派遣・DispatchEvent）で数える（D-179）。トレーニングは行った回数、踏破はレアダンジョンの踏破も数えレイドは数えない（D-191）。留守番の探索（`offline = true`）は数えない（D-161）。達成したら受け取れる印を付け、報酬は ClaimQuest・ClaimQuestBonus で受け取る（D-286）。
 
 ## 3. advance（時間経過）
 

@@ -228,8 +228,11 @@ D-280 で廃止した（留守番の探索は経験値を得ない。セーブ�
              トレーニング：Train で行った回数（1コマンドの sessions のうち実際に行った回数：D-191）
              踏破：オンラインの advance で帰還した探索（offline でない）の result = clear ごとに1。レアダンジョンの踏破も数え、レイドは数えない（D-191）
              転生：RebirthChoose ごとに1
-達成       = progress が target に届いたら done、その行の rewards を受け取り箱へ（progress は target を超えない）
-             その期間のお題が全部 done になったら、questDailyBonus / questWeeklyBonus を受け取り箱へ（bonusDone）
+達成       = progress が target に届いたら done（受け取れる。progress は target を超えない）
+             その期間のお題が全部 done になったら bonusDone（ボーナスを受け取れる）
+受け取り   = ClaimQuest でその行の rewards を、ClaimQuestBonus で questDailyBonus / questWeeklyBonus を、その場で渡す（受け取り箱を通さない：D-286）
+             ゴールド・宝箱のランクは受け取り箱と同じ決め方（受け取った時点の基準のダンジョン。§22、D-166）
+             受け取らないまま日・週が変わったら、入れ替えの前にその行・ボーナスの報酬を受け取り箱へ入れる（失わない：D-286）
 ```
 
 量の式・候補は未決（M7b-6）。advance の中では帰還・自動再派遣を先に処理し、そのあとで日・週の切り替えを行う（05章 §3 の順）。

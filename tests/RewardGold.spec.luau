@@ -128,8 +128,9 @@ return function(t)
 					}
 					s.quests.weekly = { weekIndex = 0, entries = {}, bonusDone = true }
 					Quest.count(s, "expeditions", 1, T0, master, noRng, {})
-					expect(s.inbox[1].rewards.gold).toBe(goldOf(s, row.rewards.goldMult))
-					return s.inbox[1].rewards.gold
+					local got = Quest.claim(s, "daily", row.id, master, noRng) -- D-286：クエストの面で受け取る
+					expect(got.gold).toBe(goldOf(s, row.rewards.goldMult))
+					return got.gold
 				end
 				expect(questGold(0)).toBe(
 					math.floor(master.dungeons.dng_graveyard.rewardGoldBase * row.rewards.goldMult)

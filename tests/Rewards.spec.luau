@@ -535,38 +535,87 @@ return function(t)
 				expect(s.quests.daily.entries[1].progress).toBe(4 + done)
 			end
 		)
-		it("D-153 D-164 達成したら報酬を受け取り箱へ。全部達成でボーナス", function()
-			local s = newState()
-			today(s)
-			s.inbox = {}
-			s.quests.daily.entries = {
-				{ questId = "qst_daily_expeditions", target = 1, progress = 0, done = false },
-				{ questId = "qst_daily_chests", target = 2, progress = 0, done = false },
-			}
-			local r = exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
-			local done = eventsOf(r.events, "QuestCompleted")
-			expect(#done).toBe(1)
-			expect(done[1].questId).toBe("qst_daily_expeditions")
-			expect(#s.inbox).toBe(1)
-			expect(s.inbox[1].source).toBe("quest")
-			-- ゴールドは基準のダンジョン（未踏破なので古い墓地）× goldMult（D-190）
-			expect(s.inbox[1].rewards.gold).toBe(
-				math.floor(
+		it(
+			"D-153 D-286 達成したら受け取れる印が付き、受け取り箱には入らない。全部達成でボーナス",
+			function()
+				local s = newState()
+				today(s)
+				s.inbox = {}
+				s.quests.daily.entries = {
+					{ questId = "qst_daily_expeditions", target = 1, progress = 0, done = false },
+					{ questId = "qst_daily_chests", target = 2, progress = 0, done = false },
+				}
+				local r = exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
+				local done = eventsOf(r.events, "QuestCompleted")
+				expect(#done).toBe(1)
+				expect(done[1].questId).toBe("qst_daily_expeditions")
+				expect(#s.inbox).toBe(0)
+				expect(s.quests.daily.entries[1].done).toBe(true)
+				expect(s.quests.daily.bonusDone).toBe(false)
+				-- 達成済みは数えない（量を超えない）
+				exec(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = nil })
+				Chest.add(s, "dng_graveyard", 1, 5)
+				local r2 = exec(s, { type = "OpenChests", pileKey = "dng_graveyard" })
+				expect(s.quests.daily.entries[2].progress).toBe(2)
+				expect(#eventsOf(r2.events, "QuestCompleted")).toBe(1)
+				expect(#eventsOf(r2.events, "QuestBonus")).toBe(1)
+				expect(s.quests.daily.bonusDone).toBe(true)
+				expect(#s.inbox).toBe(0)
+			end
+		)
+		it(
+			"D-286 達成したお題をクエストの面で受け取ると、その場でゴールドが入る。二度は受け取れない",
+			function()
+				local s = newState()
+				today(s)
+				s.inbox = {}
+				s.quests.daily.entries = {
+					{ questId = "qst_daily_expeditions", target = 1, progress = 0, done = false },
+				}
+				local before = exec(s, { type = "ClaimQuest", period = "daily", questId = "qst_daily_expeditions" })
+				expect(before.ok).toBe(false)
+				expect(before.error).toBe("QUEST_NOT_DONE")
+				exec(s, { type = "Dispatch", partyIndex = 1, dungeonId = "dng_graveyard" })
+				local g0 = s.gold
+				local r = exec(s, { type = "ClaimQuest", period = "daily", questId = "qst_daily_expeditions" })
+				expect(r.ok).toBe(true)
+				-- ゴールドは基準のダンジョン（未踏破なので古い墓地）× goldMult（D-190）
+				local want = math.floor(
 					master.dungeons.dng_graveyard.rewardGoldBase * master.quests.qst_daily_expeditions.rewards.goldMult
 				)
-			)
-			expect(s.quests.daily.bonusDone).toBe(false)
-			-- 達成済みは数えない（量を超えない）
-			exec(s, { type = "SetAutoRepeat", partyIndex = 1, dungeonId = nil })
-			Chest.add(s, "dng_graveyard", 1, 5)
-			local r2 = exec(s, { type = "OpenChests", pileKey = "dng_graveyard" })
-			expect(s.quests.daily.entries[2].progress).toBe(2)
-			expect(#eventsOf(r2.events, "QuestCompleted")).toBe(1)
-			expect(#eventsOf(r2.events, "QuestBonus")).toBe(1)
-			expect(s.quests.daily.bonusDone).toBe(true)
-			expect(#s.inbox).toBe(3)
-			expect(s.inbox[3].rewards.items).toEqual(K.questDailyBonus.items)
-		end)
+				expect(r.events[1].type).toBe("QuestClaimed")
+				expect(r.events[1].rewards.gold).toBe(want)
+				expect(s.gold - g0).toBe(want)
+				expect(#s.inbox).toBe(0)
+				local again = exec(s, { type = "ClaimQuest", period = "daily", questId = "qst_daily_expeditions" })
+				expect(again.error).toBe("QUEST_ALREADY_CLAIMED")
+				-- 全部達成（1件だけ）なのでボーナスも受け取れる
+				local items0 = table.clone(s.items)
+				local b = exec(s, { type = "ClaimQuestBonus", period = "daily" })
+				expect(b.ok).toBe(true)
+				for itemId, n in K.questDailyBonus.items or {} do
+					expect((s.items[itemId] or 0) - (items0[itemId] or 0)).toBe(n)
+				end
+				expect(exec(s, { type = "ClaimQuestBonus", period = "daily" }).error).toBe("QUEST_ALREADY_CLAIMED")
+			end
+		)
+		it(
+			"D-286 受け取らないまま日が変わったお題とボーナスは、失わないよう受け取り箱へ入る",
+			function()
+				local s = newState()
+				today(s)
+				s.inbox = {}
+				s.quests.daily.entries = {
+					{ questId = "qst_daily_expeditions", target = 1, progress = 1, done = true },
+				}
+				s.quests.daily.bonusDone = true
+				s.quests.daily.dayIndex -= 1 -- 前の日のお題にする
+				Game.advance(s, ctx(T0))
+				expect(#s.inbox).toBe(2)
+				expect(s.inbox[1].source).toBe("quest")
+				expect(s.inbox[2].rewards.items).toEqual(K.questDailyBonus.items)
+			end
+		)
 		it("D-161 留守中の帰還（踏破）はクエストに数えない", function()
 			local s = newState()
 			today(s)

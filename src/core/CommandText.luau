@@ -37,6 +37,9 @@ CommandText.HELP = [[
   train <adv_uid> [回数|max] トレーニング（ゴールドで経験値。既定1回）
   autosell <on|off> [最大レアリティ] [keep|all]  自動売却（keep＝修飾語つきは残す）
   claim                      受け取り箱の中身をまとめて受け取る（受け取れないものは残る）
+  qclaim <daily|weekly> <id> 達成したクエストの報酬を受け取る（D-286）
+  qbonus <daily|weekly>      クエストを全部達成したボーナスを受け取る（D-286）
+  haul <party>               帰還の獲得の吹き出しを消す（D-287）
   friend [人数]              フレンドボタン（友達の数はサーバーが数える。テキスト版は引数で与える。既定1：D-157）
   eventgo <n> [時間帯]       今のマップイベント（レアダンジョン・レイドボス）へパーティを出す（時間帯は省略で今の時間帯）
   buy <番号> [時間帯]        旅の商人の品を買う（時間帯は省略で今の時間帯）]]
@@ -130,6 +133,12 @@ function CommandText.fromTokens(tokens: { string }): any?
 		return { type = "Train", adventurerUid = tokens[2], sessions = n }
 	elseif c == "claim" then
 		return { type = "ClaimInbox" }
+	elseif c == "qclaim" then
+		return { type = "ClaimQuest", period = tokens[2], questId = tokens[3] } -- D-286
+	elseif c == "qbonus" then
+		return { type = "ClaimQuestBonus", period = tokens[2] } -- D-286
+	elseif c == "haul" then
+		return { type = "AckHaul", partyIndex = tonumber(tokens[2]) } -- D-287
 	elseif c == "friend" then
 		-- 友達の数はコマンドに入れない（サーバーが数えて ctx.friendCount で渡す。テキスト版は呼び出し側が引数を ctx に入れる）
 		return { type = "ClaimFriendReward" }

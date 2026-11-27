@@ -47,6 +47,7 @@ export type Party = {
 	index: number,                    -- 1〜（解放済みパーティ枠）
 	slots: { string },                -- 隊列1〜4の冒険者 uid（D-035）。空き枠は ""（JSON/DataStore で穴あき配列にしないため）
 	autoRepeat: { dungeonId: string }?, -- 自動再派遣の設定
+	haul: { runs: number, gold: number, chests: { [string]: number }, dungeonId: string }?, -- 帰還の獲得の記録（D-287）。オンライン中の帰還で積み、AckHaul で消す。報酬そのものは帰還のときに入っている。version 14
 	lastDungeonId: string?,           -- 最後の行き先（普通の派遣で出発したときに書く。マップイベントへの派遣は書かない）。「同じ所へ再出発」の行き先（D-228）。version 12
 }
 
@@ -92,8 +93,10 @@ export type QuestEntry = {           -- D-153。version 8（M7b-4）
 	questId: string,                  -- マスターデータ Quests の id
 	target: number,                   -- 量（パーティ数から決めた値。06章 §15）
 	progress: number,
-	done: boolean,                    -- 達成済み（報酬は達成時に受け取り箱へ）
+	done: boolean,                    -- 達成済み（受け取れる。D-286）
+	claimed: boolean?,                -- 受け取り済み（クエストの面の Claim。受け取らないまま期間が終わったら受け取り箱へ入れて true：D-286）。version 14
 }
+-- 期間の帳（daily / weekly）は entries・bonusDone（全部達成）に加え、bonusClaimed（ボーナスを受け取った：D-286。version 14）を持つ
 
 export type HireSession = {          -- 面接中の状態（再接続での引き直し逃れ防止）
 	candidates: { Candidate },
