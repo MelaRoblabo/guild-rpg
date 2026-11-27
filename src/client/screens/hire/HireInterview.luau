@@ -1,7 +1,8 @@
 --!strict
 -- S-21c 面接（D-220）。全自動で、能力の棒が上から順に素早く決まる。プレイヤーは介入しない（Stop なし）。
 -- 良い値はその行が光り、最大値は金の光（仮の短い動き。本番の演出は M8-FX）。触ると速まる。
--- 最後に Total（HP を除く4項目の合計：Q-006）がカウントアップし、hireTotalGreat・hireTotalAmazing 以上なら
+-- Total（HP を除く4項目の合計：Q-006）は 0 から始め、STR〜DEX が決まるたびにその値だけカウントアップで増やす。
+-- 最後の HP が決まると同時に確定し（D-312）、hireTotalGreat・hireTotalAmazing 以上なら
 -- 特別な演出（ハンコ・光の輪・光の筋・金の行が脈打つ。Amazing はさらに画面の閃光と大きなハンコ：D-283）。
 -- 終わったら S-21d（引き直し）へ進む。引き直しのあとも、ここを通って新しい値を見せる。
 
@@ -109,7 +110,8 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 	end
 	local candidate = h.candidates[h.pickedIndex]
 	local portrait = HireCommon.portrait(frame, candidate)
-	local panel = HireCommon.statPanel(frame, candidate, h.currentRoll, nil, true) -- Total は最後に決める
+	local panel = HireCommon.statPanel(frame, candidate, h.currentRoll, nil, true) -- Total は各行が決まるたびに増やす
+	panel.totalValue.Text = "0"
 	-- 進行中は × を薄くする（介入しない：D-220）
 	local close = HireCommon.closeTopRight(frame, api.close)
 	close.BackgroundTransparency = 0.5
@@ -164,6 +166,9 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 	end
 	task.spawn(function()
 		task.wait(0.3)
+		local running = 0 -- ここまでに決まった4項目（HP を除く）の合計
+		local total = Hiring.total(h.currentRoll)
+		local tier: string? = nil
 		for _, s in HireCommon.STATS do
 			if not alive then
 				return
@@ -179,6 +184,20 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			t:Play()
 			task.wait(STEP / speed)
 			nums[key].Text = tostring(h.currentRoll[key])
+			if key == "hp" then
+				-- 最後の HP と同時に Total を確定する（D-312）
+				panel.totalValue.Text = tostring(total)
+				HireCommon.paintTotal(panel.total, total)
+				tier = HireCommon.totalTier(total)
+				if tier then
+					celebrate(tier)
+				end
+			else
+				-- 決まった値だけ Total を増やす（D-312）
+				local from = running
+				running += h.currentRoll[key]
+				Motion.countUp(panel.totalValue, from, running, { float = false, duration = STEP / speed })
+			end
 			local q = HireCommon.quality(key, h.currentRoll[key])
 			if q then
 				local row = panel.rows[key]
@@ -187,21 +206,10 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				task.wait((if q == "max" then 0.5 else 0.2) / speed)
 			end
 		end
-		-- Total：カウントアップして段を見せる（D-283）
-		task.wait(0.25 / speed)
 		if not alive then
 			return
 		end
-		local total = Hiring.total(h.currentRoll)
-		Motion.countUp(panel.totalValue, 0, total, { float = false })
-		task.wait(Motion.T.count / speed)
-		if not alive then
-			return
-		end
-		HireCommon.paintTotal(panel.total, total)
-		local tier = HireCommon.totalTier(total)
 		if tier then
-			celebrate(tier)
 			task.wait(FX[tier].hold / speed)
 		end
 		task.wait(0.4 / speed)
