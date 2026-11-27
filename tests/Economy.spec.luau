@@ -129,6 +129,8 @@ return function(t)
 				local e = Game.query.expeditionOf(s, 1)
 				local brought = #e.log.rewards.chests
 				Game.advance(s, ctx(e.returnAt))
+				expect(Chest.total(s)).toBe(3005) -- オンラインの帰還の宝箱はパーティが持つ（D-302）
+				exec(s, { type = "ClaimHaul", partyIndex = 1 }) -- 吹き出しから開ける＝山へ移す
 				expect(Chest.total(s)).toBe(3005 + brought)
 			end
 		)

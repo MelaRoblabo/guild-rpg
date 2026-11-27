@@ -88,7 +88,7 @@ Protocol.CLIENT_COMMANDS = {
 	ClaimInbox = {}, -- D-164
 	ClaimQuest = { period = enum({ "daily", "weekly" }), questId = str(ID) }, -- D-286。クエストの報酬をその場で受け取る
 	ClaimQuestBonus = { period = enum({ "daily", "weekly" }) }, -- D-286
-	AckHaul = { partyIndex = int(1, 20) }, -- D-287。帰還の獲得の吹き出しを押した
+	ClaimHaul = { partyIndex = int(1, 20) }, -- D-287・D-302。帰還の獲得の吹き出しから開ける（パーティの宝箱を山へ移す）
 	ClaimFriendReward = {}, -- D-157。友達の数はサーバーが数えて ctx.friendCount で渡す（クライアントからは受け取らない）
 	DispatchEvent = { partyIndex = int(1, 20), eventSlot = int(0, 2 ^ 40) }, -- D-152
 	BuyFromMerchant = { eventSlot = int(0, 2 ^ 40), itemIndex = int(1, 20) }, -- D-152, D-179
@@ -303,6 +303,20 @@ function Protocol.view(state: any, master: any): any
 	v.notifyPromptDue = Game.query.notifyPromptDue(state)
 	-- 初回の誘導の済んだ段の数（D-244 ①）。誘導の前からのセーブかは stats（送らない）で判定するので、ここで渡す
 	v.guideStep = Game.query.guideStep(state)
+	-- パーティが持つ宝箱はランクを隠し、山ごとの数だけにする（D-087・D-302）
+	for _, p in v.parties or {} do
+		if type(p.haul) == "table" then
+			local counts = {}
+			for pileKey, byRank in p.haul.chests or {} do
+				local n = 0
+				for _, c in byRank do
+					n += c
+				end
+				counts[pileKey] = n
+			end
+			p.haul.chests = counts
+		end
+	end
 	for _, e in v.expeditions or {} do
 		e.seed = nil
 		e.log = Protocol.redactLog(e.log)

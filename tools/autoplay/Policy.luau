@@ -130,6 +130,16 @@ local function openAll(state: any, ctx: Ctx)
 	end
 end
 
+-- パーティが持ち帰った宝箱（D-302）を宝箱の山へ移す。オンライン中の帰還の宝箱は山に入らずパーティが持つので、
+-- 開ける前に毎回移す（前の作り＝帰還のときに山へ入る、と同じ時機で開ける）
+local function claimHauls(state: any, ctx: Ctx)
+	for i, p in state.parties do
+		if p.haul then
+			exec(state, { type = "ClaimHaul", partyIndex = i }, ctx)
+		end
+	end
+end
+
 -- 受け取り箱をまとめて受け取る（D-164）。達成したクエストとボーナスもここで受け取る（D-286：受け取り箱を通らない）
 local function claimInbox(state: any, ctx: Ctx)
 	if #state.inbox > 0 then
@@ -647,6 +657,7 @@ end
 function Policy.manage(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
 	claimInbox(state, ctx)
 	pressFriend(state, ctx)
+	claimHauls(state, ctx)
 	openAll(state, ctx)
 	equipBest(state, ctx)
 	sellJunk(state, ctx)
@@ -662,6 +673,8 @@ end
 
 -- 帰還がないときの軽い見回り（マップイベントの始まり・フレンドボタンの時刻に呼ぶ）
 function Policy.glance(state: any, ctx: Ctx, rng: Rng.Rng, stats: any)
+	-- 出発の前にパーティの宝箱を山へ移す（開けないまま出ると受け取り箱へ回り、前の作りと時機がずれる：D-302）
+	claimHauls(state, ctx)
 	pressFriend(state, ctx)
 	buyFromMerchant(state, ctx)
 	dispatchIdle(state, ctx, rng, stats)

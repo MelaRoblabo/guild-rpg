@@ -274,6 +274,7 @@ return function(t)
 			expect(e.log.chestMult).toBe(K.rareDungeonChestMult)
 			local n = #e.log.rewards.chests
 			Game.advance(s, ctx(e.returnAt))
+			exec(s, { type = "ClaimHaul", partyIndex = 1 }, e.returnAt) -- パーティが持つ宝箱を山へ（D-302）
 			expect(Chest.pileTotal(s, "special:rare:dng_ruins")).toBe(n)
 			expect(Chest.pileTotal(s, "dng_graveyard")).toBe(0)
 		end)

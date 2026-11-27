@@ -47,7 +47,7 @@ export type Party = {
 	index: number,                    -- 1〜（解放済みパーティ枠）
 	slots: { string },                -- 隊列1〜4の冒険者 uid（D-035）。空き枠は ""（JSON/DataStore で穴あき配列にしないため）
 	autoRepeat: { dungeonId: string }?, -- 自動再派遣の設定
-	haul: { runs: number, gold: number, chests: { [string]: number }, dungeonId: string }?, -- 帰還の獲得の記録（D-287）。オンライン中の帰還で積み、AckHaul で消す。報酬そのものは帰還のときに入っている。version 14
+	haul: { runs: number, gold: number, chests: { [string]: { [number]: number } }, dungeonId: string }?, -- 帰還の獲得（D-287・D-302）。オンライン中の帰還で積む。gold は入れ済みのゴールドの記録、chests は山ごと・ランクごとの宝箱そのもの（山には入れていない）。ClaimHaul で山へ移して消す。開けないまま次の冒険へ出たら宝箱は受け取り箱へ（source = "expedition"）。クライアントへは山ごとの数だけ送る（D-087）。version 15
 	lastDungeonId: string?,           -- 最後の行き先（普通の派遣で出発したときに書く。マップイベントへの派遣は書かない）。「同じ所へ再出発」の行き先（D-228）。version 12
 }
 

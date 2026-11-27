@@ -8,7 +8,7 @@ local ExclusiveGift = require("./ExclusiveGift")
 
 local Migration = {}
 
-Migration.CURRENT = 14
+Migration.CURRENT = 15
 
 local STEPS: { [number]: (any, any) -> () } = {
 	-- [1] = function(state) ... state.version = 2 end,
@@ -198,6 +198,13 @@ local STEPS: { [number]: (any, any) -> () } = {
 			end
 		end
 		state.version = 14
+	end,
+	-- v14 → v15：パーティの haul に宝箱そのもの（山ごと・ランクごと）を持つ（D-302）。v14 の haul は記録だけで、宝箱は山に入っているので消す
+	[14] = function(state)
+		for _, p in state.parties or {} do
+			p.haul = nil
+		end
+		state.version = 15
 	end,
 }
 

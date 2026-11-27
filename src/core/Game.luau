@@ -234,9 +234,11 @@ local function autoRepeatBlocker(state: any): string?
 	return nil
 end
 
--- 帰還の獲得をパーティに積む（D-287）。オンライン中の帰還だけ。自動再派遣の間は積み続け、
--- プレイヤーがギルドで待つパーティの宝箱の吹き出しを押す（AckHaul）まで残す。中身は見せるための記録で、報酬はもう入っている
-local function addHaul(state: any, e: any, gold: number, chests: number, pileKey: string)
+-- 帰還の獲得をパーティに積む（D-287・D-302）。オンライン中の帰還だけ。自動再派遣の間は積み続け、
+-- プレイヤーがギルドで待つパーティの宝箱の吹き出しを押して開ける（ClaimHaul）まで残す。
+-- ゴールドは帰還のときに入れ、見せるための記録として足す。宝箱は宝箱の山へ入れずに、ここで持つ（山ごと・ランクごとの数）。
+-- ランクはクライアントへ送らない（Protocol.view が山ごとの数に直す：D-087）
+local function addHaul(state: any, e: any, gold: number, chests: { any }, pileKey: string)
 	local p = state.parties[e.partyIndex]
 	if p == nil then
 		return
@@ -245,10 +247,43 @@ local function addHaul(state: any, e: any, gold: number, chests: number, pileKey
 	h.runs += 1
 	h.gold += gold
 	h.dungeonId = e.dungeonId
-	if chests > 0 then
-		h.chests[pileKey] = (h.chests[pileKey] or 0) + chests
+	for _, c in chests do
+		local byRank = h.chests[pileKey] or {}
+		byRank[c.rank] = (byRank[c.rank] or 0) + 1
+		h.chests[pileKey] = byRank
 	end
 	p.haul = h
+end
+
+-- 開けないまま次の冒険へ出たら、持っていた宝箱は受け取り箱へ（失わない：D-302）。記録は消す
+local function haulToInbox(state: any, partyIndex: number, now: number, master: any, events: { any })
+	local p = state.parties[partyIndex]
+	local h = p and p.haul
+	if h == nil then
+		return
+	end
+	p.haul = nil
+	local list = {}
+	local keys = {}
+	for pileKey in h.chests or {} do
+		table.insert(keys, pileKey)
+	end
+	table.sort(keys)
+	for _, pileKey in keys do
+		for rank = 1, master.rarityCount do
+			local c = h.chests[pileKey][rank]
+			if c and c > 0 then
+				table.insert(list, { pileKey = pileKey, rank = rank, count = c })
+			end
+		end
+	end
+	if #list == 0 then
+		return
+	end
+	local entry = Inbox.push(state, "expedition", now, { chests = list }, function(): Rng.Rng
+		error("haulToInbox: ランクの決まった宝箱しか入れない")
+	end, master)
+	table.insert(events, { type = "HaulToInbox", at = now, partyIndex = partyIndex, inboxUid = entry.uid })
 end
 
 -- 帰還処理：報酬を状態に反映する。online はオンライン中の時間経過での帰還（帰還の獲得を積む：D-287）
@@ -291,9 +326,12 @@ local function collect(state: any, e: any, master: any, events: { any }, online:
 	end
 	-- 宝箱はギルドの宝箱置き場へ（倉庫とは別、上限なし：D-084）。普通の探索の山の鍵は dungeonId（D-166）
 	-- レアダンジョンは special:rare:<相当するダンジョン>（D-171, D-185）
+	-- オンライン中の帰還の宝箱はパーティが持ち、吹き出しから開ける（右下の Chests には入れない：D-302）
 	local pileKey = e.chestPile or e.dungeonId
-	for _, c in r.chests do
-		Chest.add(state, pileKey, c.rank, 1)
+	if not online then
+		for _, c in r.chests do
+			Chest.add(state, pileKey, c.rank, 1)
+		end
 	end
 
 	-- 経験値（D-041：生存者で等分済み。個人倍率はここで掛ける）。順序を固定するため隊列順に処理
@@ -322,7 +360,7 @@ local function collect(state: any, e: any, master: any, events: { any }, online:
 	Guild.addExp(state, guildExp, master, events, e.returnAt)
 
 	if online then
-		addHaul(state, e, r.gold + itemsSoldGold, #r.chests, pileKey)
+		addHaul(state, e, r.gold + itemsSoldGold, r.chests, pileKey)
 	end
 	state.expeditions[e.uid] = nil
 	bump(state, if log.result == "clear" then "clears" else "retreats")
@@ -673,6 +711,8 @@ handlers.Dispatch = function(state, cmd, ctx)
 	if Party.isEmpty(p) then
 		return fail("PARTY_EMPTY")
 	end
+	local pre: { any } = {}
+	haulToInbox(state, cmd.partyIndex, ctx.now, ctx.master, pre) -- 開けないまま出たら受け取り箱へ（D-302）
 	local e = dispatch(state, cmd.partyIndex, cmd.dungeonId, ctx.now, ctx.master)
 	local events: { any } = {
 		{
@@ -684,6 +724,9 @@ handlers.Dispatch = function(state, cmd, ctx)
 		},
 	}
 	Quest.count(state, "expeditions", 1, ctx.now, ctx.master, rngTaker(state), events) -- D-179：オンライン中の出発
+	for _, ev in pre do
+		table.insert(events, ev)
+	end
 	return { ok = true, events = events }
 end
 
@@ -1531,6 +1574,7 @@ handlers.DispatchEvent = function(state, cmd, ctx)
 		return fail("PARTY_EMPTY")
 	end
 	local events: { any } = {}
+	haulToInbox(state, cmd.partyIndex, ctx.now, master, events) -- 開けないまま出たら受け取り箱へ（D-302）
 	if kind == "merchant" then
 		-- 商人へ向かう（D-274）。片道は場所の距離だけで決まる。着いたら Leave まで、とどまって買える
 		local memberUids = {}
@@ -1726,18 +1770,38 @@ handlers.ClaimQuestBonus = function(state, cmd, ctx)
 	}
 end
 
--- 帰還の獲得の吹き出しを押した（D-287）：積んだ記録を消す。報酬は帰還のときに入っている
-handlers.AckHaul = function(state, cmd, ctx)
+-- 帰還の獲得の吹き出しから開ける（D-287・D-302）：パーティが持つ宝箱を宝箱の山へ移し、記録を消す。
+-- クライアントはこのあと、移した数だけその山を開ける。ゴールドは帰還のときに入っている
+handlers.ClaimHaul = function(state, cmd, ctx)
 	local p = state.parties[cmd.partyIndex]
 	if not p then
 		return fail("PARTY_NOT_FOUND")
 	end
-	if p.haul == nil then
+	local h = p.haul
+	if h == nil then
 		return fail("HAUL_EMPTY")
 	end
-	local h = p.haul
 	p.haul = nil
-	return { ok = true, events = { { type = "HaulAcked", at = ctx.now, partyIndex = cmd.partyIndex, haul = h } } }
+	local counts: { [string]: number } = {}
+	for pileKey, byRank in h.chests or {} do
+		for rank, c in byRank do
+			Chest.add(state, pileKey, rank, c)
+			counts[pileKey] = (counts[pileKey] or 0) + c
+		end
+	end
+	return {
+		ok = true,
+		events = {
+			{
+				type = "HaulClaimed",
+				at = ctx.now,
+				partyIndex = cmd.partyIndex,
+				gold = h.gold,
+				runs = h.runs,
+				chests = counts, -- 山ごとの数（ランクは出さない：D-087）
+			},
+		},
+	}
 end
 
 -- 受け取り箱（05章 ClaimInbox、D-164, D-176）：受け取れるものだけ受け取り、残りは受け取り箱に残す（期限なし）

@@ -60,6 +60,8 @@ return function(t)
 				local e = firstExpedition(s)
 				expect(e.returnAt - T0 < 60).toBeTruthy()
 				Game.advance(s, ctx(e.returnAt))
+				-- オンラインの帰還の宝箱はパーティが持ち、吹き出しから開ける（D-302）
+				Game.execute(s, { type = "ClaimHaul", partyIndex = 1 }, ctx(e.returnAt))
 				expect(Chest.total(s) >= 1).toBeTruthy()
 			end
 		end)
@@ -312,6 +314,8 @@ return function(t)
 			end
 			expect(stopped).toBeTruthy()
 			expect(s.parties[1].autoRepeat).toBe(nil)
+			-- 報酬は消さない：パーティが持っている（D-302）
+			Game.execute(s, { type = "ClaimHaul", partyIndex = 1 }, ctx(T0 + 600))
 			expect(Chest.total(s) >= 1).toBeTruthy()
 		end)
 	end)

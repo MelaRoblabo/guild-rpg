@@ -144,6 +144,10 @@ end
 function Ledger.onCommand(L: any, _state: any, cmd: any, result: any, extra: any)
 	if cmd.type == "ClaimInbox" then
 		for _, entry in extra or {} do
+			if entry.source == "expedition" then
+				-- 開けないまま次の冒険へ出たパーティの宝箱（D-302）。帰還のときに冒険の分として数えてある
+				continue
+			end
 			local src = INBOX_SOURCE[entry.source] or entry.source
 			local r = entry.rewards
 			add(L, "gold", src, r.gold or 0)

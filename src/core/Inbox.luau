@@ -14,7 +14,7 @@ local Rng = require("./Rng")
 
 local Inbox = {}
 
-export type Source = "quest" | "playtime" | "login" | "raid" | "referral"
+export type Source = "quest" | "playtime" | "login" | "raid" | "referral" | "expedition" -- expedition：開けないまま次の冒険へ出たパーティの宝箱（D-302）
 
 local function rosterCount(state: any): number
 	local n = 0
