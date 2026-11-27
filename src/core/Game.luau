@@ -945,6 +945,29 @@ handlers.HireStart = function(state, _cmd, ctx)
 	return { ok = true, events = { { type = "HireStarted", at = ctx.now, cost = K.hireCost } } }
 end
 
+-- 求人票の引き直し（D-310）：面接の前（候補を選ぶ前）だけ。雇用費と同じ額（D-311）を払って候補を全員引き直す。
+-- 面接の無料の引き直し回数は変わらない。今週の訪問者・特別な訪問者の判定もやり直す（D-158・D-170）
+handlers.HireRerollCandidates = function(state, _cmd, ctx)
+	local K = ctx.master.K
+	local h = state.hireSession
+	if not h then
+		return fail("NO_SESSION")
+	end
+	if h.pickedIndex then
+		return fail("ALREADY_PICKED")
+	end
+	if state.gold < K.hireCost then
+		return fail("NOT_ENOUGH_GOLD")
+	end
+	state.gold -= K.hireCost
+	h.candidates = Hiring.rollCandidates(state, takeRng(state), ctx.master, ctx.now)
+	bump(state, "hireCandidateRerolls")
+	return {
+		ok = true,
+		events = { { type = "HireCandidatesRerolled", at = ctx.now, cost = K.hireCost } },
+	}
+end
+
 handlers.HirePick = function(state, cmd, ctx)
 	local h = state.hireSession
 	if not h then

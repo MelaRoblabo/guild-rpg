@@ -789,6 +789,8 @@ function Text.events(events: { any }, save: any, master: any): string
 			table.insert(lines, t .. `雇用を始めた（雇用費 {e.cost}G）`)
 		elseif e.type == "Hired" then
 			table.insert(lines, t .. `{advName(save, e.uid)}（{e.uid}）を雇用した`)
+		elseif e.type == "HireCandidatesRerolled" then
+			table.insert(lines, t .. `求人票を引き直した（{e.cost}G）`)
 		elseif e.type == "HireCanceled" then
 			table.insert(lines, t .. "雇用をやめた")
 		elseif e.type == "Dismissed" then

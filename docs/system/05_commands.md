@@ -27,6 +27,7 @@ result  = { ok = false, error = "PARTY_BUSY" }      -- 失敗（state は不変�
 | M2 | `Sell` | equipmentUids / itemId+count | 売却 | ITEM_LOCKED, ITEM_EQUIPPED | 06章 |
 | M2 | `SetLock` | uid, locked | 保護の切り替え | — | 02章 |
 | M3 | `HireStart` | — | 雇用費を払い候補を抽選 | NOT_ENOUGH_GOLD, ROSTER_FULL, SESSION_EXISTS | 02章 |
+| M8 | `HireRerollCandidates` | — | 面接の前（候補を選ぶ前）に、雇用費と同じ額（`hireCost`：D-311）を払って候補を全員引き直す。面接の無料の引き直し回数は変わらない | NO_SESSION, ALREADY_PICKED, NOT_ENOUGH_GOLD | D-310 |
 | M3 | `HirePick` | candidateIndex | 面接する候補を選び初回抽選 | — | 02章 |
 | M3 | `HireReroll` | — | 引き直し（無料回数→チケット）。今回の結果が「前回」になり、それより前の結果は消える | NO_TICKET | 02章, D-086 |
 | M3 | `HireChoose` | "previous" / "current" | 採用する結果を選んで雇用確定。職業の hireEquipment（コモン+0・アイテムレベル1の3点）を付けて来る（D-266） | — | 02章, D-266 |

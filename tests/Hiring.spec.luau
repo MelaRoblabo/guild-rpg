@@ -180,6 +180,49 @@ return function(t)
 		end)
 	end)
 
+	describe("求人票の引き直し（D-310）", function()
+		local function names(s: any): string
+			local out = {}
+			for _, c in s.hireSession.candidates do
+				table.insert(out, c.name .. ":" .. c.jobId)
+			end
+			return table.concat(out, ",")
+		end
+		it(
+			"D-310 D-311 面接の前なら雇用費と同じ額を払って候補を全員引き直せる。面接の無料回数は減らない",
+			function()
+				local s = newState(3000)
+				exec(s, { type = "HireStart" })
+				local before = names(s)
+				local r = exec(s, { type = "HireRerollCandidates" })
+				expect(r.ok).toBe(true)
+				expect(s.gold).toBe(3000 - K.hireCost - K.hireCost)
+				expect(#s.hireSession.candidates).toBe(s.expansions.candidateSlots)
+				expect(names(s) ~= before).toBe(true)
+				expect(s.hireSession.freeRerollsLeft).toBe(K.hireFreeRerolls)
+				expect(r.events[1].type).toBe("HireCandidatesRerolled")
+			end
+		)
+		it("D-310 ゴールドが足りなければ引き直せず、候補も変わらない", function()
+			local s = newState(K.hireCost + K.hireCost - 1)
+			exec(s, { type = "HireStart" })
+			local before = names(s)
+			expect(exec(s, { type = "HireRerollCandidates" }).error).toBe("NOT_ENOUGH_GOLD")
+			expect(names(s)).toBe(before)
+			expect(s.gold).toBe(K.hireCost - 1)
+		end)
+		it(
+			"D-310 候補を選んだ後（面接）と、雇用を始めていないときは引き直せない",
+			function()
+				local s = newState(1000)
+				expect(exec(s, { type = "HireRerollCandidates" }).error).toBe("NO_SESSION")
+				exec(s, { type = "HireStart" })
+				exec(s, { type = "HirePick", candidateIndex = 1 })
+				expect(exec(s, { type = "HireRerollCandidates" }).error).toBe("ALREADY_PICKED")
+			end
+		)
+	end)
+
 	describe("特別な訪問者（D-055）", function()
 		it("ユニークはステータス固定で引き直せない。名前も変えられない", function()
 			local m = Fixtures.master(function(d)

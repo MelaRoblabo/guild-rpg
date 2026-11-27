@@ -249,7 +249,7 @@ local function handle(tokens: { string }): (boolean, any)
 				say(
 					"※自動再派遣は次の帰還から働きます。待機中なら go で出発してください"
 				)
-			elseif c == "hire" or c == "pick" or c == "reroll" then
+			elseif c == "hire" or c == "repost" or c == "pick" or c == "reroll" then
 				say(Text.hiring(save, master))
 			elseif c == "rebirth" or c == "rb-reroll" then
 				say(Text.rebirth(save, master))

@@ -135,6 +135,8 @@ Words.total = "Total" -- 面接の最後の合計（HP を除く4項目：Q-006�
 Words.great = "Great" -- Total が hireTotalGreat 以上
 Words.amazing = "Amazing" -- Total が hireTotalAmazing 以上
 Words.reason.pickPosting = "Pick a posting first" -- 求人票を選ぶ前の Hire
+Words.reason.notEnoughGold = "Not enough gold" -- お金が足りない（求人票の Reroll：D-310。拡張・ダンジョンの解放でも使う）
+Words.reroll = "Reroll" -- 引き直し（D-220。求人票の引き直し：D-310）
 Words.leftCount = "%d left" -- 開封の Next の残りの数（点を並べない）
 
 -- 記号の補い（D-288。13歳のプレイテストで ▲・的・レアリティの形が分からなかった）

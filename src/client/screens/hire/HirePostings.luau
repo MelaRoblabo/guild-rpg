@@ -6,12 +6,16 @@
 --   - Hire は最初から押せない色で出し、票を選ぶと金。押せない色でも押すと理由を出す（D-250 ⑥・D-264 ②）。
 --     選ぶまでは票が少し揺れる（D-250 ⑥）。
 --   - 特別な訪問者（ユニーク）は金の票で、能力は最初から決まっている。採用すると面接を飛ばして S-21e へ。
+--   - 右下の並び（D-310）：Cancel（茶）・Reroll（金、費用は雇用費と同じ hireCost：D-311）・Hire。
+--     Reroll はゴールドを払って候補を全員引き直す（面接の前だけ）。足りなければ押せない色で、押すと理由。
+--     Cancel は雇用をやめて閉じる（雇用費は戻らない）。右上の × も Cancel と同じ。
 
 local TweenService = game:GetService("TweenService")
 
 local Components = require("../../ui/Components")
 local Create = require("../../ui/Create")
 local Art = require("../../ui/Art")
+local HubState = require("../../hub/HubState")
 local HireCommon = require("./HireCommon")
 local Motion = require("../../ui/Motion")
 local Nav = require("../../ui/Nav")
@@ -244,7 +248,23 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		[CHILDREN] = { Components.gradient(C.ch28, C.ch13) },
 		Parent = frame,
 	})
-	HireCommon.closeTopRight(frame, api.close)
+	-- 雇用をやめて閉じる（D-310：Cancel と右上の × で同じ。雇用費は戻らない）
+	local leaving = false
+	local function cancelHire()
+		if leaving then
+			return
+		end
+		leaving = true
+		if Session.view and Session.view.hireSession then
+			local r = Session.sendAndWait({ type = "HireCancel" })
+			if not (r and r.ok) then
+				leaving = false
+				return
+			end
+		end
+		api.close()
+	end
+	HireCommon.closeTopRight(frame, cancelHire)
 	if not h then
 		return { frame = frame, scrim = 1 }
 	end
@@ -402,9 +422,68 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 		glyph = "A",
 		onClick = hire,
 	})
+	stamp.LayoutOrder = 3
 	stamp.Parent = actions
+	-- 求人票の引き直し（D-310）：ゴールドを払って候補を全員引き直す
+	local rerollCost = master.K.hireCost
+	local canReroll = view ~= nil and view.gold >= rerollCost
+	local reroll: Frame
+	reroll = Components.button({
+		kind = if canReroll then "gold" else "disabled",
+		width = 240,
+		icon = Components.icon.reroll,
+		label = Words.reroll,
+		name = "Reroll",
+		cost = HubState.formatNumber(rerollCost),
+		glyph = "X",
+		onClick = function()
+			if leaving or hiring then
+				return
+			end
+			if not (Session.view and Session.view.gold >= rerollCost) then
+				Motion.reason(reroll, Words.reason.notEnoughGold)
+				return
+			end
+			leaving = true
+			local r = Session.sendAndWait({ type = "HireRerollCandidates" })
+			if r and r.ok then
+				api.replace("HirePostings")
+			else
+				leaving = false
+			end
+		end,
+	})
+	local rerollFace = reroll:FindFirstChild("Face") :: TextButton?
+	if rerollFace then
+		rerollFace.Active = true -- 押せない色でも押せて理由を出す（D-264 ②）
+	end
+	reroll.LayoutOrder = 2
+	reroll.Parent = actions
+	local cancel = Components.button({
+		kind = "brown",
+		width = 180,
+		label = Words.cancel,
+		name = "Cancel",
+		glyph = "B",
+		onClick = cancelHire,
+	})
+	cancel.LayoutOrder = 1
+	cancel.Parent = actions
+	-- 所持金が変わったら Reroll の色を合わせる（足りなければ押せない色）
+	local goldConn = Session.changed:connect(function(v: any)
+		Components.setButtonKind(reroll, if v and v.gold >= rerollCost then "gold" else "disabled")
+		if rerollFace then
+			rerollFace.Active = true
+		end
+	end)
 	refresh()
-	return { frame = frame, scrim = 1 }
+	return {
+		frame = frame,
+		scrim = 1,
+		destroy = function()
+			goldConn.disconnect()
+		end,
+	}
 end
 
 Nav.register("HirePostings", build)

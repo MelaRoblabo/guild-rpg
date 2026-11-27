@@ -20,6 +20,7 @@ CommandText.HELP = [[
   sell item <itm_id> [個数]   アイテムを売る
   lock <uid> / unlock <uid>  保護の切り替え
   hire                       雇用を始める（雇用費を支払い候補を表示）
+  repost                     求人票（候補）をゴールドで引き直す（面接の前だけ：D-310）
   pick <番号>                面接する候補を選ぶ（ステータスを抽選）
   reroll                     ステータスを引き直す（無料回数→チケット）。今回の結果が「前回」になり、それより前は消える
   choose <prev|cur>          採用する結果を選んで雇用する
@@ -106,6 +107,8 @@ function CommandText.fromTokens(tokens: { string }): any?
 		return { type = "HireChoose", which = which(tokens[2]) }
 	elseif c == "cancel" then
 		return { type = "HireCancel" }
+	elseif c == "repost" then
+		return { type = "HireRerollCandidates" } -- 求人票の引き直し（D-310）
 	elseif c == "rename" then
 		return { type = "Rename", adventurerUid = tokens[2], name = tokens[3] }
 	elseif c == "dismiss" then

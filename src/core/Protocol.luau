@@ -52,6 +52,7 @@ Protocol.CLIENT_COMMANDS = {
 	HireReroll = {},
 	HireChoose = { which = WHICH },
 	HireCancel = {},
+	HireRerollCandidates = {}, -- D-310
 	Rename = { adventurerUid = str(ID), name = str(64) },
 	Dismiss = { adventurerUid = str(ID) },
 	RebirthStart = { adventurerUid = str(ID) }, -- 見た目は確定の後に選ぶ（D-230）
