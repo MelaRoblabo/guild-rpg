@@ -61,6 +61,7 @@ ChestCommon.sourceIcon = {
 	playtime = "@time",
 	raid = "@raid",
 	referral = "@friend",
+	expedition = "@chest", -- 開けないまま次の冒険へ出たパーティの宝箱（D-302）
 }
 -- 受け取り箱の行の記号に添える語（D-251 ①）
 ChestCommon.sourceWord = {
@@ -69,6 +70,7 @@ ChestCommon.sourceWord = {
 	playtime = "Playtime",
 	raid = "Raid",
 	referral = "Friend",
+	expedition = "Adventure", -- D-302
 }
 
 export type PileInfo = { pileKey: string, special: boolean, icon: string, name: string }

@@ -48,6 +48,7 @@ local DOT_TEXTURE = "rbxasset://textures/ui/traildot.png" -- Beam の点線（D-
 local CART_LIFT = 0.7 -- 地図の上から馬車の中心までの高さ（見本がないときの仮の Part の馬車）
 local CART_TEMPLATE = "PartyCart" -- ReplicatedStorage.MapModels の馬車の見本
 local BEAM_FROM_HEIGHT = 1 -- 見本の馬車の点線の出る高さ（台座の底から）
+local CART_ICON_LIFT = 3 -- 馬車の上のアイコンを点線の点からどれだけ上に出すか（スタッド。D-290。画面の配置の値）
 -- 馬車を隠し始める近さ。0 で馬車の真ん中が模型の足もとに入ったとき、1 で台座の縁が触れたとき（1 だと道の途中で消えた）
 local CART_HIDE_REACH = 0.25
 -- 探索中のダンジョンの模型の跳ね（ボードゲームの駒を指で持ち上げてトンと置くくらい）
@@ -68,7 +69,11 @@ local eventPlaces: { BasePart } = {}
 local hidden: { [BasePart]: boolean } = {}
 local highlights: { [BasePart]: { Highlight } } = {}
 local carts: { [number]: Model } = {}
-local cartBoards: { [number]: BillboardGui } = {} -- 動いている馬車の上のリーダーのアイコン（全パーティ常に：D-290）
+-- 動いている馬車の上のリーダーのアイコン（全パーティ常に：D-290）。
+-- 3D の板（BillboardGui）では馬車の上に出なかったので、画面の部品にして毎フレーム馬車の画面上の位置へ置く
+local cartIconLayer: ScreenGui? = nil
+local cartIcons: { [number]: Frame } = {}
+local cartIconOn: { [number]: boolean } = {}
 local cartMoving: { [number]: boolean } = {} -- 移動中・帰り道（模型に触れて隠れている間も true）
 local cartTemplate: Model? = nil
 local cartRadius = 1.6 -- 馬車の足もとの半径（見本を読んだら見本の台座から出す）
@@ -301,7 +306,7 @@ local function boardOn(obj: BasePart): BillboardGui
 end
 
 -- 板の上のパーティのアイコン（押すとパーティの面）
-local function iconButton(board: BillboardGui, partyIndex: number): Frame
+local function iconButton(board: Instance, partyIndex: number): Frame
 	local name = "Party" .. partyIndex
 	local holder = board:FindFirstChild(name) :: Frame?
 	if holder then
@@ -379,6 +384,13 @@ function World3D.mount(h: Handlers)
 	MapCamera.enable()
 	MapAmbience.mount(mapPart) -- 光・色・被写界深度・埃
 	makeReticle(boardFolder :: Instance)
+	cartIconLayer = new("ScreenGui", {
+		Name = "CartIcons",
+		IgnoreGuiInset = true,
+		ResetOnSpawn = false,
+		DisplayOrder = 5, -- メイン画面の部品（DisplayOrder 10）より下。面を開けば面が上になる
+		Parent = boardFolder,
+	}) :: ScreenGui
 	RunService.RenderStepped:Connect(World3D.step)
 	RunService.RenderStepped:Connect(updateAim)
 	-- 旅の商人（D-274）・レイドボス（D-275）：ReplicatedStorage.MapModels の模型を見本に、出ている間だけ場所に置く
@@ -800,31 +812,20 @@ function World3D.refresh(view: any)
 			cart.Parent = nil -- 動いている間に出すか隠すかは step で決める（模型に触れている間は隠す）
 		end
 		-- 馬車の上のリーダーのアイコン（D-290）：動いている馬車には、どのパーティを選んでいても常に出す。
-		-- 馬車を隠している間（模型に触れている・待機・探索中）は、付け先が地図から外れるので出ない
-		local cb = cartBoards[i]
-		if moving and cart and cart.PrimaryPart then
-			if cb == nil or cb.Parent == nil then
-				local board = new("BillboardGui", {
-					Name = "CartBoard" .. i,
-					AlwaysOnTop = true,
-					Active = true,
-					Size = UDim2.fromOffset(ICON_SIZE + 16, ICON_SIZE + 16),
-					SizeOffset = Vector2.new(0, 0.5),
-					StudsOffsetWorldSpace = Vector3.new(0, 2.2, 0),
-					ResetOnSpawn = false,
-					Parent = boardFolder,
-				}) :: BillboardGui
-				iconButton(board, i)
-				cartBoards[i] = board
-				cb = board
+		-- 置く場所と、模型に触れて馬車を隠している間に隠すのは step で決める
+		cartIconOn[i] = moving
+		if moving and cartIconLayer then
+			local h = cartIcons[i]
+			if h == nil or h.Parent == nil then
+				h = iconButton(cartIconLayer :: ScreenGui, i)
+				h.AnchorPoint = Vector2.new(0.5, 1)
+				h.Visible = false
+				cartIcons[i] = h
 			end
-			local b = cb :: BillboardGui
-			b.Adornee = cart.PrimaryPart
-			b.Enabled = true
-			local icon = (b:FindFirstChild("Party" .. i) :: Frame):FindFirstChild("PartyIcon") :: Frame
+			local icon = (h :: Frame):FindFirstChild("PartyIcon") :: Frame
 			PartyIcon.set(icon, view, i, s.state)
-		elseif cb then
-			cb.Enabled = false
+		elseif cartIcons[i] then
+			cartIcons[i].Visible = false
 		end
 		-- 点線（馬車 → 目的地）
 		local beam = beams[i]
@@ -1065,6 +1066,15 @@ function World3D.step()
 				local parent: Instance? = if hide then nil else cartFolder
 				if cart.Parent ~= parent then
 					cart.Parent = parent
+				end
+				-- 馬車の上のアイコン（D-290）：画面上の位置へ。隠している間・画面の外では出さない
+				local icon = cartIcons[i]
+				local cam = Workspace.CurrentCamera
+				if icon and cam then
+					local top = pos + Vector3.new(0, BEAM_FROM_HEIGHT + CART_ICON_LIFT, 0)
+					local v, onScreen = cam:WorldToViewportPoint(top)
+					icon.Visible = cartIconOn[i] == true and not hide and onScreen
+					icon.Position = UDim2.fromOffset(v.X, v.Y)
 				end
 			end
 		end

@@ -54,6 +54,7 @@ local chestNotice: Frame
 local chestButton: Frame
 local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 ②）
 local questBadge: TextLabel -- 受け取れるクエストの数（D-286）
+local hopHaul: (t: number) -> () -- 吹き出しの宝箱を跳ねさせる（下で定義）
 
 ---------------------------------------------------------------------------
 -- 3D マップ（D-270）
@@ -80,7 +81,8 @@ local function openParty(partyIndex: number)
 	Nav.open("PartyPanel", { partyIndex = partyIndex })
 end
 
--- 帰還の獲得の吹き出しを押した（D-287）：獲得の画面 → 宝箱があれば Open でその宝箱の開封へ
+-- 帰還の獲得の吹き出しを押した（D-287・D-302）：獲得の画面 → Open で、パーティが持ち帰った宝箱を山へ移して開ける。
+-- × で閉じたら何も受け取らない（吹き出しは残る）。持ち帰った宝箱は右下の Chests には入っていない
 local function openHaul(partyIndex: number)
 	local view = Session.view
 	local party = nil
@@ -93,11 +95,13 @@ local function openHaul(partyIndex: number)
 	if h == nil then
 		return
 	end
-	Session.send({ type = "AckHaul", partyIndex = partyIndex }) -- 見たので記録を消す（報酬は帰還のときに入っている）
-	local chests, piles = 0, {}
+	local chests, piles, counts = 0, {}, {}
 	for pileKey, n in h.chests or {} do
-		chests += n
-		table.insert(piles, pileKey)
+		if n > 0 then
+			chests += n
+			counts[pileKey] = n
+			table.insert(piles, pileKey)
+		end
 	end
 	table.sort(piles)
 	local tiles = {}
@@ -107,22 +111,40 @@ local function openHaul(partyIndex: number)
 	if chests > 0 then
 		table.insert(tiles, { kind = "chest", n = chests })
 	end
-	local primary = nil
+	local function claim(): boolean
+		local ok, r = pcall(Session.sendAndWait, { type = "ClaimHaul", partyIndex = partyIndex })
+		return ok and r ~= nil and r.ok == true
+	end
+	local primary
 	if chests > 0 then
 		primary = {
 			icon = "@chest",
 			label = Words.open,
 			onClick = function(api: Nav.Api)
+				if not claim() then
+					api.close()
+					return
+				end
 				-- 持ち帰った宝箱だけを開ける。初回は演出をフルで（D-267 ④）
 				local first = Guide.is("chests") or Guide.is("openAll")
 				Guide.done("openAll")
-				local batch = ChestCommon.open(piles, false, h.chests)
+				local batch = ChestCommon.open(piles, false, counts)
 				if batch then
 					batch.first = first
 					api.replace("ChestOpening", { batch = batch })
 				else
 					api.close()
 				end
+			end,
+		}
+	else
+		-- 宝箱がない（ゴールドだけ）：OK で記録を消す
+		primary = {
+			icon = "✔",
+			label = Words.ok,
+			onClick = function(api: Nav.Api)
+				claim()
+				api.close()
 			end,
 		}
 	end
@@ -644,7 +666,7 @@ local function refreshStatic(view: any)
 		hasInbox = true
 		break
 	end
-	chestNotice.Visible = hasInbox
+	chestNotice.Visible = hasInbox and total > 0 -- 宝箱が 0 のときは出さない（2026-11-27 ユーザー指示）
 end
 
 -- 初回の誘導（D-244 ①）：馬車（待機の最初のパーティ）→ 帰還のあとの宝箱ボタン
@@ -674,7 +696,18 @@ local function refreshGuide(view: any)
 	for _, c in view.chests or {} do
 		total += c.count
 	end
-	Guide.mark(chestButton, (Guide.is("chests") or Guide.is("openAll")) and total > 0 and Nav.depth() == 0, 18, true)
+	-- 帰還の宝箱はパーティの横の吹き出しから開ける（D-302）。吹き出しが出ていればそちらを指す
+	local haulRow: number? = nil
+	for i, r in rows do
+		if r.haul.Visible and haulRow == nil then
+			haulRow = i
+		end
+	end
+	local chestStep = (Guide.is("chests") or Guide.is("openAll")) and Nav.depth() == 0
+	for i, r in rows do
+		Guide.mark(r.haul, chestStep and i == haulRow, 14)
+	end
+	Guide.mark(chestButton, chestStep and haulRow == nil and total > 0, 18, true)
 	-- 最後の段：右上の Quests（並べる仕組みの中なので、輪と指はメイン画面の面に重ねる：D-246 ②）
 	Guide.markOver(questButton, Guide.is("quests") and Nav.depth() == 0, 33, layer, 19)
 end
@@ -719,6 +752,30 @@ local function refreshMoving(view: any)
 	end
 end
 
+-- 帰還の宝箱の吹き出しの中の宝箱を跳ねさせる（目を引くため：D-302）。
+-- トンと高く跳ねて傾き、小さくもう1回跳ねて止まる、を HOP_CYCLE 秒ごとにくり返す（画面の動きの値。ゲームの数値ではない）
+local HOP_CYCLE = 1.6
+local HOP_HIGH, HOP_LOW = 12, 5 -- 跳ねる高さ（px）
+hopHaul = function(t: number)
+	for _, r in rows do
+		local pic = r.haul.Visible and r.haul:FindFirstChild("Pic") :: Frame?
+		if pic then
+			local k = t % HOP_CYCLE
+			local y, rot = 0, 0
+			if k < 0.32 then
+				local u = k / 0.32
+				y = -math.sin(u * math.pi) * HOP_HIGH
+				rot = math.sin(u * math.pi * 2) * 8
+			elseif k < 0.52 then
+				local u = (k - 0.32) / 0.2
+				y = -math.sin(u * math.pi) * HOP_LOW
+			end
+			pic.Position = UDim2.new(0.5, 0, 0.5, y)
+			pic.Rotation = rot
+		end
+	end
+end
+
 function Hub.mount()
 	layer = new("Frame", {
 		Name = "Hub",
@@ -740,6 +797,7 @@ function Hub.mount()
 	end)
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
+		hopHaul(os.clock())
 		acc += dt
 		if acc >= 0.1 then
 			acc = 0
