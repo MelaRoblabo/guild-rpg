@@ -45,9 +45,14 @@ return function(t)
 			adv.giftIds = { "gift_glutton" }
 			exec(s, { type = "Train", adventurerUid = uid, sessions = 1 })
 			adv = s.adventurers[uid]
-			local need = Formulas.expToNext(1, K, 3)
-			expect(adv.level).toBe(2)
-			expect(adv.exp).toBe(K.trainingFacility[1].expPerSession - need)
+			-- 倍率を掛けない経験値（1回分そのまま）で上がった結果と一致する
+			local level, exp = 1, K.trainingFacility[1].expPerSession
+			while exp >= Formulas.expToNext(level, K, 3) do
+				exp -= Formulas.expToNext(level, K, 3)
+				level += 1
+			end
+			expect(adv.level).toBe(level)
+			expect(adv.exp).toBe(exp)
 		end)
 		it("D-077 トレーニング場のレベルで決まる上限までしか上がらない", function()
 			local s, uid = newState()

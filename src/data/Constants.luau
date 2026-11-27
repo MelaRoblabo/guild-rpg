@@ -51,9 +51,11 @@ return {
 	-- 必要経験値 = floor(expBase × Lv^expExponent × expCycleMult[転生回数+1])（D-071）
 	-- expCycleMult は tools/sim/progression.luau が「各周回の所要時間」に合わせて書き換える
 	-- M7b-6：自動プレイで最大の育成までの暦日数（D-161, D-199）に合わせ、全周回を1.10倍にした（docs/reports/M7b6_balance.md）
+	-- MB-5：D-280（留守番の経験値なし）の後、コア約30日・ヘビー約15日（D-291）に合わせて3周目以降を0.39倍にした
+	--   （1・2周目は最初の転生までの手応えのため据え置き。docs/reports/MB5_balance.md）
 	expBase = 100,
 	expExponent = 1.5,
-	expCycleMult = { 1.63, 1.136, 1.635, 2.701, 4, 6.438, 10.86, 13.02, 17.16 },
+	expCycleMult = { 1.63, 1.136, 0.638, 1.053, 1.56, 2.511, 4.235, 5.078, 6.692 },
 	levelCapInitial = 20, -- D-071
 	levelCapPerRebirth = 10,
 	levelCapMax = 100,
@@ -155,15 +157,15 @@ return {
 		{ id = "+3", grade = 3, weight = 0.01 },
 	},
 	modifierChance = 0.40, -- 仮
-	potionChanceRarePlus = 0.05, -- 仮
+	potionChanceRarePlus = 0.005, -- 仮。MB-5：指南書・手鏡・ロケットをコアで1日約20個に（D-298）
 	potionKindWeights = {
 		{ id = "job_change", weight = 0.40 },
 		{ id = "appearance_change", weight = 0.30 },
 		{ id = "appearance_keep", weight = 0.30 },
 	},
 	itemEventWeights = {
-		{ id = "ticket", weight = 0.02 }, -- D-074 で約1/10、D-097 でさらに1/3（M6 テストプレイで余ったため）
-		{ id = "sellable", weight = 0.98 },
+		{ id = "ticket", weight = 0.011 }, -- D-074 で約1/10、D-097 でさらに1/3（M6 テストプレイで余ったため）、MB-5 で冒険の配分を10%に（D-200）
+		{ id = "sellable", weight = 0.989 },
 	},
 	sellRarityMult = { 1, 1.5, 2.5, 4, 7, 12 }, -- 仮。レアリティの数だけ並べる（D-085）
 	sellGradeCoef = 0.5, -- 仮
@@ -209,7 +211,7 @@ return {
 		{ id = "mev_merchant", weight = 6 },
 	},
 	-- レアダンジョン（D-152, D-171, D-173）
-	rareDungeonChestMult = 1.5, -- 宝箱の数の倍率。1.5〜2 の範囲で仮（M7b-6）。端数は確率で切り上げ
+	rareDungeonChestMult = 1.8, -- 宝箱の数の倍率。1.5〜2 の範囲で仮（M7b-6）。MB-5 で宝箱の10倍（D-292）に合わせて1.8。端数は確率で切り上げ
 	-- レイドボス（D-152, D-179。06章 §12）。HP とダメージの式は仮（M7b-6 で決める）
 	--   HP     = floor(踏破済みの一番深いダンジョンの base.hp × raidHpMult × 一様乱数[raidHpSpread.min, max))（プレイヤーごと）
 	--   ダメージ = floor(パーティ全員の攻撃力（出発時の実効値）の合計 × raidDamagePerAtk)

@@ -10,21 +10,21 @@
 -- 報酬は達成したときに受け取り箱へ入る（D-164）。全部達成のボーナスは Constants.questDailyBonus / questWeeklyBonus
 -- お題の候補・量は仮（M7b-6）。報酬の量は M7b-6 の自動プレイで入手先の配分（D-160）に合わせた（docs/reports/M7b6_balance.md）
 --   どのお題も同じ報酬（期間ごと）。チケット・ゴールド・宝箱の割合（D-160, D-200）に合わせた。
---   ポーションは量を優先してお題ごとには出さない（D-201。全部達成のボーナスに少しだけ）
+--   指南書・手鏡・ロケットはデイリーのお題ごとにロケット1つ、ウィークリーのお題ごとに手鏡とロケット1つずつ（D-293・D-298：クエストから1日約4個。MB-5）
 
 local QUEST_CHEST = "special:quest"
 
--- デイリーのお題1つの報酬（M7b-6）
+-- デイリーのお題1つの報酬（M7b-6。ロケットは MB-5）
 local DAILY_REWARDS = {
 	goldMult = 30,
 	chests = { { pileKey = QUEST_CHEST, count = 60 } },
-	items = { itm_slot_ticket = 6 },
+	items = { itm_slot_ticket = 6, itm_potion_appearance_keep = 1 },
 }
--- ウィークリーのお題1つの報酬（M7b-6）
+-- ウィークリーのお題1つの報酬（M7b-6。手鏡・ロケットは MB-5）
 local WEEKLY_REWARDS = {
 	goldMult = 120,
 	chests = { { pileKey = QUEST_CHEST, count = 350 } },
-	items = { itm_slot_ticket = 18 },
+	items = { itm_slot_ticket = 18, itm_potion_appearance_change = 1, itm_potion_appearance_keep = 1 },
 }
 
 return {
