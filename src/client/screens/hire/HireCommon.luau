@@ -315,6 +315,10 @@ function HireCommon.statPanel(parent: Frame, candidate: any, roll: any, prev: an
 	local marks = HireCommon.growthMarks(candidate.jobId)
 	local attack = HireCommon.attackStat(candidate.jobId)
 	local rows: { [string]: Frame } = {}
+	-- ▲ の列の見出し（D-288：▲ だけでは伸びやすさと分からなかった）
+	local growthHead = Components.statHeader(Words.growth)
+	growthHead.LayoutOrder = 0
+	growthHead.Parent = content
 	for i, s in HireCommon.STATS do
 		local r = Components.statRow({
 			stat = s.key,
@@ -327,8 +331,8 @@ function HireCommon.statPanel(parent: Frame, candidate: any, roll: any, prev: an
 			prev = if prev then prev[s.key] else nil,
 		})
 		r.LayoutOrder = i
-		-- Total の行が入るように 52 → 44（面の高さ 448 のまま。大きい棒 32 は収まる）
-		r.Size = UDim2.new(1, 0, 0, 44)
+		-- Total の行と Growth の見出し（D-288）が入るように 52 → 39（面の高さ 448 のまま。大きい棒 32 は収まる）
+		r.Size = UDim2.new(1, 0, 0, 39)
 		r.Parent = content
 		rows[s.key] = r
 	end

@@ -50,10 +50,10 @@ local function itemCard(parent: Frame, item: any, x: number, band: number, onPin
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = content,
 	})
-	-- レアリティの形（色だけで分けない）
+	-- レアリティの形と名前（色だけで分けない。形だけでは格が分からないので名前も：D-288）
 	local shapes = Components.text({
-		text = ChestCommon.rarityShape(item.rarity),
-		size = 40,
+		text = ChestCommon.rarityLabel(item.rarity),
+		size = 36,
 		color = color,
 		font = Tokens.font.number,
 	})

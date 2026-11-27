@@ -6,6 +6,7 @@ local Game = require("@game/ReplicatedStorage/Core/Game")
 local Inventory = require("@game/ReplicatedStorage/Core/Inventory")
 local Party = require("@game/ReplicatedStorage/Core/Party")
 local HubState = require("../../hub/HubState")
+local PartyIcon = require("../../ui/PartyIcon")
 
 local AdvCommon = {}
 
@@ -51,14 +52,26 @@ AdvCommon.lineWord = { warrior = "Warrior", scout = "Scout", mage = "Mage", supp
 local STATE_GLYPH =
 	{ moving = "@cart_moving", exploring = "@cart_exploring", returning = "@cart_returning", waiting = "@cart_waiting" }
 
--- 札の中身（アイコンと語の並び：Components.setParts に渡す）。パーティにいなければ nil
+-- 札の中身（状態の印：Components.setParts に渡す）。パーティにいなければ nil。
+--   パーティは番号ではなくリーダーの顔で見せる（D-288）。顔は AdvCommon.partyIcon で札の左に置く
 function AdvCommon.partyBadge(view: any, uid: string): { string }?
 	local p = Party.find(view, uid)
 	if p == nil then
 		return nil
 	end
 	local s = HubState.status(view, p)
-	return { AdvCommon.icon.party, tostring(p), STATE_GLYPH[s.state] or "@cart_waiting" }
+	return { STATE_GLYPH[s.state] or "@cart_waiting" }
+end
+
+-- その人がいるパーティのリーダーの顔の小さな丸（D-288）。パーティにいなければ nil
+function AdvCommon.partyIcon(view: any, uid: string, size: number): Frame?
+	local p = Party.find(view, uid)
+	if p == nil then
+		return nil
+	end
+	local icon = PartyIcon.make(size)
+	PartyIcon.set(icon, view, p)
+	return icon
 end
 
 return AdvCommon

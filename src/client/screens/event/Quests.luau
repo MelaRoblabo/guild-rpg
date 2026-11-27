@@ -5,7 +5,8 @@
 --   - 行：1段目＝何をするかの短い英語（アイコンなし：D-233 ①）＋右に報酬の札（一番大きい報酬1つ：④）、
 --     2段目＝進みの棒に「18 / 30」（③）。済んだ行は報酬の札を✓に変え、行を暗くして沈める。
 --   - 下の段＝全部済んだときのボーナス：★の宝箱の下に済んだ行の数（1 / 3：⑤）、右に中身。全部済むと金の輪。
---   - 報酬は達成した瞬間に受け取り箱へ（D-164）。この面に受け取るボタンはない。× は面の右上の角。
+--   - 達成した行とボーナスに金の Claim。押すとその場で受け取り、獲得の画面（RewardGet）で中身を見せる（受け取り箱を通さない：D-286）。
+--     受け取った行は✓にして沈める。× は面の右上の角。
 
 local Calendar = require("@game/ReplicatedStorage/Core/Calendar")
 local Chest = require("@game/ReplicatedStorage/Core/Chest")
@@ -23,6 +24,7 @@ local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
 local WarehouseCommon = require("../warehouse/WarehouseCommon")
+local Words = require("../../ui/Words")
 local master = require("../../Master")
 
 local C = Tokens.color
@@ -31,6 +33,51 @@ local CHILDREN = Create.Children
 
 local deps = { nextDayStart = Calendar.nextDayStart, nextWeekStart = Calendar.nextWeekStart }
 local REWARD_ICON = { chest = "@chest", ticket = Components.icon.ticket, gold = Components.icon.coin }
+
+-- 受け取った中身（Inbox.grant の形）を獲得の画面の札にする（D-286）
+local function tilesOf(r: any): { any }
+	local tiles = {}
+	if r == nil then
+		return tiles
+	end
+	if (r.gold or 0) > 0 then
+		table.insert(tiles, { kind = "gold", n = r.gold })
+	end
+	local chests = 0
+	for _, c in r.chests or {} do
+		chests += c.count
+	end
+	if chests > 0 then
+		table.insert(tiles, { kind = "chest", n = chests })
+	end
+	local ids = {}
+	for id in r.items or {} do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		table.insert(tiles, { kind = "item", id = id, n = r.items[id] })
+	end
+	return tiles
+end
+
+-- 受け取るコマンドを送り、獲得の画面を重ねる（D-286）
+local busy = false
+local function claim(cmd: any, api: Nav.Api)
+	if busy then
+		return
+	end
+	busy = true
+	local ok, r = pcall(Session.sendAndWait, cmd)
+	busy = false
+	if ok and r and r.ok then
+		for _, e in r.events or {} do
+			if e.type == "QuestClaimed" or e.type == "QuestBonusClaimed" then
+				api.open("RewardGet", { tiles = tilesOf(e.rewards) })
+			end
+		end
+	end
+end
 
 local function build(_params: any?, api: Nav.Api): Nav.Built
 	Guide.done("quests") -- 誘導の最後の段（D-246 ②）
@@ -85,6 +132,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				end
 			end
 			local all = #book.entries > 0 and done == #book.entries
+			local bonusClaimable = book.bonusDone and not book.bonusClaimed -- D-286
 			local b: Frame = new("Frame", {
 				Name = if period == "daily" then "Daily" else "Weekly",
 				LayoutOrder = col,
@@ -131,12 +179,15 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			for i, e in book.entries do
 				local row = master.quests[e.questId]
 				local locked = QuestView.locked(row and row.kind, e, anyRebirthable)
+				local claimable = e.done and not e.claimed -- 受け取れる（D-286）
+				local sunk = e.done and not claimable
 				local r: Frame = new("Frame", {
 					Name = "Row_" .. e.questId,
 					LayoutOrder = i,
-					Size = UDim2.new(1, 0, 0, 76),
-					BackgroundColor3 = if e.done then C.ch68 else C.ch75,
-					BackgroundTransparency = if e.done or locked then 0.35 else 0,
+					Size = UDim2.new(1, 0, 0, if claimable then 86 else 76),
+					BackgroundColor3 = if sunk then C.ch68 else C.ch75,
+					BackgroundTransparency = if sunk or locked then 0.35 else 0,
+					[CHILDREN] = if claimable then { Components.stroke(C.selAmber, 3) } else nil,
 					[CHILDREN] = { Components.corner(8), Components.padding(6, 10, 7, 14) },
 					Parent = b,
 				})
@@ -152,7 +203,22 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				if locked then
 					Components.setParts(word, { "@locked", if row then row.nameEn else e.questId })
 				end
-				if e.done then
+				if claimable then
+					local qid, per = e.questId, period
+					local btn = Components.button({
+						kind = "gold",
+						width = 150,
+						label = Words.claim,
+						name = "Claim",
+						onClick = function()
+							claim({ type = "ClaimQuest", period = per, questId = qid }, api)
+						end,
+					})
+					btn.AnchorPoint = Vector2.new(1, 0.5)
+					btn.Position = UDim2.fromScale(1, 0.5)
+					btn.ZIndex = 3
+					btn.Parent = r
+				elseif e.done then
 					local ok =
 						Components.text({ text = "✓", size = 23, color = C.inkDark, font = Tokens.font.number })
 					ok.AnchorPoint = Vector2.new(1, 0)
@@ -178,7 +244,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 					Visible = not locked, -- 鍵の行は進みの棒を出さない（D-250 ⑦）
 					AnchorPoint = Vector2.new(0, 1),
 					Position = UDim2.fromScale(0, 1),
-					Size = UDim2.new(1, 0, 0, 28),
+					Size = UDim2.new(1, if claimable then -164 else 0, 0, 28), -- 受け取れる行は右に Claim
 					BackgroundColor3 = C.barTrack,
 					[CHILDREN] = { Components.corner(6) },
 					Parent = r,
@@ -216,6 +282,22 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 				},
 				Parent = b,
 			})
+			if bonusClaimable then
+				local per = period
+				local btn = Components.button({
+					kind = "gold",
+					width = 150,
+					label = Words.claim,
+					name = "ClaimBonus",
+					onClick = function()
+						claim({ type = "ClaimQuestBonus", period = per }, api)
+					end,
+				})
+				btn.AnchorPoint = Vector2.new(1, 0.5)
+				btn.Position = UDim2.fromScale(1, 0.5)
+				btn.ZIndex = 3
+				btn.Parent = bonusRow
+			end
 			-- 「全部終えるともらえる」を、行の数だけの小さなチェック枠が埋まっていく形で見せる（D-269 ②。▣★ 0/3 では分からなかった）
 			local bonusWord =
 				Components.text({ text = "Bonus", size = 21, color = C.inkDark, font = Tokens.font.display })
@@ -257,7 +339,7 @@ local function build(_params: any?, api: Nav.Api): Nav.Built
 			local items: Frame = new("Frame", {
 				Name = "Items",
 				Position = UDim2.fromOffset(124, 0),
-				Size = UDim2.new(1, -124, 1, 0),
+				Size = UDim2.new(1, if bonusClaimable then -284 else -124, 1, 0),
 				BackgroundTransparency = 1,
 				[CHILDREN] = {
 					new("UIListLayout", {

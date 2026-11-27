@@ -383,7 +383,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					Parent = rightContent,
 				})
 				local shape = Components.text({
-					text = ChestCommon.rarityShape(item.rarity),
+					text = ChestCommon.rarityLabel(item.rarity), -- 形＋名前（D-288）
 					size = 30,
 					color = C.inkLight,
 					font = Tokens.font.number,

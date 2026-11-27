@@ -24,7 +24,7 @@ local CHILDREN = Create.Children
 
 local ChestCommon = {}
 
-ChestCommon.deps = { value = Formulas.bulkSellValue, canEquip = Inventory.canEquip }
+ChestCommon.deps = { value = Formulas.bulkSellValue, canEquip = Inventory.canEquip, busy = Party.isAdventurerBusy }
 
 -- 仮のアイコン（文字）。素材ができたら画像に差し替える（D-227 ②）
 ChestCommon.icon = {
@@ -104,6 +104,12 @@ function ChestCommon.rarityShape(rank: number): string
 	return RARITY_SHAPE[rank] or RARITY_SHAPE[1]
 end
 
+-- 形＋レアリティの名前（「◆ Epic」。形だけでは格が分からなかった：D-288。ChestResults の札と同じ並び）
+function ChestCommon.rarityLabel(rank: number): string
+	local rr = master.raw.Rarities[rank]
+	return ChestCommon.rarityShape(rank) .. (if rr then " " .. rr.nameEn else "")
+end
+
 -- 品の名前（修飾語＋装備名。グレードは別に出す）
 function ChestCommon.itemName(item: any): string
 	local mod = if item.modifierId then master.modifiers[item.modifierId] else nil
@@ -149,7 +155,8 @@ export type Batch = {
 }
 
 -- 山ごとに OpenChests を送り、1つの束にまとめる。1つも開けられなければ nil
-function ChestCommon.open(piles: { string }, all: boolean): Batch?
+-- counts を渡すと、その山はその数まで（帰還で持ち帰った宝箱だけを開ける：D-287）
+function ChestCommon.open(piles: { string }, all: boolean, counts: { [string]: number }?): Batch?
 	local batch: Batch = {
 		piles = piles,
 		all = all,
@@ -165,7 +172,11 @@ function ChestCommon.open(piles: { string }, all: boolean): Batch?
 	}
 	for i, pileKey in piles do
 		local send = if i == #piles then Session.sendAndWait else Session.send
-		local r = send({ type = "OpenChests", pileKey = pileKey, count = master.K.chestBatchOpen })
+		local n = master.K.chestBatchOpen
+		if counts and counts[pileKey] then
+			n = math.clamp(counts[pileKey], 1, n)
+		end
+		local r = send({ type = "OpenChests", pileKey = pileKey, count = n })
 		if r and r.ok then
 			for _, e in r.events or {} do
 				if e.type == "ChestsOpened" then

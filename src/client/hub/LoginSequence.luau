@@ -5,10 +5,12 @@
 --   → カットイン（最大1回。設定でオフなら出さない）→ カレンダー（ログインボーナスが届いた日）
 --   の順に1枚ずつ出す。次へで差し替え、最後の次へで閉じる。B・Esc で閉じたら残りは出さない。
 --   休息ボーナスは廃止（D-280）。
+--   カレンダーは初回の誘導を終えるまで出さず、終えたら画面が空いたときに出す（D-289。時機は Guide.CALENDAR_AFTER）。
 --   ログインボーナスは留守の計算ではなく、ログイン直後の最初のオンラインの時間経過で届く（D-155、Game の advanceOnline）。
 --   そのため LoginBonus はログインの知らせとは別に受け取り、流れの途中なら最後につなぎ、そうでなければ画面が空いたときに出す。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
+local Guide = require("./Guide")
 local LoginFlow = require("../login/LoginFlow")
 local Nav = require("../ui/Nav")
 local ReturnToast = require("./ReturnToast")
@@ -28,6 +30,7 @@ local startDone = false -- ログインのまとめを出し終えたか（そ�
 local pendingCalendar: Step? = nil
 local opened = false -- 流れの画面が開いているか（トーストの間は閉じている）
 local inToasts = false -- 帰還のトーストを出している間（D-281）
+local heldCalendar: Step? = nil -- 誘導を終えるまで待たせているカレンダー（D-289）
 
 local function step()
 	index += 1
@@ -67,13 +70,28 @@ local function run(list: { Step })
 	step()
 end
 
--- ログインボーナスのカレンダー（1日1回）。流れの途中なら最後に足し、そうでなければ画面が空くのを待って出す
+-- 画面が空くのを待って1枚の流れとして出す
+local function runWhenFree(s: Step)
+	task.spawn(function()
+		while Nav.depth() > 0 or inToasts do
+			task.wait(0.5)
+		end
+		run({ s })
+	end)
+end
+
+-- ログインボーナスのカレンダー（1日1回）。流れの途中なら最後に足し、そうでなければ画面が空くのを待って出す。
+-- 初回の誘導を終えていなければ、終えるまで待たせる（D-289）
 local function queueCalendar(bonus: any)
 	if calendarShown then
 		return
 	end
 	calendarShown = true
 	local s = { id = "LoginCalendar", params = { loginBonus = bonus } }
+	if not Guide.calendarReady() then
+		heldCalendar = s
+		return
+	end
 	if not startDone then
 		pendingCalendar = s -- まとめより先に届いた：まとめの後ろにつなぐ（LoginSequence.start）
 		return
@@ -83,12 +101,7 @@ local function queueCalendar(bonus: any)
 		table.insert(steps, s)
 		return
 	end
-	task.spawn(function()
-		while Nav.depth() > 0 do
-			task.wait(0.5)
-		end
-		run({ s })
-	end)
+	runWhenFree(s)
 end
 
 function LoginSequence.start(events: { any })
@@ -119,7 +132,11 @@ function LoginSequence.start(events: { any })
 	local cal = pendingCalendar
 	pendingCalendar = nil
 	if cal then
-		table.insert(list, cal)
+		if Guide.calendarReady() then
+			table.insert(list, cal)
+		else
+			heldCalendar = cal -- 誘導を終えるまで待たせる（D-289）
+		end
 	end
 	startDone = true
 	if #list > 0 then
@@ -150,6 +167,14 @@ function LoginSequence.mount()
 		begin(Session.loadEvents)
 	end
 	Session.loaded:connect(begin)
+	-- 誘導が進んでカレンダーを出してよくなったら、待たせていた分を出す（D-289）
+	Guide.changed:connect(function()
+		local s = heldCalendar
+		if s and Guide.calendarReady() then
+			heldCalendar = nil
+			runWhenFree(s)
+		end
+	end)
 	-- ログイン直後（や日の区切り）のオンラインの時間経過で届くログインボーナス
 	Session.events:connect(function(reason: string, events: { any })
 		if reason == "load" then

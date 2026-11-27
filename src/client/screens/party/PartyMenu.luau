@@ -1,14 +1,14 @@
 --!strict
 -- S-12 編成の面（タイトル Edit Party：D-265 ④⑥。D-005・D-120・D-130・D-216・D-231 ⑦⑨⑩・D-232 ⑧・D-266・D-269）。
 --   開き方：待機中のパーティの面の Edit Party、採用の後の Add to Party、冒険者の詳細の Add to Party。× は右上。
---   - 上：羊皮紙のパネルに隊列1〜4のカード（左が1番）。題の札＝パーティの印＋番号＋Edit Party。
+--   - 上：羊皮紙のパネルに隊列1〜4のカード（左が1番）。題の札＝リーダーの顔のアイコン＋Edit Party（D-288）。右上に的の凡例。
 --     カード：肖像＋名前＋職業の札＋★転生＋Lv／ATK・DEF・MDEF の凹み（語つき：D-269 ④）／最大HP の棒／装備の枠3つ（押すと S-42）。
 --     被弾の ⚠＋棒は出さない（D-269 ①）。代わりにカードの下の縁に的の印（D-284）：よく狙われる隊列ほど大きく明るい。
 --     率は D-005 の hitWeights（マスターデータ）を入っている人だけで按分する（HitMark）。文字・数字は出さない。
 --   - パーティの中の並び替え（D-284）：隊列のカードを持ち上げてほかの隊列へ落とすと入れ替わる（空きなら移る）。
 --     SetPartySlot 1回で入れ替わる（同じパーティの人なら入れ替え）。2人の顔が互いの隊列へ飛ぶ。
 --   - 左下：控えの列（Reserve）を常に出す。カードは顔の絵・名前・Lv・職業のアイコン。新しく来た人は先頭に NEW で脈打つ。
---     ほかのパーティの人は番号つきで沈める（入れられない）。
+--     ほかのパーティの人はそのパーティのリーダーの顔のアイコンつきで沈める（入れられない：D-288）。
 --   - 入れ替え（D-265 ④）：
 --       ドラッグ：控えのカードを持ち上げると隊列のカードが脈打ち、落とした隊列と入れ替わる。
 --       タップ：控えのカードを押す → 隊列のカードが脈打つ → 隊列を押す。隊列を先に押すと控えのカードが脈打つ。
@@ -33,6 +33,7 @@ local HubState = require("../../hub/HubState")
 local Motion = require("../../ui/Motion")
 local Portrait = require("../../ui/Portrait")
 local Nav = require("../../ui/Nav")
+local PartyIcon = require("../../ui/PartyIcon")
 require("./DungeonPick") -- 行き先の一覧の窓を登録する（D-282）
 local Root = require("../../ui/Root")
 local Screen = require("../Screen")
@@ -426,14 +427,87 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			newcomer = nil
 		end
 
-		-- 隊列のパネル（題の札＝パーティの番号＋画面のタイトル：D-264 ②）
+		-- 隊列のパネル（題の札＝リーダーの顔のアイコン＋画面のタイトル：D-264 ②・D-288。番号ではなく顔で見分ける）
 		local panel, content = Components.panel({
 			size = UDim2.new(1, -80, 0, PANEL_H),
 			position = UDim2.fromOffset(40, band + 44),
-			title = { I.party, tostring(partyIndex), Words.title.editParty },
+			title = Words.title.editParty,
 		})
 		panel.Name = "Formation"
 		panel.Parent = body
+		local plaque = panel:FindFirstChild("TitlePlaque") :: Frame?
+		if plaque then
+			-- 札の中を横に並べる：顔のアイコン → タイトル（D-288）
+			new("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, 10),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Parent = plaque,
+			})
+			for _, c in plaque:GetChildren() do
+				if c:IsA("TextLabel") then
+					c.LayoutOrder = 2
+				end
+			end
+			local icon = PartyIcon.make(40)
+			icon.LayoutOrder = 1
+			icon.ZIndex = 7
+			icon.Parent = plaque
+			PartyIcon.set(icon, view, partyIndex)
+		end
+		-- 的の凡例（D-288）：小さい的 ▶ 大きい的＋「Gets hit more」。的だけでは何の印か分からなかった。数字は出さない
+		local legend: Frame = new("Frame", {
+			Name = "HitLegend",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -120, 0, 0), -- 右上の × （画面の右上の段）に重ねない
+			Size = UDim2.fromOffset(0, 44),
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = C.ch10,
+			ZIndex = 6,
+			[CHILDREN] = {
+				Components.corner(22),
+				Components.stroke(C.bronze, 2),
+				Components.padding(0, 16, 0, 12),
+				new("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, 8),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+			},
+			Parent = panel,
+		})
+		local function legendMark(order: number, share: number)
+			local holder: Frame = new("Frame", {
+				Name = "Mark" .. order,
+				LayoutOrder = order,
+				Size = UDim2.fromOffset(34, 34),
+				BackgroundTransparency = 1,
+				ZIndex = 6,
+				Parent = legend,
+			})
+			-- 凡例の的は見た目の見本（ゲームの数値ではない）：一番狙われる的に対する割合
+			local m = HitMark.make(math.floor(34 * math.sqrt(share) + 0.5), share)
+			m.Position = UDim2.fromScale(0.5, 0.5)
+			m.ZIndex = 7
+			m.Parent = holder
+		end
+		legendMark(1, 0.25)
+		local arrow = Components.text({ text = "▶", size = 21, color = C.inkMid, font = Tokens.font.number })
+		arrow.LayoutOrder = 2
+		arrow.ZIndex = 7
+		arrow.Parent = legend
+		legendMark(3, 1)
+		local lw = Components.text({
+			text = Words.getsHitMore,
+			size = 21,
+			color = C.inkLight,
+			font = Tokens.font.bodyStrong,
+		})
+		lw.LayoutOrder = 4
+		lw.ZIndex = 7
+		lw.Parent = legend
 		new("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			Padding = UDim.new(0, 10),
@@ -879,10 +953,18 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 						if job and job.attackType == "magic" then "@job_magic" else "@job_physical",
 						"Lv" .. o.adv.level,
 					}
-					else { I.party, tostring(o.p) } -- ほかのパーティの人は番号（入れられない）
+					else {} -- ほかのパーティの人はそのパーティのリーダーの顔（下。入れられない：D-288）
 			)
 			sub.TextTransparency = if free then 0 else 0.5
 			sub.Parent = rc
+			if not free then
+				local pi = PartyIcon.make(30)
+				pi.Name = "OtherParty"
+				pi.Position = UDim2.fromOffset(78, 38)
+				pi.BackgroundTransparency = 0.3
+				pi.Parent = rc
+				PartyIcon.set(pi, view, o.p :: number)
+			end
 			if o.uid == newcomer then
 				new("TextLabel", {
 					Name = "New",

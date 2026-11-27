@@ -5,8 +5,8 @@
 --   - レア：強さ＝踏破済みの一番深いダンジョンの番号に ✓ と攻撃の種類の割合／★の宝箱 ×倍率／
 --     選んだパーティの4人（有利な区分に緑の輪）と罠の避けやすさの棒（S-15 と同じ物差し：D-234 ①）。
 --   - レイド：ボスの HP の棒に、選んだパーティのダメージの見込みを薄く重ねる（数字なし：D-231 ⑬）／
---     参加したら★の宝箱（出発したパーティの番号と ✓）。
---   - パーティは「番号＋状態の札」から選ぶ（D-231 ⑰）。探索中は押せない、出発済みは ✓。
+--     参加したら★の宝箱（出発したパーティのリーダーの顔と ✓：D-288）。
+--   - パーティは「リーダーの顔＋状態の札」から選ぶ（D-231 ⑰・D-288）。探索中は押せない、出発済みは ✓。
 --   - 旅の商人（D-274）：片道の時間（One way）と品のレアリティの形。送れるのは1パーティだけ。着いたら商人の面で買う。
 --   - 金の Go（馬車＋種類のアイコン）＝DispatchEvent。
 
@@ -21,6 +21,7 @@ local Create = require("../../ui/Create")
 local Hint = require("../../party/Hint")
 local HubState = require("../../hub/HubState")
 local Nav = require("../../ui/Nav")
+local PartyIcon = require("../../ui/PartyIcon")
 local Root = require("../../ui/Root")
 local Session = require("../../Session")
 local Tokens = require("../../ui/Tokens")
@@ -306,12 +307,22 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			label(r2, 1, "@chest", 28)
 			label(r2, 2, "@party", 25)
 			for i, p in joined do
-				local j = WarehouseCommon.pill("✓", tostring(p), 21, C.okGreen)
+				-- 参加したパーティ：✓＋リーダーの顔（番号ではなく顔：D-288）
+				local j = WarehouseCommon.pill("✓", "", 21, C.okGreen)
+				for _, c in j:GetChildren() do
+					if c:IsA("TextLabel") and c.LayoutOrder == 2 then
+						c:Destroy() -- 空の語の枠は要らない
+					end
+				end
+				local face = PartyIcon.make(30)
+				face.LayoutOrder = 3
+				face.Parent = j
+				PartyIcon.set(face, view, p)
 				j.LayoutOrder = 2 + i
 				j.Parent = r2
 			end
 		end
-		-- パーティの札（番号＋状態：D-231 ⑰）
+		-- パーティの札（リーダーの顔＋状態の印：D-231 ⑰・D-288。番号ではなく顔）
 		local picks: Frame = new("Frame", {
 			Name = "Parties",
 			LayoutOrder = 3,
@@ -336,11 +347,12 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				local b: TextButton = new("TextButton", {
 					Name = "Party" .. p,
 					LayoutOrder = p,
-					Text = p .. "  " .. (if done then "✓" elseif ok then "▶" else "●"),
+					Text = if done then "✓" elseif ok then "▶" else "●", -- 状態の印は右、顔は左（D-288）
 					TextSize = 25,
 					FontFace = Tokens.font.display,
 					TextColor3 = if done then C.okGreen else C.inkLight,
 					TextTransparency = if ok or done then 0 else 0.5,
+					TextXAlignment = Enum.TextXAlignment.Right,
 					AutoButtonColor = false,
 					Active = ok,
 					Size = UDim2.fromOffset(109, 88),
@@ -348,9 +360,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					[CHILDREN] = {
 						Components.corner(14),
 						Components.stroke(if sel then C.selAmber elseif ok then C.bronze else C.ch28, 3),
+						Components.padding(0, 14, 0, 0),
 					},
 					Parent = picks,
 				})
+				local face = PartyIcon.make(56)
+				face.AnchorPoint = Vector2.new(0, 0.5)
+				face.Position = UDim2.new(0, 8, 0.5, 0)
+				face.BackgroundTransparency = if ok or done then 0 else 0.5
+				face.Parent = b
+				PartyIcon.set(face, view, p)
 				if ok then
 					b.Activated:Connect(function()
 						pick = p

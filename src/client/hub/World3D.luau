@@ -68,6 +68,7 @@ local eventPlaces: { BasePart } = {}
 local hidden: { [BasePart]: boolean } = {}
 local highlights: { [BasePart]: { Highlight } } = {}
 local carts: { [number]: Model } = {}
+local cartBoards: { [number]: BillboardGui } = {} -- 動いている馬車の上のリーダーのアイコン（全パーティ常に：D-290）
 local cartMoving: { [number]: boolean } = {} -- 移動中・帰り道（模型に触れて隠れている間も true）
 local cartTemplate: Model? = nil
 local cartRadius = 1.6 -- 馬車の足もとの半径（見本を読んだら見本の台座から出す）
@@ -797,6 +798,33 @@ function World3D.refresh(view: any)
 		cartMoving[i] = moving
 		if cart and not moving then
 			cart.Parent = nil -- 動いている間に出すか隠すかは step で決める（模型に触れている間は隠す）
+		end
+		-- 馬車の上のリーダーのアイコン（D-290）：動いている馬車には、どのパーティを選んでいても常に出す。
+		-- 馬車を隠している間（模型に触れている・待機・探索中）は、付け先が地図から外れるので出ない
+		local cb = cartBoards[i]
+		if moving and cart and cart.PrimaryPart then
+			if cb == nil or cb.Parent == nil then
+				local board = new("BillboardGui", {
+					Name = "CartBoard" .. i,
+					AlwaysOnTop = true,
+					Active = true,
+					Size = UDim2.fromOffset(ICON_SIZE + 16, ICON_SIZE + 16),
+					SizeOffset = Vector2.new(0, 0.5),
+					StudsOffsetWorldSpace = Vector3.new(0, 2.2, 0),
+					ResetOnSpawn = false,
+					Parent = boardFolder,
+				}) :: BillboardGui
+				iconButton(board, i)
+				cartBoards[i] = board
+				cb = board
+			end
+			local b = cb :: BillboardGui
+			b.Adornee = cart.PrimaryPart
+			b.Enabled = true
+			local icon = (b:FindFirstChild("Party" .. i) :: Frame):FindFirstChild("PartyIcon") :: Frame
+			PartyIcon.set(icon, view, i, s.state)
+		elseif cb then
+			cb.Enabled = false
 		end
 		-- 点線（馬車 → 目的地）
 		local beam = beams[i]

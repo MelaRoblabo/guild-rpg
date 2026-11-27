@@ -123,4 +123,10 @@ Words.amazing = "Amazing" -- Total が hireTotalAmazing 以上
 Words.reason.pickPosting = "Pick a posting first" -- 求人票を選ぶ前の Hire
 Words.leftCount = "%d left" -- 開封の Next の残りの数（点を並べない）
 
+-- 記号の補い（D-288。13歳のプレイテストで ▲・的・レアリティの形が分からなかった）
+Words.getsHitMore = "Gets hit more" -- 編成の面の的の凡例：小さい的 ▶ 大きい的（D-284・D-288）
+
+-- 獲得の画面（D-286・D-287）
+Words.title.rewards = "Rewards" -- クエストの報酬を受け取ったときの題
+
 return Words

@@ -92,6 +92,24 @@ return function(t)
 				expect(list[i - 1].delta >= list[i].delta).toBe(true)
 			end
 		end)
+		it("D-285 ギルドにいない（冒険中の）人は勧めない", function()
+			local s, adv, cur = setup()
+			local uid = add(s, cur, { rarity = 6, grade = 3 })
+			local away = table.clone(deps) :: any
+			away.busy = function(_s: any, advUid: string): boolean
+				return advUid == adv.uid
+			end
+			local all = Upgrades.forItem(s, uid, master, deps)
+			local some = Upgrades.forItem(s, uid, master, away)
+			local found = false
+			for _, u in all do
+				found = found or u.advUid == adv.uid
+			end
+			expect(found).toBe(true)
+			for _, u in some do
+				expect(u.advUid ~= adv.uid).toBe(true)
+			end
+		end)
 	end)
 
 	describe("D-223 結果のカード（Upgrades.plan）", function()

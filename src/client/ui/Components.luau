@@ -926,6 +926,30 @@ function Components.statRow(p: StatRowProps): Frame
 	return row
 end
 
+-- 能力の行の上に置く見出しの段（D-288）：statRow の ▲ の列の真上に語（Growth）を出す。
+--   ▲ だけでは何の印か分からなかった（13歳のプレイテスト）。列の位置は statRow と同じ並び（余白12＋アイコン32＋間12＋語64＋間12）
+Components.STAT_HEADER_H = 22
+function Components.statHeader(word: string): Frame
+	local row: Frame = new("Frame", {
+		Name = "StatHeader",
+		Size = UDim2.new(1, 0, 0, Components.STAT_HEADER_H),
+		BackgroundTransparency = 1,
+	})
+	local t = Components.text({
+		text = word,
+		size = Tokens.text.caption,
+		color = C.inkMid,
+		font = Tokens.font.bodyStrong,
+		xAlign = Enum.TextXAlignment.Left,
+	})
+	t.Name = "Growth"
+	t.AutomaticSize = Enum.AutomaticSize.None
+	t.Position = UDim2.fromOffset(12 + 32 + 12 + 64 + 12, 0)
+	t.Size = UDim2.fromOffset(120, Components.STAT_HEADER_H)
+	t.Parent = row
+	return row
+end
+
 ---------------------------------------------------------------------------
 -- 札・吹き出し
 

@@ -19,6 +19,9 @@ local CHILDREN = Create.Children
 local Guide = {}
 
 Guide.STEPS = { "wagon", "go", "chests", "openAll", "equip", "quests" }
+-- ログインボーナスのカレンダーを出してよくなる段（この段が済んだら出す。D-289）。
+-- 誘導はまだ変わるので、出す時機はここ1か所で変える（nil にすると誘導を全部終えたら）
+Guide.CALENDAR_AFTER = nil :: string?
 Guide.changed = Signal.new() :: Signal.Signal<boolean>
 
 local localDone = 0 -- サーバーへ送った分（要約が届くまでの間も先へ進めるため）
@@ -32,6 +35,13 @@ end
 -- 今光らせる段（全部済んでいれば nil）
 function Guide.current(): string?
 	return Guide.STEPS[doneCount() + 1]
+end
+
+-- ログインボーナスのカレンダーを出してよいか（D-289）
+function Guide.calendarReady(): boolean
+	local after = Guide.CALENDAR_AFTER
+	local need = if after then table.find(Guide.STEPS, after) or #Guide.STEPS else #Guide.STEPS
+	return doneCount() >= need
 end
 
 function Guide.is(key: string): boolean

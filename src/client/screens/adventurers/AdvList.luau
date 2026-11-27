@@ -1,6 +1,6 @@
 --!strict
 -- S-40 冒険者一覧（D-117・D-119・D-130・D-217・D-218・§5.1）。問い＝「誰を見る？」。カードを押すと S-41。
---   - 6列のカード（肖像・名前・♂♀・転生の★・職業の札・Lv）。左上にパーティの番号と状態の印（パーティなしは何も付けない）。
+--   - 6列のカード（肖像・名前・♂♀・転生の★・職業の札・Lv）。顔の下にパーティのリーダーの顔（D-288。番号ではなく顔）と状態の印（パーティなしは何も付けない）。
 --   - ティッカー：転生できる人＝赤い「!」、倉庫にもっと良い装備がある人＝緑の▲。保護中＝ピン（D-217）。
 --   - 在籍数（14/16）は出さず、上限までの残りを点線の空き枠で見せる。満杯のときだけ右上に警告の札（D-218）。
 --   - 上の並んだタブ＝職業系統（全員・Warrior・Scout・Mage・Support）。その右に並べ方のボタン（面で並べ方・向き・状態）。
@@ -84,7 +84,7 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 	if Portrait.fill(pic, adv.appearanceId) then
 		face.Visible = false
 	end
-	-- 顔の下の帯：パーティの番号と状態（顔にかからないように：D-269 ②）
+	-- 顔の下の帯：パーティのリーダーの顔と状態（顔にかからないように：D-269 ②。番号ではなく顔：D-288）
 	local badge = AdvCommon.partyBadge(view, adv.uid)
 	if badge then
 		local tag: Frame = new("Frame", {
@@ -96,11 +96,27 @@ local function card(view: any, adv: any, order: number, onClick: () -> ()): Text
 			BackgroundColor3 = C.ch10,
 			BackgroundTransparency = 0.15,
 			ZIndex = 11,
-			[CHILDREN] = { Components.corner(6), Components.padding(0, 10, 0, 8) },
+			[CHILDREN] = {
+				Components.corner(6),
+				Components.padding(0, 10, 0, 4),
+				new("UIListLayout", {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, 6),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+			},
 			Parent = pic,
 		})
+		local leaderFace = AdvCommon.partyIcon(view, adv.uid, 28)
+		if leaderFace then
+			leaderFace.LayoutOrder = 1
+			leaderFace.ZIndex = 12
+			leaderFace.Parent = tag
+		end
 		local bt = smallText("", 21, C.inkLight, tag, 12)
 		bt.Size = UDim2.fromOffset(0, 34)
+		bt.LayoutOrder = 2
 		Components.setParts(bt, badge)
 	end
 	-- 右上：転生できる「!」、もっと良い装備の ▲

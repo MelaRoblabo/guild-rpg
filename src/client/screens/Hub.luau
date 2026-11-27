@@ -25,6 +25,7 @@ local PickMode = require("../hub/PickMode")
 local LoginSequence = require("../hub/LoginSequence")
 local ReturnToast = require("../hub/ReturnToast")
 local Root = require("../ui/Root")
+local ChestCommon = require("./chest/ChestCommon")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
 local Words = require("../ui/Words")
@@ -40,7 +41,10 @@ local Hub = {}
 local layer: Frame
 local listFrame: Frame
 -- 左の一覧の行：リーダーのアイコン（右上に動く状態の印）と名前（D-271）
-local rows: { [number]: { button: TextButton, icon: Frame, name: TextLabel, pinch: Frame, ring: UIStroke } } = {}
+local rows: {
+	[number]: { button: TextButton, icon: Frame, name: TextLabel, pinch: Frame, ring: UIStroke, haul: TextButton },
+} =
+	{}
 local newFaceBoard: BillboardGui? = nil -- ギルドの上の、全員が冒険中に雇った人の NEW の顔（D-265 ②）
 local goldText: TextLabel
 local chestCount: TextLabel
@@ -49,6 +53,7 @@ local lastChestTotal: number? = nil -- 前に見た宝箱の数（増えたら�
 local chestNotice: Frame
 local chestButton: Frame
 local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 ②）
+local questBadge: TextLabel -- 受け取れるクエストの数（D-286）
 
 ---------------------------------------------------------------------------
 -- 3D マップ（D-270）
@@ -57,12 +62,64 @@ local questButton: TextButton -- 誘導の最後の段で光らせる（D-246 �
 local function openParty(partyIndex: number)
 	HubState.selected = partyIndex
 	PickMode.stop() -- 行き先を選ぶのをやめる
+	-- 前に選んだパーティの面・行き先の一覧（DungeonPick）を下に残さない（古い一覧が残っていた）
+	Nav.home()
 	Nav.open("PartyPanel", { partyIndex = partyIndex })
+end
+
+-- 帰還の獲得の吹き出しを押した（D-287）：獲得の画面 → 宝箱があれば Open でその宝箱の開封へ
+local function openHaul(partyIndex: number)
+	local view = Session.view
+	local party = nil
+	for _, p in (view and view.parties) or {} do
+		if p.index == partyIndex then
+			party = p
+		end
+	end
+	local h = party and party.haul
+	if h == nil then
+		return
+	end
+	Session.send({ type = "AckHaul", partyIndex = partyIndex }) -- 見たので記録を消す（報酬は帰還のときに入っている）
+	local chests, piles = 0, {}
+	for pileKey, n in h.chests or {} do
+		chests += n
+		table.insert(piles, pileKey)
+	end
+	table.sort(piles)
+	local tiles = {}
+	if (h.gold or 0) > 0 then
+		table.insert(tiles, { kind = "gold", n = h.gold })
+	end
+	if chests > 0 then
+		table.insert(tiles, { kind = "chest", n = chests })
+	end
+	local primary = nil
+	if chests > 0 then
+		primary = {
+			icon = "@chest",
+			label = Words.open,
+			onClick = function(api: Nav.Api)
+				-- 持ち帰った宝箱だけを開ける。初回は演出をフルで（D-267 ④）
+				local first = Guide.is("chests") or Guide.is("openAll")
+				Guide.done("openAll")
+				local batch = ChestCommon.open(piles, false, h.chests)
+				if batch then
+					batch.first = first
+					api.replace("ChestOpening", { batch = batch })
+				else
+					api.close()
+				end
+			end,
+		}
+	end
+	Nav.open("RewardGet", { title = PartyIcon.name(view, partyIndex), tiles = tiles, primary = primary })
 end
 
 local function mount3D()
 	World3D.mount({
 		onDungeon = function(id: string)
+			Nav.home() -- 前の面（パーティの面・行き先の一覧）を下に残さない
 			Nav.open("DungeonPanel", { dungeonId = id }) -- 面がカメラをそのダンジョンへ寄せる
 		end,
 		onGuild = function()
@@ -232,7 +289,57 @@ local function rowFor(partyIndex: number)
 		-- 触るとカメラがそのパーティへ寄って旋回し、パーティの面を開く（D-270 ⑤）
 		openParty(partyIndex)
 	end)
-	r = { button = button, icon = icon, name = name, pinch = pinch, ring = ring }
+	-- 帰還の獲得の吹き出し（D-287）：ギルドで待つパーティに持ち帰った物があれば、行の右に宝箱の吹き出し
+	local haul: TextButton = new("TextButton", {
+		Name = "Haul",
+		Text = "",
+		AutoButtonColor = false,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(1, 14, 0.5, 0),
+		Size = UDim2.fromOffset(66, 58),
+		BackgroundColor3 = C.ch75,
+		Visible = false,
+		ZIndex = 24,
+		[CHILDREN] = { Components.corner(14), Components.stroke(C.selAmber, 3) },
+		Parent = button,
+	})
+	-- 吹き出しの尾（行の方を指す）
+	new("Frame", {
+		Name = "Tail",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.fromOffset(16, 16),
+		Rotation = 45,
+		BackgroundColor3 = C.ch75,
+		BorderSizePixel = 0,
+		ZIndex = 23,
+		Parent = haul,
+	})
+	local chestPic: Frame = new("Frame", {
+		Name = "Pic",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(46, 46),
+		BackgroundTransparency = 1,
+		ZIndex = 25,
+		Parent = haul,
+	})
+	if not Art.put(chestPic, Art.chest(1, false)) then
+		local g = Components.text({ text = "@chest", size = 34, color = C.inkDark, font = Tokens.font.number })
+		g.AutomaticSize = Enum.AutomaticSize.None
+		g.Size = UDim2.fromScale(1, 1)
+		g.ZIndex = 25
+		g.Parent = chestPic
+	end
+	for _, d in chestPic:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.ZIndex = 25
+		end
+	end
+	haul.Activated:Connect(function()
+		openHaul(partyIndex)
+	end)
+	r = { button = button, icon = icon, name = name, pinch = pinch, ring = ring, haul = haul }
 	rows[partyIndex] = r
 	return r
 end
@@ -310,6 +417,22 @@ local function buildEdges(parent: Frame)
 	quest.Activated:Connect(function()
 		Nav.open("Quests") -- D-233（M8-6）
 	end)
+	-- 受け取れるクエストの数の札（D-286）。並びの中に入れないよう、語の札の右上に重ねる
+	questBadge = new("TextLabel", {
+		Name = "Claimable",
+		Text = "",
+		TextSize = 21,
+		FontFace = Tokens.font.number,
+		TextColor3 = C.inkWhite,
+		BackgroundColor3 = C.notice,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, 22, 0, -14),
+		Size = UDim2.fromOffset(32, 32),
+		Visible = false,
+		ZIndex = 25,
+		[CHILDREN] = { Components.corner(16), Components.stroke(C.ch75, 2) },
+		Parent = quest:FindFirstChild("Word"),
+	})
 	local gear = edgeButton("⚙", Words.settings, "settings")
 	gear.LayoutOrder = 2
 	gear.Parent = topRight
@@ -450,6 +573,28 @@ local function refreshStatic(view: any)
 		return
 	end
 	goldText.Text = HubState.formatNumber(view.gold or 0)
+	-- 受け取れるクエスト（達成して受け取っていない行とボーナス：D-286）
+	local claimable = 0
+	for _, period in { "daily", "weekly" } do
+		local book = view.quests and view.quests[period]
+		if book then
+			for _, e in book.entries or {} do
+				if e.done and not e.claimed then
+					claimable += 1
+				end
+			end
+			if book.bonusDone and not book.bonusClaimed then
+				claimable += 1
+			end
+		end
+	end
+	if questBadge then
+		if claimable > 0 and not questBadge.Visible then
+			Motion.bump(questBadge)
+		end
+		questBadge.Visible = claimable > 0
+		questBadge.Text = tostring(claimable)
+	end
 	local total = 0
 	for _, c in view.chests or {} do
 		total += c.count
@@ -551,6 +696,12 @@ local function refreshMoving(view: any)
 		r.name.Text = (string.gsub(leaderName, "'s Party$", ""))
 		r.pinch.Visible = s.pinch
 		r.ring.Transparency = if HubState.selected == i then 0 else 1
+		-- 待機（Zzz）になったら帰還の獲得の吹き出し（D-287）。自動再派遣の間は出さず、止まって帰ったときに合算で出す
+		local showHaul = s.state == "waiting" and party.haul ~= nil
+		if showHaul and not r.haul.Visible then
+			Motion.bump(r.haul)
+		end
+		r.haul.Visible = showHaul
 	end
 end
 
@@ -596,6 +747,7 @@ require("./chest/ChestOpening")
 require("./chest/ChestFeature")
 require("./chest/ChestReveal")
 require("./chest/ChestResults")
+require("./reward/RewardGet")
 require("./rebirth/RebirthRitual")
 require("./rebirth/RebirthCharge")
 require("./rebirth/RebirthCompare")

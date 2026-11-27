@@ -6,9 +6,10 @@
 --   - 肖像の右上＝保護のピン（D-217）。肖像の下の段＝改名・見た目変更（個数）・転職ポーション（個数）・解雇。
 --   - メイン（金）＝トレーニング1回（費用つき）。押し続けると約0.5秒で連続に入り、ゴールド・上限・指を離すまで続く。
 --     Lv が上がっても止めない（D-231 ⑪・D-232 ⑦）。上限 Lv なら Rebirth（語あり）→ S-43a。
---   - 探索中は装備・転職・解雇・メインを押せない色にし、メインの左に理由の札（パーティの番号と状態）。
+--   - 探索中は装備・転職・解雇・メインを押せない色にし、メインの左に理由の札（パーティのリーダーの顔と状態：D-288）。
 --   - 確認は解雇だけ（D-231 ①）。転職・見た目変更は押したらすぐ。
 
+local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local JobChange = require("@game/ReplicatedStorage/Core/JobChange")
 local Party = require("@game/ReplicatedStorage/Core/Party")
@@ -305,6 +306,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		-- 能力の列（素の能力。雇用・転生と同じ並び）
 		local marks = HireCommon.growthMarks(adv.jobId)
 		local attack = HireCommon.attackStat(adv.jobId)
+		-- ▲ の列の見出し（D-288：▲ だけでは伸びやすさと分からなかった）。XP の棒の下・能力の行の上
+		local growthHead = Components.statHeader(Words.growth)
+		growthHead.LayoutOrder = 2
+		growthHead.Parent = leftCol
 		for i, s in HireCommon.STATS do
 			local r = Components.statRow({
 				stat = s.key,
@@ -315,8 +320,8 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				big = s.key == attack or s.key == "hp",
 				marks = marks[s.key],
 			})
-			r.LayoutOrder = 1 + i
-			r.Size = UDim2.new(1, 0, 0, 50)
+			r.LayoutOrder = 2 + i
+			r.Size = UDim2.new(1, 0, 0, 46) -- Growth の見出しが入るように 50 → 46（D-288）
 			r.Parent = leftCol
 			-- トレーニングで上がった数字はカウントアップ（D-269 ③）
 			local from = trainedFrom and trainedFrom[s.key]
@@ -501,10 +506,16 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local actions = Screen.actionRow(body)
 		if exploring then
 			local why = pill("", AdvCommon.partyBadge(view, uid) or "", 25)
+			-- 札の左にパーティのリーダーの顔（番号ではなく顔：D-288）
+			local leaderFace = AdvCommon.partyIcon(view, uid, 34)
+			if leaderFace then
+				leaderFace.LayoutOrder = 0
+				leaderFace.Parent = why
+			end
 			why.LayoutOrder = 1
 			why.Parent = actions
 		end
-		-- 控えの人（どのパーティにもいない）には Add to Party（D-265 ⑤）。編成の面がその人を控えの先頭で光らせて開く。
+		-- 控えの人（どのパーティにもいない）には Add to Party（D-265 ⑤）。空き枠があれば先に入れ（D-283 と同じ）、なければ編成の面がその人を控えの先頭で光らせて開く。
 		-- 全員が冒険中なら灰色で、押すと理由を出す（D-265 ②）
 		if Party.find(view, uid) == nil then
 			local target: number? = nil
@@ -524,9 +535,29 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				glyph = "X",
 				reason = Words.reason.partyOut,
 				onClick = function()
-					if target then
-						api.open("PartyMenu", { partyIndex = target, newcomer = uid })
+					if target == nil then
+						return
 					end
+					-- 雇用と同じく、待機中のパーティの空き枠に先に入れる（D-283）。入れたら Auto Equip してその編成の面へ
+					local into, slot = HireCommon.openSlot(Session.view)
+					if into and slot then
+						local r = Session.sendAndWait({
+							type = "SetPartySlot",
+							partyIndex = into,
+							slot = slot,
+							adventurerUid = uid,
+						})
+						if r and r.ok then
+							local v2 = Session.view
+							if v2 and #AutoEquip.plan(v2, into, master, uid) > 0 then
+								Session.sendAndWait({ type = "AutoEquip", partyIndex = into, adventurerUid = uid })
+							end
+							api.open("PartyMenu", { partyIndex = into })
+							return
+						end
+					end
+					-- 空き枠がない：編成の面でその人を控えの先頭で光らせる（D-265 ⑤）
+					api.open("PartyMenu", { partyIndex = target, newcomer = uid })
 				end,
 			})
 			addBtn.LayoutOrder = 1
@@ -670,7 +701,17 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					nm.LayoutOrder = 1
 					nm.Parent = b
 					local gm = HireCommon.growthMarks(row.jobId)
-					local k = 2
+					-- ▲ の札の前に Growth の語（D-288：▲ STR だけでは伸びやすさと分からなかった）
+					local gw = Components.text({
+						text = Words.growth,
+						size = 21,
+						color = C.inkMid,
+						font = Tokens.font.bodyStrong,
+					})
+					gw.LayoutOrder = 2
+					gw.ZIndex = 34
+					gw.Parent = b
+					local k = 3
 					for _, s in HireCommon.STATS do
 						if gm[s.key] then
 							local g = pill(I.up, s.label, 21, C.up)

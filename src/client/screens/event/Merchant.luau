@@ -192,7 +192,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				l.TextTransparency = if it.bought then 0.55 else 0
 				l.Parent = card
 			end
-			txt(1, ChestCommon.rarityShape(it.rarity), 25, ChestCommon.rarityColor(it.rarity))
+			txt(1, ChestCommon.rarityLabel(it.rarity), 21, ChestCommon.rarityColor(it.rarity)) -- 形＋名前（D-288）
 			-- 装備の絵（見た目の段：D-254）。絵がなければ枠のアイコン
 			local art = Art.icon(Art.equip(it), 88, 2)
 			if art then

@@ -1,9 +1,9 @@
 --!strict
 -- 帰還のトースト（11章 §5・D-116・D-128・D-214・D-236 ④・D-281）。メイン画面の帯のすぐ下、左の一覧の右に暗い木のカプセル（右上のボタンに重ねない）。
---   - オンライン中の帰還（ExpeditionReturned、留守番でないもの）で出す。少しの間に帰ったパーティは1つにまとめる（D-128）。
+--   - オンライン中の帰還では出さない（左の一覧の宝箱の吹き出しに替えた：D-287）。
 --   - ログインでは、まとめ（S-01）を閉じたあと、留守の間に帰ったパーティごとに1つずつ出す（playLogin：D-281）。
 --     触るか時間がたつと次のパーティへ。全部出し終えたらカットインへ（hub/LoginSequence）。
---   - 中身：馬車（帰る向き）＋パーティの番号（まとめは重ねる）＋宝箱の数（0 からカウントアップ：D-269 ⑤）＋
+--   - 中身：馬車（帰る向き）＋パーティのリーダーの顔の丸（まとめは重ねる。番号ではなく顔：D-288）＋宝箱の数（0 からカウントアップ：D-269 ⑤）＋
 --     XP の札（日替わり＝太陽と倍率：06章 §16。留守番の探索は経験値なし：D-280。休息ボーナスは廃止：D-280）。
 --     右の端の Go＝同じ所へもう一度（待機のパーティだけ）。
 --   - レベルが上がった人がいれば「Lv▲ 人数」の札を足し、その人をパーティの面で一度光らせる（D-246 ④）。
@@ -15,7 +15,7 @@ local Create = require("../ui/Create")
 local HubState = require("./HubState")
 local LevelUpMarks = require("./LevelUpMarks")
 local Motion = require("../ui/Motion")
-local Nav = require("../ui/Nav")
+local PartyIcon = require("../ui/PartyIcon")
 local Root = require("../ui/Root")
 local Session = require("../Session")
 local Tokens = require("../ui/Tokens")
@@ -28,12 +28,9 @@ local CHILDREN = Create.Children
 
 -- 見せる時間とまとめる間（D-238 ③）
 local SHOW_SECONDS = master.K.returnToastSeconds
-local GROUP_SECONDS = master.K.returnToastGroupSeconds
 
 local ReturnToast = {}
 
-local pending: { any } = {}
-local pendingLevelUps: { [string]: boolean } = {} -- まとめる間にレベルが上がった人（D-246 ④）
 local current: Frame? = nil
 local token = 0
 
@@ -131,11 +128,39 @@ local function show(group: { any }, levelUps: number, onEnd: (() -> ())?)
 		t.Parent = tap
 		return t
 	end
-	local nums = {}
-	for _, p in parties do
-		table.insert(nums, tostring(p))
+	-- 帰ったパーティ：帰る向きの印＋リーダーの顔の丸（まとめは少し重ねて並べる。番号ではなく顔：D-288）
+	local who: Frame = new("Frame", {
+		Name = "Parties",
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(0, 52),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 1,
+		ZIndex = 52,
+		[CHILDREN] = {
+			new("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Padding = UDim.new(0, -10),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		},
+		Parent = tap,
+	})
+	local arrow = Components.text({ text = "◀", size = 28, color = C.inkLight, font = Tokens.font.number })
+	arrow.LayoutOrder = -1
+	arrow.ZIndex = 52
+	arrow.Parent = who
+	new(
+		"Frame",
+		{ Name = "Gap", LayoutOrder = 0, Size = UDim2.fromOffset(28, 1), BackgroundTransparency = 1, Parent = who }
+	)
+	for k, p in parties do
+		local icon = PartyIcon.make(48)
+		icon.LayoutOrder = k
+		icon.ZIndex = 52 + k
+		icon.Parent = who
+		PartyIcon.set(icon, Session.view, p)
 	end
-	label(1, "◀ " .. table.concat(nums, " "), 28, C.inkLight)
 	local chestLabel = label(2, "▣ +0", 30, C.numHi)
 	-- 宝箱の数は 0 からカウントアップ（D-269 ⑤）
 	task.defer(function()
@@ -211,41 +236,17 @@ function ReturnToast.playLogin(groups: { { any } }, done: () -> ())
 end
 
 function ReturnToast.mount()
+	-- オンライン中の帰還はトーストを出さず、ギルドで待機になったら左の一覧の宝箱の吹き出しで見せる（D-287）。
+	-- レベルが上がった人の印だけはここで付ける（パーティの面で一度光らせる：D-246 ④）
 	Session.events:connect(function(reason: string, events: { any })
 		if reason == "load" then
-			return -- ログインの帰還はまとめの画面で見せる（S-01）
+			return -- ログインの帰還はまとめの画面のあとでトーストにする（S-01・D-281）
 		end
 		for _, e in events do
-			if e.type == "ExpeditionReturned" and not e.offline then
-				table.insert(pending, e)
-			elseif e.type == "LevelUp" and e.uid then
-				pendingLevelUps[e.uid] = true
-				LevelUpMarks.note(e.uid) -- パーティの面で一度光らせる（トーストを出さないときも）
+			if e.type == "LevelUp" and e.uid then
+				LevelUpMarks.note(e.uid)
 			end
 		end
-		if #pending == 0 then
-			return
-		end
-		task.delay(GROUP_SECONDS, function()
-			if #pending == 0 then
-				return
-			end
-			local group = pending
-			pending = {}
-			local levelUps = 0
-			for _ in pendingLevelUps do
-				levelUps += 1
-			end
-			pendingLevelUps = {}
-			local view = Session.view
-			if Nav.depth() > 0 or view == nil then
-				return
-			end
-			if not Game.query.preferences(view, master).returnToast then
-				return
-			end
-			show(group, levelUps)
-		end)
 	end)
 end
 

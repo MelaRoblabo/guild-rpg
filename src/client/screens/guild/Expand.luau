@@ -123,7 +123,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			-- 状態の札（条件もお金も足りないときは両方：D-237 ①）
 			if r.step then
 				if r.needLevel then
-					local p = WarehouseCommon.pill("@locked", { "@guild", "Lv" .. r.needLevel }, 21)
+					local p = WarehouseCommon.pill("@locked", { "@guild", Words.guild, "Lv " .. r.needLevel }, 21) -- ⌂ だけでは何の Lv か分からないので語（D-288）
 					p.LayoutOrder = 4
 					p.Parent = b
 				end
