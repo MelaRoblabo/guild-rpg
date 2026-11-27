@@ -1032,7 +1032,7 @@ local function validateHiringData(c: Checker, d: any)
 			uniqueLooks[u.appearanceId] = true
 		end
 		keyed("uniques", uniqueLooks)
-		for _, group in { "npcs", "ui" } do
+		for _, group in { "npcs", "ui", "eventBackgrounds" } do
 			for key, v in d.Images[group] or {} do
 				asset(`Images.{group}.{key}`, v)
 			end

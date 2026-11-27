@@ -29,6 +29,11 @@ function Art.background(dungeonId: string?): string?
 	return if dungeonId and images.backgrounds then images.backgrounds[dungeonId] else nil
 end
 
+-- レアダンジョンの中の背景（D-304）
+function Art.rareDungeonBackground(): string?
+	return if images.eventBackgrounds then images.eventBackgrounds.rareDungeon else nil
+end
+
 function Art.gift(giftId: string?): string?
 	return if giftId and images.gifts then images.gifts[giftId] else nil
 end

@@ -162,10 +162,15 @@ local function mount3D()
 			Nav.open("HireDesk") -- ギルド（S-20＝受付の広間：D-122・D-231 ③）
 		end,
 		onParty = openParty,
-		-- レイドボス（D-275）：出発できる間は出発の面
+		-- レイドボス（D-275）・レアダンジョンの水晶の祠（D-304）：出発できる間は出発の面
 		onRaid = function(slot: number)
-			local cur = Game.query.mapEvent(Session.now(), master).current
-			if Session.view and cur.kind == "raid" and cur.eventSlot == slot and cur.open then
+			local cur = Game.query.mapEvent(Session.now(), master, Session.view).current
+			if
+				Session.view
+				and (cur.kind == "raid" or cur.kind == "rareDungeon")
+				and cur.eventSlot == slot
+				and cur.open
+			then
 				PickMode.stop()
 				Nav.open("EventDepart", { slot = slot })
 			end

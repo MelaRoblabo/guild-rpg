@@ -69,6 +69,7 @@ local Words = {
 	-- 旅の商人（D-274）
 	merchant = "Merchant",
 	raidBoss = "Raid Boss", -- レイドボス（D-275。照準の札）
+	rareDungeon = "Rare Dungeon", -- レアダンジョンの水晶の祠（D-304。照準の札）
 	leave = "Leave", -- 商人のところから帰る
 	leavesIn = "Leaves in", -- 商人が去るまで（頭上の時計）
 	arrivesIn = "Arrives in", -- パーティが商人に着くまで

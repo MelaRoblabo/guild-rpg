@@ -233,6 +233,10 @@ return {
 		uni_lyra = "rbxassetid://125742582734845",
 		uni_bran = "rbxassetid://109404262602838",
 	},
+	-- マップイベントの中の背景（1024×512。レアダンジョンは相当するダンジョンの絵でなく専用の絵：D-304）
+	eventBackgrounds = {
+		rareDungeon = "rbxassetid://125938020114153",
+	},
 	-- NPC（受付嬢・旅の商人。680×800 透過）
 	npcs = {
 		npc_receptionist = "rbxassetid://95271683081881",

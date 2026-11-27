@@ -9,6 +9,7 @@
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Party = require("@game/ReplicatedStorage/Core/Party")
+local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local TweenService = game:GetService("TweenService")
 local Components = require("../ui/Components")
 local Create = require("../ui/Create")
@@ -522,14 +523,19 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				c:Destroy()
 			end
 		end
-		-- ダンジョンの中だけ、そのダンジョンの背景（15章 §9。文字が読めるよう少し沈める）
+		-- ダンジョンの中だけ、そのダンジョンの背景（15章 §9。文字が読めるよう少し沈める）。
+		--   レアダンジョン（宝箱の山が special:rare:）は専用の背景（D-304）
 		if not (st.phase == "floor" and st.kind == "battle") then
 			local m = scene:FindFirstChild("Monster")
 			if m then
 				m:Destroy()
 			end
 		end
-		local bgImage = if st.phase == "floor" then Art.background(e.dungeonId) else nil
+		local rare = e.chestPile ~= nil and string.sub(e.chestPile, 1, #Chest.RARE_PREFIX) == Chest.RARE_PREFIX
+		local bgImage = if st.phase ~= "floor"
+			then nil
+			elseif rare then Art.rareDungeonBackground() or Art.background(e.dungeonId)
+			else Art.background(e.dungeonId)
 		local bg = scene:FindFirstChild("Bg") :: ImageLabel?
 		if bgImage then
 			if bg == nil then

@@ -36,7 +36,7 @@
 | `PlaytimeRewards.luau` | プレイ時間の段階（D-154） | — |
 | `SpecialChests.luau` | 特別な宝箱の表（D-166） | `spc_` |
 | `MapEvents.luau` | マップイベント（種類・場所。D-152） | `mev_` |
-| `Images.luau` | 画像のアセットID（モンスター・ダンジョンの背景・宝箱・道具・装備の見た目。15章 §4）。バストアップは `Appearances` の `imageId` | — |
+| `Images.luau` | 画像のアセットID（モンスター・ダンジョンの背景・マップイベントの中の背景（`eventBackgrounds`：レアダンジョンは専用の絵：D-304）・宝箱・道具・装備の見た目。15章 §4）。バストアップは `Appearances` の `imageId` | — |
 
 ## 2. 検証（MasterData.luau）
 

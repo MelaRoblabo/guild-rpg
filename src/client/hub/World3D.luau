@@ -41,7 +41,7 @@ export type Handlers = {
 	onGuild: () -> (),
 	onParty: (partyIndex: number) -> (),
 	onMerchant: (eventSlot: number) -> (), -- 旅の商人（D-274）
-	onRaid: (eventSlot: number) -> (), -- レイドボス（D-275）
+	onRaid: (eventSlot: number) -> (), -- レイドボス（D-275）・レアダンジョンの水晶の祠（D-304）
 }
 
 local DOT_TEXTURE = "rbxasset://textures/ui/traildot.png" -- Beam の点線（D-270 ②）
@@ -406,7 +406,7 @@ function World3D.mount(h: Handlers)
 			if hd == nil then
 				return
 			end
-			if kind == "raid" then
+			if kind == "raid" or kind == "rareDungeon" then
 				hd.onRaid(slot)
 			else
 				hd.onMerchant(slot)
@@ -571,7 +571,7 @@ local function open(t: Target?)
 		h.onGuild()
 	elseif t.kind == "merchant" then
 		h.onMerchant(t.index :: number)
-	elseif t.kind == "raid" then
+	elseif t.kind == "raid" or t.kind == "rareDungeon" then
 		h.onRaid(t.index :: number)
 	else
 		h.onDungeon(t.id :: string)
@@ -597,6 +597,8 @@ local function targetName(t: Target): string
 		return Words.merchant
 	elseif t.kind == "raid" then
 		return Words.raidBoss
+	elseif t.kind == "rareDungeon" then
+		return Words.rareDungeon
 	end
 	local d = master.dungeons[t.id :: string]
 	return if d then d.nameEn else ""
@@ -604,7 +606,7 @@ end
 
 -- 縁を光らせる所：見えている模型（外側の箱は透明なので、子の Model・Part）
 local function lightTarget(t: Target): Instance
-	if t.kind == "party" or t.kind == "merchant" or t.kind == "raid" then
+	if t.kind == "party" or t.kind == "merchant" or t.kind == "raid" or t.kind == "rareDungeon" then
 		return t.model
 	end
 	for _, c in t.model:GetChildren() do

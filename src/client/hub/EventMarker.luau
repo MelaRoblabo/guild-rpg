@@ -8,6 +8,7 @@
 --   ⑤ 締め切り間近は印が小さく揺れ、締め切ったら「Closed」のハンコを押して消える（D-269 ③。黙って消えていた）。
 --   3D マップ（D-270 ⑦）：印は地図の上の場所（Studio の EventPlace01〜）に BillboardGui で出す。
 --   旅の商人・レイドボスには印を出さない（D-274・D-275：地図の上の物そのものと頭上の時計：EventWorld）。
+--   レアダンジョンも出ている間は印を出さない（D-304：地図の上の水晶の祠）。予告の間だけ印を出す。
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
@@ -164,8 +165,10 @@ function EventMarker.refresh(view: any)
 		ev = st.next
 		notice = true
 	end
-	if ev and (ev.kind == "merchant" or ev.kind == "raid") then
-		ev = nil -- 商人・レイドボスは地図の上の物（EventWorld）が出す（D-274・D-275）
+	-- 商人・レイドボスは地図の上の物（EventWorld）が出す（D-274・D-275）。
+	-- 出ているレアダンジョンも地図の上の水晶の祠が出す（D-304）。予告の間だけ印を出す
+	if ev and (ev.kind == "merchant" or ev.kind == "raid" or (ev.kind == "rareDungeon" and not notice)) then
+		ev = nil
 	end
 	current = if notice then nil else ev
 	-- 出ていたイベントが締め切られた（次の予告になった・消えた）ら、その場所に Closed のハンコ
