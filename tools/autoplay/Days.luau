@@ -23,11 +23,10 @@ local Days = {}
 local T0 = 1767225600 -- 2026-01-01 00:00 UTC（ツールの起点。ゲームの数値ではない）
 local DAY = 86400
 
--- 最大の育成（D-161 の「最大の育成まで」）：決定・仕様書に定義がないので、ここでは
---   パーティ枠を最後まで拡張し、パーティに入っている全員が最後の転生（上限レベル levelCapMax）で上限レベルに届いた状態
--- とする（要確認）
+-- 最大の育成（D-199）：パーティ枠を最後まで拡張し、パーティに入っている全員が最後の転生（上限レベル levelCapMax）で
+--   上限レベルに届いた状態
 local MAX_GROWTH_TEXT =
-	"パーティ枠を最後まで拡張し、パーティに入っている全員が最後の転生（上限レベル levelCapMax）で上限レベルに届いた状態（仮の定義）"
+	"パーティ枠を最後まで拡張し、パーティに入っている全員が最後の転生（上限レベル levelCapMax）で上限レベルに届いた状態（D-199）"
 
 local function maxPartySlots(master: any): number
 	local e = master.expansions.exp_party
@@ -219,19 +218,11 @@ function Days.run(opts: any, master: any): any
 			local endAt = loginAt + s.minutes * 60
 			-- 留守番（D-161）：ログアウトからログインまでを core の留守の計算で進める
 			if logoutAt then
-				local inflight = 0 -- ログアウトの前にオンラインで出した探索の経験値（オンラインの価値に数える）
-				for _, e in state.expeditions do
-					if not e.offline and not e.raidDamage then
-						for _, v in e.log.rewards.exp do
-							inflight += v
-						end
-					end
-				end
+				-- 留守番の探索は経験値を得ない（D-280）。留守の計算の中で増えた経験値は、ログアウトの前にオンラインで
+				-- 出した探索が帰還した分だけなので、すべてオンラインの価値に数える
 				local snap = Ledger.expSnapshot(state)
 				local evs = Game.advance(state, ctx(loginAt, false))
-				local gained = Ledger.expGained(state, snap, expToNext)
-				ledger.value.online.exp += math.min(gained, inflight)
-				ledger.value.offline.exp += math.max(0, gained - inflight)
+				ledger.value.online.exp += Ledger.expGained(state, snap, expToNext)
 				Ledger.onAdvance(ledger, evs)
 				watchEvents(evs)
 				local away = loginAt - logoutAt
@@ -361,6 +352,7 @@ function Days.run(opts: any, master: any): any
 	end
 
 	return {
+		master = master,
 		state = state,
 		ledger = ledger,
 		stats = stats,
@@ -436,7 +428,10 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 		return if b > 0 then string.format("%.1f倍", a / b) else "-"
 	end
 	table.insert(lines, "")
-	table.insert(lines, "## 1時間あたりの価値：オンライン／留守番（D-161 の目標は10倍以上）")
+	table.insert(
+		lines,
+		"## 1時間あたりの価値：オンライン／留守番（D-292：ゴールドと宝箱が「6時間まで」で10倍以上）"
+	)
 	table.insert(lines, "")
 	table.insert(
 		lines,
@@ -447,7 +442,7 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 	)
 	table.insert(
 		lines,
-		"オンラインはオンラインで出した探索（ログアウトの時点で出ていた探索を含む）、留守番は留守番の探索の分。経験値は休息ボーナス・個人の補正を掛けた後（留守の計算の中でログアウト前の探索の分は概算で引く）。"
+		"オンラインはオンラインで出した探索（ログアウトの時点で出ていた探索を含む）、留守番は留守番の探索の分。経験値は個人の補正を掛けた後。留守番の探索は経験値を得ない（D-280）ので、経験値の比は参考（目標から外した：D-292）。"
 	)
 	table.insert(lines, "")
 	table.insert(
@@ -583,8 +578,20 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 		{ "ゴールド（宝箱込み）", { "gold", "chestGold" }, "gold" },
 		{ "宝箱", { "chests" }, "chests" },
 		{ "チケット", { "tickets" }, "tickets" },
-		{ "ポーション", { "potions" }, "potions" },
+		{ "指南書・手鏡・ロケット", { "tools" }, "tools" },
 	}
+	-- 目標は src/data/BalanceTargets.luau の配分の行（judge = "share"）から取る（MB）
+	local shareTargets = {}
+	local METRIC_OF = { gold = "shareGold", chests = "shareChests", tickets = "shareTickets", tools = "shareTools" }
+	for _, t in (r.master.balanceTargets and r.master.balanceTargets.targets) or {} do
+		if t.judge == "share" then
+			for res, m in METRIC_OF do
+				if t.metric == m then
+					shareTargets[res] = t.columns
+				end
+			end
+		end
+	end
 	for _, row in rows do
 		local shares, total = Ledger.shares(L.totals, row[2])
 		local a = `| {row[1]} | 実測 |`
@@ -595,10 +602,10 @@ function Days.report(r: any, opts: any, elapsed: number): (string, string)
 		table.insert(lines, a)
 		if row[1] ~= "ゴールド（宝箱込み）" then
 			local b = `| | 目標 |`
-			local targets = Ledger.TARGETS[row[3]]
-			for i = 1, #Ledger.COLUMNS do
-				local t = targets[i]
-				b ..= ` {if t == true then "あり" elseif t == nil then "—" else tostring(t)} |`
+			local targets = shareTargets[row[3]] or {}
+			for _, col in Ledger.COLUMNS do
+				local t = targets[col.key]
+				b ..= ` {if t == nil then "—" else tostring(t)} |`
 			end
 			b ..= " |"
 			table.insert(lines, b)

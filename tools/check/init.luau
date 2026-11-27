@@ -1,5 +1,5 @@
 --!strict
--- まとめて確認する：StyLua（整形チェック）→ selene → マスターデータ検証 → 全テスト
+-- まとめて確認する：StyLua（整形チェック）→ selene → マスターデータ検証 → 全テスト → バランスの成績表が動くか
 -- 使い方: lune run tools/check
 
 local process = require("@lune/process")
@@ -47,6 +47,8 @@ else
 end
 
 step("テスト", "lune", { "run", "tools/test" })
+-- バランスの成績表が今の仕様で動くか（判定はしない。MB）。本番の判定は lune run tools/balance
+step("バランスの成績表（動くか）", "lune", { "run", "tools/balance", "--", "--quick", "--quiet" })
 
 print(if failed then "\n✗ check 失敗" else "\n✓ check 成功")
 process.exit(if failed then 1 else 0)

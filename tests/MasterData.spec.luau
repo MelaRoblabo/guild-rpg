@@ -125,6 +125,51 @@ return function(t)
 				expect(paths["Appearances[2].imageId"]).toBe(nil)
 			end
 		)
+		it(
+			"D-291 バランスの目標の表：決定ID・判定の仕方・型・配分の列が正しくなければ失敗",
+			function()
+				local d = clone(Data)
+				local rows = d.BalanceTargets.targets
+				rows[1].decision = "なし"
+				rows[2].judge = "maybe"
+				rows[3].profiles = { "casual" }
+				local share
+				for _, r in rows do
+					if r.judge == "share" then
+						share = r
+						break
+					end
+				end
+				share.columns.shop = 10
+				local paths = {}
+				for _, e in errorsOf(d) do
+					paths[e.path] = true
+				end
+				expect(paths["BalanceTargets.targets[1].decision"]).toBe(true)
+				expect(paths["BalanceTargets.targets[2].judge"]).toBe(true)
+				expect(paths["BalanceTargets.targets[3].profiles[1]"]).toBe(true)
+			end
+		)
+		it(
+			"D-291 バランスの目標の表：near に幅がない・存在しないダンジョンを指すと失敗",
+			function()
+				local d = clone(Data)
+				for _, r in d.BalanceTargets.targets do
+					if r.id == "bal_days_to_max_growth" then
+						r.tol = nil
+					elseif r.id == "bal_stage_clear" then
+						r.byDungeon.dng_none = 0.5
+					end
+				end
+				local msgs = {}
+				for _, e in errorsOf(d) do
+					table.insert(msgs, e.path .. " " .. e.message)
+				end
+				local all = table.concat(msgs, "\n")
+				expect(string.find(all, "tol", 1, true) ~= nil).toBe(true)
+				expect(string.find(all, "dng_none", 1, true) ~= nil).toBe(true)
+			end
+		)
 		it("必須の定数が欠けると失敗", function()
 			local d = clone(Data)
 			d.Constants.maxTurns = nil

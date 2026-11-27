@@ -27,4 +27,5 @@ return {
 	PlaytimeRewards = require("@self/PlaytimeRewards"),
 	MapEvents = require("@self/MapEvents"),
 	Images = require("@self/Images"),
+	BalanceTargets = require("@self/BalanceTargets"), -- バランスの目標（ツール用。MB）
 }

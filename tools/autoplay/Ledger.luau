@@ -3,7 +3,8 @@
 -- advance のイベントと、方針が実行したコマンドの結果から、報酬を入手先ごとに数える。ゲームのルールは持たない。
 --   入手先：adventure（オンラインで出した探索）・offline（留守番の探索）・quest・login・playtime・friend・
 --           mapevent（レアダンジョン・レイド）・guild（ギルドレベル）・referral（紹介）・merchant（商人で買った装備）
---   報酬  ：gold（入手先が直接くれたゴールド）・chests（宝箱の数）・tickets（ステータススロットチケット）・potions（ポーション）
+--   報酬  ：gold（入手先が直接くれたゴールド）・chests（宝箱の数）・tickets（ステータススロットチケット）・
+--           tools（指南書・手鏡・ロケット。D-255 で旧ポーションから名前が変わった。アイテムの kind は potion_* のまま）
 --           chestGold（宝箱の中身から出たゴールド：中身のゴールド・素材の自動売却・装備の売却。宝箱の入手先に付ける）
 -- 普通のダンジョンの宝箱の山はオンラインと留守番の宝箱が混ざるので、中身は山に入った数の割合で按分する。
 
@@ -21,27 +22,19 @@ Ledger.SOURCES = {
 	"referral",
 	"merchant",
 }
-Ledger.RESOURCES = { "gold", "chestGold", "chests", "tickets", "potions" }
+Ledger.RESOURCES = { "gold", "chestGold", "chests", "tickets", "tools" }
 
--- D-160 の目標の表（docs/system/04_master_data.md §13）の列。留守番の探索は「冒険」に数える（D-200）。
--- 「プレイ時間」の列はプレイ時間報酬だけ
+-- 配分の表（D-160）の列。key は目標の表（src/data/BalanceTargets.luau の columns）と同じ。
+-- 留守番の探索は「冒険」に数える（D-200）。「プレイ時間」の列はプレイ時間報酬だけ。
+-- 目標の値はここに書かない（MB：目標は src/data/BalanceTargets.luau だけに置く）
 Ledger.COLUMNS = {
-	{ name = "冒険", sources = { "adventure", "offline" } },
-	{ name = "クエスト", sources = { "quest" } },
-	{ name = "ログイン", sources = { "login" } },
-	{ name = "プレイ時間", sources = { "playtime" } },
-	{ name = "フレンド", sources = { "friend" } },
-	{ name = "マップイベント", sources = { "mapevent" } },
-	{ name = "ギルドレベル", sources = { "guild" } },
-}
-
--- D-160 の目標（%）。04章 §13 の表の写し（マスターデータの rewardShareTargets はまだ無いので、比べるためにここに置く）
--- nil は「—」、true は「あり（比率は M7b-6）」
-Ledger.TARGETS = {
-	gold = { 65, 10, 5, 10, 5, 5, nil },
-	chests = { 70, 10, 5, 5, nil, 10, nil },
-	tickets = { 10, 45, 15, 5, nil, nil, 25 }, -- D-200：フレンドの5%はクエストへ
-	potions = { 50, 20, 20, nil, nil, 10, true },
+	{ key = "adventure", name = "冒険", sources = { "adventure", "offline" } },
+	{ key = "quest", name = "クエスト", sources = { "quest" } },
+	{ key = "login", name = "ログイン", sources = { "login" } },
+	{ key = "playtime", name = "プレイ時間", sources = { "playtime" } },
+	{ key = "friend", name = "フレンド", sources = { "friend" } },
+	{ key = "mapevent", name = "マップイベント", sources = { "mapevent" } },
+	{ key = "guild", name = "ギルドレベル", sources = { "guild" } },
 }
 
 local INBOX_SOURCE =
@@ -91,8 +84,8 @@ local function addItems(L: any, items: any, src: string | Weights)
 		if row then
 			if row.kind == "ticket" then
 				add(L, "tickets", src, n)
-			elseif string.sub(row.kind, 1, 6) == "potion" then
-				add(L, "potions", src, n)
+			elseif string.sub(row.kind, 1, 6) == "potion" then -- 指南書・手鏡・ロケット（D-255）
+				add(L, "tools", src, n)
 			end
 		end
 	end
@@ -260,6 +253,16 @@ function Ledger.raidSummary(L: any): any
 	end
 	table.sort(s.ratios)
 	return s
+end
+
+-- 列（D-160 の表）ごとの割合（%）を列の key で返す
+function Ledger.sharesByKey(totals: any, resources: { string }): ({ [string]: number }, number)
+	local list, all = Ledger.shares(totals, resources)
+	local out = {}
+	for i, c in Ledger.COLUMNS do
+		out[c.key] = list[i]
+	end
+	return out, all
 end
 
 -- 列（D-160 の表）ごとの割合（%）。resources は合わせて数える報酬の一覧

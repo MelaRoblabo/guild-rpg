@@ -1505,6 +1505,100 @@ local function validateMapEvents(c: Checker, d: any)
 	end
 end
 
+-- バランスの目標の表（MB。D-291〜D-296、src/data/BalanceTargets.luau）。ゲームの動きには使わない
+local BALANCE_SOURCES = { autoplay = true, sim = true }
+local BALANCE_JUDGES = { near = true, atLeast = true, atMost = true, share = true, baseline = true }
+local BALANCE_PROFILES = { light = true, core = true, heavy = true }
+local BALANCE_COLUMNS =
+	{ adventure = true, quest = true, login = true, playtime = true, friend = true, mapevent = true, guild = true }
+
+local function validateBalanceTargets(c: Checker, d: any)
+	local bt = d.BalanceTargets
+	if type(bt) ~= "table" then
+		c:error("BalanceTargets", "テーブルが必要")
+		return
+	end
+	c:integer("BalanceTargets.seeds", bt.seeds, 1)
+	local rows = bt.targets
+	if not c:array("BalanceTargets.targets", rows) then
+		return
+	end
+	c:uniqueIds("BalanceTargets.targets", rows, "bal_")
+	local dungeons = idSet(d.Dungeons)
+	for i, r in rows do
+		local p = `BalanceTargets.targets[{i}]`
+		if type(r.decision) ~= "string" or not string.find(r.decision, "^D%-%d+") then
+			c:error(p .. ".decision", "根拠の決定ID（D-xxx）が必要")
+		end
+		if type(r.name) ~= "string" or r.name == "" then
+			c:error(p .. ".name", "名前が必要")
+		end
+		if type(r.metric) ~= "string" or r.metric == "" then
+			c:error(p .. ".metric", "指標の名前が必要")
+		end
+		oneOf(c, p .. ".source", r.source, BALANCE_SOURCES)
+		oneOf(c, p .. ".judge", r.judge, BALANCE_JUDGES)
+		if r.source == "autoplay" then
+			if c:array(p .. ".profiles", r.profiles) then
+				for k, prof in r.profiles do
+					oneOf(c, `{p}.profiles[{k}]`, prof, BALANCE_PROFILES)
+				end
+			end
+			if r.friends ~= nil then
+				c:integer(p .. ".friends", r.friends, 0)
+			end
+		elseif r.profiles ~= nil or r.friends ~= nil then
+			c:error(p, "profiles・friends は source = autoplay のときだけ")
+		end
+		if r.byDungeon ~= nil and type(r.byDungeon) == "table" then
+			for id, v in r.byDungeon do
+				c:ref(`{p}.byDungeon`, id, dungeons)
+				c:number(`{p}.byDungeon.{id}`, v, 0)
+			end
+		end
+		if r.byProfile ~= nil and type(r.byProfile) == "table" then
+			for prof, v in r.byProfile do
+				oneOf(c, `{p}.byProfile`, prof, BALANCE_PROFILES)
+				c:number(`{p}.byProfile.{prof}`, v, 0)
+			end
+		end
+		if r.judge == "near" or r.judge == "atLeast" or r.judge == "atMost" then
+			if r.value == nil and r.byProfile == nil and r.byDungeon == nil then
+				c:error(p, "value・byProfile・byDungeon のどれかが必要")
+			elseif r.value ~= nil then
+				c:number(p .. ".value", r.value, 0)
+			end
+			if r.judge == "near" then
+				if r.tol == nil and r.tolAbs == nil then
+					c:error(p, "near には tol（割合）か tolAbs（絶対値）が必要")
+				end
+				if r.tol ~= nil then
+					c:number(p .. ".tol", r.tol, 0, 1)
+				end
+				if r.tolAbs ~= nil then
+					c:number(p .. ".tolAbs", r.tolAbs, 0)
+				end
+			end
+		elseif r.judge == "share" then
+			if type(r.columns) ~= "table" then
+				c:error(p .. ".columns", "入手先ごとの目標（%）が必要")
+			else
+				local sum = 0
+				for col, v in r.columns do
+					oneOf(c, `{p}.columns`, col, BALANCE_COLUMNS)
+					if c:number(`{p}.columns.{col}`, v, 0, 100) then
+						sum += v
+					end
+				end
+				if sum > 100 then
+					c:error(p .. ".columns", `合計が100を超える: {sum}`)
+				end
+			end
+			c:number(p .. ".tolPt", r.tolPt, 0, 100)
+		end
+	end
+end
+
 local function byId(rows: any): { [string]: any }
 	local m = {}
 	if type(rows) == "table" then
@@ -1593,6 +1687,7 @@ function MasterData.validate(data: any): { Issue }
 	validateRewardSources(c, data)
 	validateMapEvents(c, data)
 	validateEnglishNames(c, data)
+	validateBalanceTargets(c, data)
 	return c.issues
 end
 
@@ -1706,6 +1801,7 @@ function MasterData.load(data: any): any
 		playtimeRewards = data.PlaytimeRewards,
 		mapEventKinds = byId(data.MapEvents.kinds),
 		mapEventPlaces = data.MapEvents.places,
+		balanceTargets = data.BalanceTargets, -- ツール用（MB）
 	})
 end
 
