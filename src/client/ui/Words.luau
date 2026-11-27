@@ -76,6 +76,16 @@ local Words = {
 	oneWay = "One way", -- 商人までの片道
 	shopping = "Shopping", -- パーティが商人のところにいる
 	backIn = "Back in", -- パーティが帰るまで（水晶の祠の頭上の時計：D-304）
+	-- 日替わりの特性の効果（D-307：ダンジョンの面の絵の右下。%s は値）
+	dailyTrait = {
+		chestMult = "Chests ×%s",
+		expMult = "EXP ×%s",
+		atkPctPhysical = "Physical ATK +%s%%",
+		atkPctMagic = "Magic ATK +%s%%",
+		travelMult = "Travel −%s%%",
+	},
+	clear = "Clear!", -- ダンジョンを踏破して出るとき（D-307）
+	fail = "Fail...", -- 途中で撤退して出るとき（D-307）
 	unlock = "Unlock", -- ゴールドでダンジョンを先に解放する（D-279）
 	unlocked = "Unlocked", -- 解放できたときのハンコ（D-279・D-269）
 }

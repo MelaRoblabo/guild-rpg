@@ -328,6 +328,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				text = if s.merchant
 					then Words.merchant -- 商人へ（D-274）
 					elseif s.raid then Words.raidBoss -- レイドボスへ（D-275）
+					elseif s.rareSlot then Words.rareDungeon -- レアダンジョン（D-307）
 					elseif d then d.nameEn
 					else s.dungeonId,
 				size = 23,

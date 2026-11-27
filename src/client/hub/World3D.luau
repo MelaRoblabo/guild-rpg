@@ -21,6 +21,7 @@ local Chest = require("@game/ReplicatedStorage/Core/Chest")
 local Expedition = require("@game/ReplicatedStorage/Core/Expedition")
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
+local Motion = require("../ui/Motion")
 local Create = require("../ui/Create")
 local HubState = require("./HubState")
 local MapAmbience = require("./MapAmbience")
@@ -88,6 +89,8 @@ local handlers: Handlers? = nil
 local cartFolder: Folder? = nil
 local boardFolder: Instance? = nil
 local lastStatus: { [number]: any } = {}
+-- 探索中のパーティの結果と場所（ダンジョンから出たときに Clear!／Fail... を出す：D-307）
+local exploringResult: { [number]: { clear: boolean, place: BasePart } } = {}
 local exploringIn: { [BasePart]: boolean } = {} -- 中でパーティが探索中のダンジョン
 
 -- 跳ねているダンジョン：動かす模型（物の子）と元の位置、次の跳ねの時刻
@@ -489,6 +492,77 @@ function World3D.focusDungeon(id: string)
 	end
 end
 
+-- ダンジョンから出たときの結果のハンコ（D-307）：物の上に「Clear!」（金）か「Fail...」（赤）を、
+-- 共通のハンコの動き（D-269）で押して数秒見せる。踏破のときは金の光の粒も弾ける
+local RESULT_SECONDS = 2.6
+local function showResult(place: BasePart, clear: boolean)
+	local parent = boardFolder
+	if parent == nil then
+		return
+	end
+	local minV, maxV = boundsOf(place)
+	local c = (minV + maxV) / 2
+	local top = Vector3.new(c.X, maxV.Y, c.Z)
+	local anchor: Part = new("Part", {
+		Name = "ResultAnchor",
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		Transparency = 1,
+		Size = Vector3.new(0.2, 0.2, 0.2),
+		Position = top + Vector3.new(0, 4, 0),
+		Parent = Workspace,
+	})
+	local b: BillboardGui = new("BillboardGui", {
+		Name = "ResultStamp",
+		Adornee = anchor,
+		AlwaysOnTop = true,
+		Size = UDim2.fromOffset(240, 240),
+		Parent = parent,
+	})
+	local holder: Frame = new("Frame", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Parent = b,
+	})
+	Motion.stamp(
+		holder,
+		if clear then Words.clear else Words.fail,
+		if clear then Tokens.color.coinGold else Tokens.color.warnDark,
+		210
+	)
+	if clear and not Motion.reduced() then
+		local spark: ParticleEmitter = new("ParticleEmitter", {
+			Texture = "rbxasset://textures/particles/sparkles_main.dds",
+			Enabled = false,
+			Color = ColorSequence.new(Color3.fromRGB(255, 222, 130), Color3.fromRGB(255, 180, 80)),
+			LightEmission = 0.9,
+			Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0) }),
+			Lifetime = NumberRange.new(0.7, 1.3),
+			Speed = NumberRange.new(5, 11),
+			SpreadAngle = Vector2.new(180, 180),
+			Acceleration = Vector3.new(0, -4, 0),
+			Drag = 1.5,
+			Parent = anchor,
+		})
+		spark:Emit(36)
+	end
+	task.delay(RESULT_SECONDS, function()
+		b:Destroy()
+		anchor:Destroy()
+	end)
+end
+
+-- マップイベントの物（水晶の祠など）へ寄る（D-307）
+function World3D.focusEvent(kind: string, eventSlot: number)
+	local m = EventWorld.model(kind, eventSlot)
+	if m then
+		local p = m:GetPivot().Position
+		MapCamera.focus(Vector3.new(p.X, topY(), p.Z))
+	end
+end
+
 -- パーティの今いる所：移動中・帰り道は馬車（模型に入って隠れている間も、馬車の位置は毎フレーム動いている）、
 -- 探索中・商人のところは行き先の物、待機中はギルド
 local function partyPos(partyIndex: number): Vector3?
@@ -791,6 +865,21 @@ function World3D.refresh(view: any)
 	for _, party in view.parties or {} do
 		local i = party.index
 		local s = HubState.status(view, i)
+		-- ダンジョン（レアダンジョンを含む。商人・レイドは除く）から出たら結果のハンコ（D-307）
+		local prev = lastStatus[i]
+		if s.state == "exploring" and not s.merchant and not s.raid then
+			local e = Game.query.expeditionOf(view, i)
+			local place = destOf(e)
+			if e and place then
+				exploringResult[i] = { clear = e.log and e.log.result == "clear", place = place }
+			end
+		elseif prev and prev.state == "exploring" and exploringResult[i] then
+			local r = exploringResult[i]
+			showResult(r.place, r.clear)
+			exploringResult[i] = nil
+		else
+			exploringResult[i] = nil
+		end
 		lastStatus[i] = s
 		if s.state == "exploring" and s.dungeonId and not s.merchant and not s.rareSlot then
 			local d = dungeonObjs[s.dungeonId]

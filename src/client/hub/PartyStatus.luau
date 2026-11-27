@@ -23,6 +23,7 @@ export type Status = {
 	merchant: boolean?, -- 商人へ向かっている・とどまっている（D-274。行き先はダンジョンでなく商人の場所）
 	raid: boolean?, -- レイドボスへ（D-275。行き先はレイドボスの場所）
 	rareSlot: number?, -- レアダンジョンへの派遣ならその時間帯（D-304。行き先はダンジョンでなく水晶の祠の場所）
+	hpRatio: number?, -- メンバーの HP の合計 ÷ 最大 HP の合計（D-307：パーティ一覧の棒。まだ戦っていなければ 1、待機中は nil）
 }
 
 export type Progress = { phase: string, ratio: number, floorIndex: number? }
@@ -99,6 +100,7 @@ function PartyStatus.compute(
 	end
 	local hp = PartyStatus.hpAt(log, now)
 	s.hp = hp
+	s.hpRatio = 1
 	if hp then
 		local sum, total = 0, 0
 		for i, h in hp do
@@ -108,6 +110,9 @@ function PartyStatus.compute(
 			end
 			sum += math.max(h, 0)
 			total += m
+		end
+		if total > 0 then
+			s.hpRatio = sum / total
 		end
 		local low = pinchHpRatio ~= nil and total > 0 and sum / total < pinchHpRatio
 		-- 帰り道はもう戦わないので、ピンチの印は出さない（見る理由がない：D-214 ①）

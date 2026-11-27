@@ -6,6 +6,7 @@
 --   - 部品はすべて Roblox の帯より下に置く（D-219・D-225 ①）。
 
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Game = require("@game/ReplicatedStorage/Core/Game")
 local Components = require("../ui/Components")
@@ -42,7 +43,15 @@ local layer: Frame
 local listFrame: Frame
 -- 左の一覧の行：リーダーのアイコン（右上に動く状態の印）と名前（D-271）
 local rows: {
-	[number]: { button: TextButton, icon: Frame, name: TextLabel, pinch: Frame, ring: UIStroke, haul: TextButton },
+	[number]: {
+		button: TextButton,
+		icon: Frame,
+		name: TextLabel,
+		pinch: Frame,
+		ring: UIStroke,
+		haul: TextButton,
+		hp: Frame,
+	},
 } =
 	{}
 local newFaceBoard: BillboardGui? = nil -- ギルドの上の、全員が冒険中に雇った人の NEW の顔（D-265 ②）
@@ -172,7 +181,12 @@ local function mount3D()
 				and cur.open
 			then
 				PickMode.stop()
-				Nav.open("EventDepart", { slot = slot })
+				-- レアダンジョンは通常のダンジョンと同じ面（D-307）、レイドボスは出発の面
+				if cur.kind == "rareDungeon" then
+					Nav.open("DungeonPanel", { rareSlot = slot })
+				else
+					Nav.open("EventDepart", { slot = slot })
+				end
 			end
 		end,
 		-- 旅の商人（D-274）：向かうパーティを待っているなら出発の面、向かっている・着いているなら商人の面
@@ -305,7 +319,7 @@ local function rowFor(partyIndex: number)
 		xAlign = Enum.TextXAlignment.Left,
 	})
 	name.AutomaticSize = Enum.AutomaticSize.None
-	name.Position = UDim2.fromOffset(68, 20)
+	name.Position = UDim2.fromOffset(68, 10)
 	name.Size = UDim2.fromOffset(72, 26)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	name.ZIndex = 22
@@ -318,8 +332,8 @@ local function rowFor(partyIndex: number)
 		TextColor3 = C.warnDark,
 		BackgroundColor3 = C.ch10,
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -4, 1, -4),
-		Size = UDim2.fromOffset(28, 28),
+		Position = UDim2.fromOffset(62, 62), -- リーダーのアイコンの右下（右は HP の棒：D-307）
+		Size = UDim2.fromOffset(26, 26),
 		ZIndex = 24,
 		Visible = false,
 		[CHILDREN] = { Components.corner(14), Components.stroke(C.warnDark, 2) },
@@ -379,7 +393,26 @@ local function rowFor(partyIndex: number)
 	haul.Activated:Connect(function()
 		openHaul(partyIndex)
 	end)
-	r = { button = button, icon = icon, name = name, pinch = pinch, ring = ring, haul = haul }
+	-- パーティの HP の棒（D-307：名前の下。メンバーの HP の合計 ÷ 最大 HP の合計。戦闘中にどのパーティが大変かを見る）
+	local hpTrack: Frame = new("Frame", {
+		Name = "Hp",
+		Position = UDim2.fromOffset(68, 42),
+		Size = UDim2.fromOffset(74, 12),
+		BackgroundColor3 = C.barTrack,
+		ZIndex = 22,
+		[CHILDREN] = { Components.corner(6) },
+		Parent = button,
+	})
+	local hpFill: Frame = new("Frame", {
+		Name = "Fill",
+		Position = UDim2.fromOffset(2, 2),
+		Size = UDim2.new(1, -4, 1, -4),
+		BackgroundColor3 = C.statHp,
+		ZIndex = 23,
+		[CHILDREN] = { Components.corner(4) },
+		Parent = hpTrack,
+	})
+	r = { button = button, icon = icon, name = name, pinch = pinch, ring = ring, haul = haul, hp = hpFill }
 	rows[partyIndex] = r
 	return r
 end
@@ -747,6 +780,15 @@ local function refreshMoving(view: any)
 		local leaderName = PartyIcon.name(view, i)
 		r.name.Text = (string.gsub(leaderName, "'s Party$", ""))
 		r.pinch.Visible = s.pinch
+		-- HP の棒（D-307）。減ったときは少しずつ縮める。色はパーティの面のメンバーの HP と同じ（ピンチなら赤）
+		local ratio = math.clamp(s.hpRatio or 1, 0, 1)
+		if r.hp:GetAttribute("Ratio") ~= ratio then
+			r.hp:SetAttribute("Ratio", ratio)
+			TweenService:Create(r.hp, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {
+				Size = UDim2.new(ratio, -4 * ratio, 1, -4),
+			}):Play()
+		end
+		r.hp.BackgroundColor3 = if s.pinch then C.dangerRed else C.statHp
 		r.ring.Transparency = if HubState.selected == i then 0 else 1
 		-- 待機（Zzz）になったら帰還の獲得の吹き出し（D-287）。自動再派遣の間は出さず、止まって帰ったときに合算で出す
 		local showHaul = s.state == "waiting" and party.haul ~= nil

@@ -132,6 +132,17 @@ return function(t)
 			expect(MapLayout.cameraX(2000, 1280, 4000)).toBe(2000 - 640)
 		end)
 	end)
+	describe("D-307 パーティ一覧の HP の棒", function()
+		it(
+			"D-307 メンバーの HP の合計 ÷ 最大 HP の合計。まだ戦っていなければ 1、待機中は nil",
+			function()
+				local e = makeExpedition({ { 50, 100, 0, 50 } })
+				expect(PartyStatus.compute(e, 1050, Expedition.progressAt, MAX, 0.3).hpRatio).toBe(1)
+				expect(PartyStatus.compute(e, 1125, Expedition.progressAt, MAX, 0.3).hpRatio).toBe(0.5)
+				expect(PartyStatus.compute(nil, 1125, Expedition.progressAt, MAX, 0.3).hpRatio).toBe(nil)
+			end
+		)
+	end)
 	describe("D-304 レアダンジョンへのパーティは行き先が水晶の祠", function()
 		it("D-304 宝箱の山が special:rare: の派遣だけ、その時間帯を rareSlot に持つ", function()
 			local e = makeExpedition({})

@@ -10,7 +10,11 @@
 --      前のダンジョンが解放済みで、ゴールドが足りるときだけ押せる。押せないときも押せて、理由の吹き出し2秒（D-264）。
 --      解放できたらハンコ（D-269）を押して、同じ面を ② の形で作り直す（そのまま Go できる）。
 --   攻略ヒント（D-250 ③）：Foes＝多い種族（英語の短い語を多い順、一番多いものは濃い縁）、Traps＝罠Lv の2行だけ。
---   派遣費は出さない（D-163）。マップイベント（レアダンジョン・レイド）の面は ④ の画面で作る。
+--   派遣費は出さない（D-163）。レイドの面は ④ の画面（EventDepart）で作る。
+--   レアダンジョン（D-307）：地図の水晶の祠を触ると、② と同じ形で開く（params.rareSlot）。題は Rare Dungeon、絵は専用の背景、
+--     攻略ヒントは強さの基準のダンジョン（D-187）。絵の左上に締め切りまでの時計。Go → 待機中のパーティ（出発済みは除く）→ DispatchEvent。
+--     締め切ったら閉じる。
+--   日替わり（D-307）：今日の特性が付いているダンジョンは、絵の右下に太陽と効果（Chests ×1.5 など）を出す。レアダンジョンには出さない（D-187）。
 
 local AutoEquip = require("@game/ReplicatedStorage/Core/AutoEquip")
 local ExclusiveGift = require("@game/ReplicatedStorage/Core/ExclusiveGift")
@@ -109,7 +113,7 @@ local function label(parent: GuiObject, order: number, text: string, size: numbe
 end
 
 -- 中の背景の絵（D-282）。locked は暗く沈める（色相は茶のまま：D-222）
-local function artFrame(parent: GuiObject, d: any, locked: boolean): Frame
+local function artFrame(parent: GuiObject, d: any, locked: boolean, image: string?): Frame
 	local f: Frame = new("Frame", {
 		Name = "Art",
 		LayoutOrder = 0,
@@ -119,7 +123,7 @@ local function artFrame(parent: GuiObject, d: any, locked: boolean): Frame
 		[CHILDREN] = { Components.corner(8) },
 		Parent = parent,
 	})
-	local img = Art.put(f, Art.background(d.id), { scaleType = Enum.ScaleType.Crop, zIndex = f.ZIndex + 1 })
+	local img = Art.put(f, image or Art.background(d.id), { scaleType = Enum.ScaleType.Crop, zIndex = f.ZIndex + 1 })
 	if img then
 		img.Name = "Bg"
 		if locked then
@@ -154,8 +158,39 @@ local function artFrame(parent: GuiObject, d: any, locked: boolean): Frame
 	return f
 end
 
+-- 絵の上に重ねる札（左上の時計・右下の日替わり）。絵の中の物より上に出す
+local function onArt(art: Frame, g: GuiObject)
+	g.ZIndex = art.ZIndex + 5
+	for _, x in g:GetDescendants() do
+		if x:IsA("GuiObject") then
+			x.ZIndex = art.ZIndex + 6
+		end
+	end
+	g.Parent = art
+end
+
+-- 日替わりの特性の効果の語（D-307）。値は「×1.5」「+20%」「−30%」の形
+local function traitText(trait: any): string?
+	local fmt = Words.dailyTrait[trait.effect]
+	if fmt == nil then
+		return nil
+	end
+	local v = trait.value
+	local shown = if trait.effect == "travelMult"
+		then (1 - v) * 100
+		elseif trait.effect == "atkPctPhysical" or trait.effect == "atkPctMagic" then v * 100
+		else v
+	return string.format(fmt, string.format("%g", math.floor(shown * 100 + 0.5) / 100))
+end
+
 local function build(params: any?, api: Nav.Api): Nav.Built
-	local dungeonId = (params :: any).dungeonId :: string
+	local rareSlot = (params :: any).rareSlot :: number?
+	local dungeonId = ((params :: any).dungeonId or "") :: string
+	if rareSlot then
+		-- レアダンジョン（D-307）：攻略ヒントは強さの基準のダンジョン（D-187）
+		local v = Session.view
+		dungeonId = if v then Game.query.rareDungeon(v, rareSlot, master).dungeonId else ""
+	end
 	local d = master.dungeons[dungeonId]
 	local band = Root.bandBottom()
 	local frame: Frame = new("Frame", {
@@ -183,7 +218,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local choosing = false -- Go の後に出す待機のパーティの一覧（D-272）
 	local render: () -> ()
 	-- ダンジョンを選んだときは、カメラがそのダンジョンへ寄って旋回する（メニューから開いたときも：D-270 ⑤）
-	World3D.focusDungeon(dungeonId)
+	if rareSlot then
+		World3D.focusEvent("rareDungeon", rareSlot)
+	else
+		World3D.focusDungeon(dungeonId)
+	end
 
 	render = function()
 		body:ClearAllChildren()
@@ -191,10 +230,17 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		if view == nil or d == nil then
 			return
 		end
-		local unlocked = view.unlockedDungeons and view.unlockedDungeons[dungeonId] == true
+		local unlocked = rareSlot ~= nil or (view.unlockedDungeons and view.unlockedDungeons[dungeonId] == true)
 		local fromParty = PickMode.partyIndex
-		if fromParty and HubState.status(view, fromParty).state ~= "waiting" then
+		if rareSlot or (fromParty and HubState.status(view, fromParty).state ~= "waiting") then
 			fromParty = nil
+		end
+		-- レアダンジョンに出発済みのパーティ（1パーティ1回まで：D-152）
+		local joined: { [number]: boolean } = {}
+		if rareSlot then
+			for _, i in Game.query.rareDungeon(view, rareSlot, master).joined do
+				joined[i] = true
+			end
 		end
 		local mode = if not unlocked then "locked" elseif fromParty then "party" else "map"
 
@@ -212,7 +258,10 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		local panel, content = Components.panel({
 			size = UDim2.fromOffset(PANEL_W, panelH),
 			position = UDim2.fromOffset(PANEL_X, band + 44),
-			title = if mode == "locked" then { roman(d), d.nameEn, "@locked" } else roman(d) .. "  " .. d.nameEn,
+			title = if rareSlot
+				then Words.rareDungeon
+				elseif mode == "locked" then { roman(d), d.nameEn, "@locked" }
+				else roman(d) .. "  " .. d.nameEn,
 		})
 		panel.Name = "Panel"
 		panel.Parent = body
@@ -224,7 +273,32 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 		new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = content })
 
 		-- 中の背景の絵（D-282）
-		local art = artFrame(content, d, mode == "locked")
+		local art = artFrame(content, d, mode == "locked", if rareSlot then Art.rareDungeonBackground() else nil)
+		if rareSlot then
+			-- 左上：締め切りまでの時計（下の時計の処理で書き換える）
+			local timer = Components.chip("@time", "", C.bronzeHi)
+			timer.Name = "Timer"
+			timer.Position = UDim2.fromOffset(8, 8)
+			onArt(art, timer)
+		else
+			-- 右下：日替わりの特性（太陽・金：D-162）
+			for _, dt in Game.query.dailyTraits(Session.now(), master).today do
+				local trait = if dt.dungeonId == dungeonId then master.dailyTraits[dt.traitId] else nil
+				local text = if trait then traitText(trait) else nil
+				if text then
+					local chip = Components.chip("@daily", text, C.coinGold)
+					chip.Name = "Daily"
+					chip.AnchorPoint = Vector2.new(1, 1)
+					chip.Position = UDim2.new(1, -8, 1, -8)
+					local st = chip:FindFirstChildOfClass("UIStroke")
+					if st then
+						st.Color = C.coinGold
+						st.Thickness = 3
+					end
+					onArt(art, chip)
+				end
+			end
+		end
 
 		-- 攻略ヒント（D-048。初めての人に読める2行だけ：D-250 ③）
 		local hint: Frame = new("Frame", {
@@ -336,7 +410,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			-- ② マップから：ボタンは Go だけ（D-282）。押すと待機のパーティの一覧を出す（D-272）
 			local waiting = {}
 			for _, party in view.parties or {} do
-				if HubState.status(view, party.index).state == "waiting" then
+				if HubState.status(view, party.index).state == "waiting" and not joined[party.index] then
 					local members = 0
 					for _, uid in party.slots do
 						if view.adventurers[uid] then
@@ -427,8 +501,11 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 							return
 						end
 						busy = true
-						local r =
-							Session.sendAndWait({ type = "Dispatch", partyIndex = w.index, dungeonId = dungeonId })
+						local r = Session.sendAndWait(
+							if rareSlot
+								then { type = "DispatchEvent", partyIndex = w.index, eventSlot = rareSlot }
+								else { type = "Dispatch", partyIndex = w.index, dungeonId = dungeonId }
+						)
 						busy = false
 						choosing = false
 						if r and r.ok then
@@ -465,7 +542,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 				},
 				Parent = art,
 			})
-			local function onArt(g: GuiObject)
+			local function raise(g: GuiObject)
 				g.ZIndex = art.ZIndex + 5
 				for _, x in g:GetDescendants() do
 					if x:IsA("GuiObject") then
@@ -473,13 +550,13 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 					end
 				end
 			end
-			onArt(label(cond, 1, "@locked", 48, C.inkLight))
+			raise(label(cond, 1, "@locked", 48, C.inkLight))
 			if prev then
-				onArt(label(cond, 2, "→", 30, C.inkLight))
+				raise(label(cond, 2, "→", 30, C.inkLight))
 				local circle = WarehouseCommon.pill("✓", roman(prev), 23)
 				circle.LayoutOrder = 3
 				circle.Parent = cond
-				onArt(circle)
+				raise(circle)
 			end
 			-- 金の Unlock と金額（D-279）。前のダンジョンが解放済みで、ゴールドが足りるときだけ押せる
 			local price = (d :: any).unlockGold :: number?
@@ -537,6 +614,7 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 	local function keyOf(view: any): string
 		local parts = {
 			tostring(view.unlockedDungeons and view.unlockedDungeons[dungeonId]),
+			if rareSlot then table.concat(Game.query.rareDungeon(view, rareSlot, master).joined, ",") else "",
 			tostring(view.unlockedDungeons and d and d.unlockAfterClear and view.unlockedDungeons[d.unlockAfterClear]),
 			tostring(view.gold),
 			tostring(PickMode.partyIndex),
@@ -561,11 +639,42 @@ local function build(params: any?, api: Nav.Api): Nav.Built
 			render()
 		end
 	end)
+	-- レアダンジョン：左上の時計を書き換え、締め切ったら閉じる（D-307）
+	local alive = true
+	if rareSlot then
+		task.spawn(function()
+			while alive do
+				local view = Session.view
+				local cur = if view then Game.query.mapEvent(Session.now(), master, view).current else nil
+				if cur == nil or not cur.open or cur.kind ~= "rareDungeon" or cur.eventSlot ~= rareSlot then
+					api.close()
+					return
+				end
+				local timer = body:FindFirstChild("Timer", true)
+				if timer then
+					local labels = {}
+					for _, c in timer:GetChildren() do
+						if c:IsA("TextLabel") then
+							table.insert(labels, c)
+						end
+					end
+					local left = math.max(0, math.ceil(cur.closesIn or 0))
+					local lbl = labels[2]
+					if lbl then
+						lbl.Text = string.format("%s %d:%02d", Words.leavesIn, left // 60, left % 60)
+						lbl.TextColor3 = if left <= master.K.mapEventEndingSeconds then C.warn else C.inkLight
+					end
+				end
+				task.wait(0.25)
+			end
+		end)
+	end
 	return {
 		frame = frame,
 		scrim = 0.5, -- 後ろの暗幕は 50%（D-225 ③）
 		passThrough = true, -- 開いたままでも 3D マップのカメラを動かせる（D-270）
 		destroy = function()
+			alive = false
 			conn.disconnect()
 		end,
 	}

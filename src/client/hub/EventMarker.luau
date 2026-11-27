@@ -125,6 +125,8 @@ function EventMarker.mount(getPlace: (number) -> BasePart?, parentGui: Instance)
 		end
 		if ev.kind == "merchant" then
 			Nav.open("Merchant", { slot = ev.eventSlot })
+		elseif ev.kind == "rareDungeon" then
+			Nav.open("DungeonPanel", { rareSlot = ev.eventSlot }) -- 通常のダンジョンと同じ面（D-307）
 		else
 			Nav.open("EventDepart", { slot = ev.eventSlot })
 		end
